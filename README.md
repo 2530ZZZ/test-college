@@ -1,7 +1,17 @@
 project/
-├── main.py                  # 主入口，调度整个流程
-├── collector.py             # GitHub 搜索、仓库处理、文件树遍历
-├── parsers.py               # 节点提取器集合（策略模式）
-├── proxy_model.py           # 统一数据模型 StandardProxy
-├── utils.py                 # 工具函数（safe_get、base64解码、超时装饰器等）
-└── .github/workflows/collect.yml  # GitHub Actions 工作流
+
+├── config.py            # 测速参数
+
+├── tester.py            # 测速模块
+
+├── proxy_model.py       # 统一数据模型（已有）
+
+├── parsers.py           # 解析器（已有）
+
+├── utils.py             # 工具函数（已有）
+
+├── collector.py         # 搜集模块（已有）
+
+├── main.py              # 入口，调用搜集 + 测速
+
+└── .github/workflows/collect.yml
