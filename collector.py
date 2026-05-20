@@ -1,8 +1,7 @@
 """
 GitHub 节点收集器 —— 负责搜索仓库、遍历文件树、提取节点。
-采用类封装，消除全局变量，保留黑名单、SHA 缓存（仓库+文件）、分片等全部功能。
-新增文件级别缓存（dr_commit_cache.txt），避免24小时内重复处理相同文件。
-所有缓存均带时间戳，最终清理24小时前的旧记录，防止文件无限膨胀。
+采用类封装，保留黑名单、仓库 SHA 缓存、文件 SHA 缓存、分片等全部功能。
+现已适配新版 parsers.py，直接产出 StandardProxy 并转为去重字符串集合。
 """
 
 import os
@@ -14,7 +13,7 @@ from email.utils import parsedate_to_datetime
 
 import utils
 from utils import safe_get, now_str, timeout_decorator, beijing_tz
-from parsers import extract_raw_links, parse_line
+from parsers import extract_and_parse          # 新解析器：一次调用完成提取+解析
 from proxy_model import StandardProxy
 
 
@@ -34,16 +33,16 @@ class Collector:
         self.queries = queries or []
 
         # 状态变量
-        self.all_links: List[str] = []                     # 本次收集到的所有源文件链接
-        self.unique_nodes: Set[str] = set()                # 去重后的节点 raw_link 集合
+        self.all_links: List[str] = []                     # 本次收集到的所有源文件 raw URL
+        self.unique_nodes: Set[str] = set()                # 去重后的节点字符串（raw_link 或 json）
         self.seen_repos: Set[str] = set()                  # 已检查过的仓库（避免重复处理）
         self.blacklist_repos: Set[str] = set()             # 永久黑名单仓库
         self.checked_count: int = 0                        # 已检查仓库总数
 
         # 缓存：仓库 + 文件
-        # repo_commit_cache: key = GitHub 仓库完整URL, value = (commit_sha, last_update_utc)
+        # repo_cache: key = GitHub 仓库完整URL, value = (commit_sha, last_update_utc)
         self.repo_cache: Dict[str, Tuple[str, datetime]] = {}
-        # file_commit_cache: key = 文件 raw URL, value = (commit_sha, last_processed_utc)
+        # file_cache: key = 文件 raw URL, value = (commit_sha, last_processed_utc)
         self.file_cache: Dict[str, Tuple[str, datetime]] = {}
 
         # 加载持久化数据
@@ -65,7 +64,10 @@ class Collector:
         self.save_results()
 
         elapsed = time.time() - start_time
-        print(f"[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f} 秒", flush=True)
+        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f} 秒", flush=True)
+        print(f"  检查仓库数: {self.checked_count}")
+        print(f"  收集到源链接数: {len(self.all_links)}")
+        print(f"  去重节点总数: {len(self.unique_nodes)}")
 
     def search_query(self, query: str, max_pages: int = 10):
         """对单个关键词进行多页搜索"""
@@ -187,12 +189,12 @@ class Collector:
             # ---------- 获取该条目的最近 commit 时间 ----------
             file_time = None
             time_source = None
+            file_commit_sha = None
 
             # 方法1：通过 Commits API 获取
             commit_url = f"https://api.github.com/repos/{repo}/commits?path={item_path}&per_page=1"
             c_resp = safe_get(commit_url, self.headers, timeout=(8, 12),
                               operation_name=f"commit 查询 {item_path}")
-            file_commit_sha = None
             if c_resp and c_resp.status_code == 200:
                 try:
                     commit_list = c_resp.json()
@@ -246,36 +248,26 @@ class Collector:
                 file_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{item_path}"
                 # ---------- 文件缓存检查 ----------
                 if file_commit_sha is not None:
-                    # 若文件缓存中已有相同 sha 且时间在 24 小时内，跳过
                     if file_url in self.file_cache:
                         cached_sha, cached_time = self.file_cache[file_url]
                         if (cached_sha == file_commit_sha and
                                 datetime.now(timezone.utc) - cached_time < timedelta(hours=24)):
                             print(f"   ⏭️ 跳过文件 {file_url}：文件缓存命中（{file_commit_sha[:7]}）", flush=True)
                             continue
-                else:
-                    # 如果没有 commit sha（通过 Last-Modified 确定时间），
-                    # 为避免重复下载，也记录一个缓存，使用内容的 hash？
-                    # 这里简单处理：如果有 Last-Modified 但没有 commit sha，仍进行下载，
-                    # 但后续可以改进。
-                    pass
-
-                # 下载并提取节点
+                # 下载文件并提取节点
                 print(f"   🔍 检查文件: {file_url}", flush=True)
                 file_resp = safe_get(file_url, self.headers, timeout=(10, 30))
                 if not file_resp:
                     continue
 
-                # 提取原始节点行
-                raw_lines = extract_raw_links(file_resp.text)
+                # 使用新解析器一次性提取并解析
+                proxies = extract_and_parse(file_resp.text, source_url=file_url)
                 new_nodes = []
-                for line in raw_lines:
-                    proxy = parse_line(line)
-                    if proxy:
-                        node_str = proxy.to_node_line()
-                        if node_str not in self.unique_nodes:
-                            self.unique_nodes.add(node_str)
-                            new_nodes.append(node_str)
+                for proxy in proxies:
+                    node_str = proxy.to_node_line()
+                    if node_str not in self.unique_nodes:
+                        self.unique_nodes.add(node_str)
+                        new_nodes.append(node_str)
 
                 if new_nodes:
                     self.all_links.append(file_url)
@@ -311,14 +303,12 @@ class Collector:
                     if len(parts) >= 2:
                         url = parts[0]
                         sha = parts[1]
-                        # 读取时间戳（如果存在）
                         timestamp = None
                         if len(parts) >= 3:
                             try:
                                 timestamp = datetime.fromisoformat(parts[2])
                             except ValueError:
                                 pass
-                        # 兼容旧格式：若无时间戳，设为很早的时间，让其在清理中被淘汰
                         if timestamp is None:
                             timestamp = datetime.min.replace(tzinfo=timezone.utc)
                         if url.startswith("https://github.com/"):
@@ -381,7 +371,7 @@ class Collector:
                 f.write("\n".join(self.unique_nodes))
             print(f"\n[{now_str()}] 已保存 {len(self.unique_nodes)} 条节点到 no.txt", flush=True)
 
-        # 2. 分片到 no/ 文件夹
+        # 2. 分片到 no/ 文件夹，生成 no_w_li.txt
         no_dir = "no"
         if os.path.exists(no_dir):
             shutil.rmtree(no_dir)
