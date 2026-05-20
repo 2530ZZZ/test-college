@@ -26,8 +26,11 @@ SS_URI_RE = re.compile(
 BASE64_RE = re.compile(r'[A-Za-z0-9+/=]{100,}')
 # Markdown 代码块
 CODE_BLOCK_RE = re.compile(r'(?:```(?:[\w]*)\n?)([\s\S]*?)(?:\n?```)|`([^`\n]+)`')
-# Clash 单行 YAML 代理
+# Clash 单行 YAML 代理 (大括号格式: - { name: ... })
 CLASH_SINGLE_RE = re.compile(r'-\s*\{[^}]*?(?:name|server|port|type|uuid|password|ps|flow)[^}]*\}', re.DOTALL)
+# --- 修复：用于拆分单行 YAML 节点的新正则表达式 ---
+# 匹配以 "- name:" 或 "- " 开头的行，并匹配到下一个 "- " 或字符串末尾
+CLASH_SINGLE_YAML_RE = re.compile(r'(?:^|\n)\s*(-\s+name:.*?)(?=\n\s*-|\Z)', re.DOTALL)
 # Clash 多行 YAML 代理 (直到下一个 - name: 或文件结尾)
 CLASH_MULTI_RE = re.compile(r'-\s*name:.*?(?=-\s*name:|\Z)', re.DOTALL)
 # JSON 格式 proxies/outbounds 提取
@@ -60,29 +63,33 @@ def extract_raw_candidates(text: str) -> List[str]:
     for ss in SS_URI_RE.findall(text):
         candidates.append(ss)
 
-    # 4. Clash YAML 单行代理
+    # 4. Clash YAML 单行代理 (大括号格式)
     for m in CLASH_SINGLE_RE.findall(text):
         clean = re.sub(r'\s+', ' ', m.strip())
         if len(clean) > 40:
             candidates.append(clean)
 
-    # 5. Clash YAML 多行代理
+    # 5. Clash YAML 多行代理 (传统的多行格式)
     for m in CLASH_MULTI_RE.findall(text):
+        clean = re.sub(r'\s+', ' ', m.strip())
+        # 只有当它看起来像是一个多行块时才添加，避免误判
+        if '\n' in m and len(clean) > 30 and ('server:' in clean or 'type:' in clean):
+            candidates.append(clean)
+
+    # 5.1. --- 新增：提取单行 YAML 节点 ---
+    # 匹配以 "- name:" 开头的行，直到下一个 "- " 或字符串末尾
+    for m in CLASH_SINGLE_YAML_RE.findall(text):
         clean = re.sub(r'\s+', ' ', m.strip())
         if len(clean) > 30 and ('server:' in clean or 'type:' in clean):
             candidates.append(clean)
 
     # 6. JSON 格式的 proxies/outbounds 数组
     for arr in JSON_PROXY_ARRAY_RE.findall(text):
-        # 分割 JSON 对象
         for obj in re.findall(r'\{[\s\S]*?\}', arr):
-            # 尝试解析为 dict，若失败则保留原字符串
             try:
                 proxy_dict = json.loads(obj)
-                # 如果是标准 JSON 代理，直接序列化回去（保持统一）
                 candidates.append(json.dumps(proxy_dict, ensure_ascii=False))
             except Exception:
-                # 不完整的 JSON 片段，尝试清理后保留
                 clean_obj = re.sub(r'\s+', ' ', obj.strip())
                 if any(k in clean_obj.lower() for k in ['server', 'port', 'type', 'uuid']):
                     candidates.append(clean_obj)
@@ -91,7 +98,6 @@ def extract_raw_candidates(text: str) -> List[str]:
     try:
         config = json.loads(text)
         if isinstance(config, dict):
-            # 提取 proxies / outbounds
             for key in ('proxies', 'outbounds'):
                 if key in config and isinstance(config[key], list):
                     for item in config[key]:
@@ -123,19 +129,24 @@ def parse_single_line(line: str) -> Optional[StandardProxy]:
     if not line:
         return None
 
-    # 尝试判断格式
     lower = line.lower()
     # 标准 URI 链接
     if any(lower.startswith(f'{p}://') for p in ('vmess', 'vless', 'trojan', 'ss', 'ssr',
                                                   'hysteria', 'hysteria2', 'hy2', 'tuic',
                                                   'reality', 'wireguard', 'sing-box')):
         return parse_uri(line)
-    # Clash YAML 单行对象
+    # Clash YAML 单行对象 (大括号)
     if line.startswith('- {') and ('name' in lower or 'type' in lower):
         return parse_clash_single(line)
-    # Clash 多行代理片段
+    # --- 修复：区分单行和多行 Clash YAML ---
+    # 如果看起来像是一个YAML节点（以 "- name:" 开头），先检查它是否包含换行符
     if line.startswith('- name:') and ('server:' in lower or 'type:' in lower):
-        return parse_clash_multi(line)
+        if '\n' in line:
+            # 包含换行符，仍然尝试作为多行块处理
+            return parse_clash_multi(line)
+        else:
+            # 不包含换行符，直接作为单行解析
+            return parse_clash_multi(line)  # parse_clash_multi 内部的正则已修复
     # JSON 对象
     if line.startswith('{') and ('server' in lower or 'type' in lower):
         try:
@@ -162,13 +173,11 @@ def parse_raw_link(raw: str) -> Optional[StandardProxy]:
 def parse_uri(uri: str) -> Optional[StandardProxy]:
     """解析 vmess://, vless://, trojan://, ss://, hysteria2:// 等 URI"""
     try:
-        # 分割协议和其余部分
         protocol, rest = uri.split('://', 1)
         protocol = protocol.lower()
         proxy = StandardProxy(protocol=protocol, raw_link=uri)
 
         if protocol == 'vmess':
-            # vmess 链接是 base64 编码的 JSON
             decoded = safe_base64_decode(rest)
             if decoded:
                 try:
@@ -184,15 +193,10 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
                 except Exception:
                     pass
         elif protocol in ('vless', 'trojan'):
-            # vless://uuid@server:port?params#remark
-            # trojan://password@server:port?params#remark
-            # 分离出 用户信息、主机端口、参数、备注
-            # 1. 去掉备注
             note = ''
             if '#' in rest:
                 rest, note = rest.split('#', 1)
                 proxy.remark = urllib.parse.unquote(note)
-            # 2. 分离参数部分
             params = {}
             if '?' in rest:
                 rest, query = rest.split('?', 1)
@@ -200,13 +204,11 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
                     if '=' in item:
                         k, v = item.split('=', 1)
                         params[k] = v
-            # 3. 分离用户信息和主机端口
             if '@' in rest:
                 userinfo, hostport = rest.split('@', 1)
                 proxy.uuid = urllib.parse.unquote(userinfo)
             else:
                 hostport = rest
-            # 4. 解析主机和端口
             if '[' in hostport and ']' in hostport:  # IPv6
                 host, port_part = hostport.rsplit(':', 1)
             else:
@@ -218,7 +220,6 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
                     port_part = '443'
             proxy.server = host
             proxy.port = int(port_part)
-            # 5. 参数解析
             proxy.transport = params.get('type', 'tcp')
             proxy.security = params.get('security', 'none')
             proxy.sni = params.get('sni', '')
@@ -226,14 +227,11 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
             if not proxy.remark and proxy.server:
                 proxy.remark = f"{protocol}-{proxy.server}:{proxy.port}"
         elif protocol == 'ss':
-            # ss://base64(method:password)@server:port?plugin=...
-            # 去掉备注
             note = ''
             rest_no_note = rest
             if '#' in rest:
                 rest_no_note, note = rest.split('#', 1)
                 proxy.remark = urllib.parse.unquote(note)
-            # 分离参数
             params = {}
             if '?' in rest_no_note:
                 rest_no_note, query = rest_no_note.split('?', 1)
@@ -241,22 +239,18 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
                     if '=' in item:
                         k, v = item.split('=', 1)
                         params[k] = v
-            # 处理用户信息部分（可能经过 base64 编码）
             if '@' in rest_no_note:
                 userinfo, hostport = rest_no_note.split('@', 1)
-                # userinfo 一般是 base64(method:password)
                 decoded_userinfo = safe_base64_decode(userinfo)
                 if decoded_userinfo and ':' in decoded_userinfo:
                     method, pwd = decoded_userinfo.split(':', 1)
                     proxy.security = method
                     proxy.uuid = pwd
                 else:
-                    # 可能是明文
                     if ':' in userinfo:
                         proxy.security, proxy.uuid = userinfo.split(':', 1)
             else:
                 hostport = rest_no_note
-            # 解析主机端口
             if '[' in hostport and ']' in hostport:
                 host, port_part = hostport.rsplit(':', 1)
             else:
@@ -268,35 +262,26 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
                     port_part = '8388'
             proxy.server = host
             proxy.port = int(port_part)
-            # 插件参数
             if 'plugin' in params:
                 plugin_info = urllib.parse.unquote(params['plugin'])
                 if ';' in plugin_info:
                     plugin_name, plugin_opts = plugin_info.split(';', 1)
-                    # 简化：记录 transport 为 plugin 名
                     proxy.transport = plugin_name
-                    # 实际插件参数可能包含 obfs, tls 等，这里不深入
         elif protocol == 'ssr':
-            # ssr:// 为 base64 编码的复杂结构，暂时保留 raw_link 并尝试解码
             decoded = safe_base64_decode(rest)
             if decoded:
-                # 格式 server:port:protocol:method:obfs:password_base64?...
                 parts = decoded.split(':')
                 if len(parts) >= 6:
                     proxy.server = parts[0]
                     proxy.port = int(parts[1])
                     proxy.transport = parts[2]
                     proxy.security = parts[3]
-                    # 密码为 base64 编码
                     pwd_raw = parts[5].split('/?')[0].split('&')[0] if '?' in parts[5] else parts[5]
                     pwd_decoded = safe_base64_decode(pwd_raw)
                     proxy.uuid = pwd_decoded or pwd_raw
-                    # 备注
                     if '#' in uri:
                         proxy.remark = urllib.parse.unquote(uri.split('#')[1])
         elif protocol in ('hysteria', 'hysteria2', 'hy2'):
-            # hysteria://password@server:port?params#remark
-            # 类似 trojan
             note = ''
             if '#' in rest:
                 rest, note = rest.split('#', 1)
@@ -325,9 +310,8 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
             proxy.server = host
             proxy.port = int(port_part)
             proxy.sni = params.get('sni', '')
-            proxy.tls = True  # hysteria 默认 TLS
+            proxy.tls = True
         elif protocol == 'tuic':
-            # tuic://uuid:password@server:port?params#remark
             note = ''
             if '#' in rest:
                 rest, note = rest.split('#', 1)
@@ -344,7 +328,6 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
                 if ':' in userinfo:
                     uid, pwd = userinfo.split(':', 1)
                     proxy.uuid = uid
-                    # TUIC 密码通常就是第二个部分
                     proxy.security = pwd
             else:
                 hostport = rest
@@ -362,38 +345,22 @@ def parse_uri(uri: str) -> Optional[StandardProxy]:
             proxy.sni = params.get('sni', '')
             proxy.tls = True
         elif protocol == 'reality':
-            # vless 的一种，但具有 reality 特性，格式类似 vless
-            # vless://uuid@server:port?type=tcp&security=reality&...
-            # 直接复用 vless 解析
             return parse_uri(uri.replace('reality://', 'vless://'))
         elif protocol == 'wireguard':
-            # wireguard 通常以配置文件形式，URI 较少见
-            pass
-        # 补齐其他协议...
-
-        # 如果 server 为空，则尝试从 raw_link 进一步提取（兜底）
-        if not proxy.server:
-            # 简单尝试从 remark 或 link 猜测
             pass
 
         return proxy
     except Exception as e:
-        # 解析失败，至少返回包含 raw_link 的基础对象
         return StandardProxy(raw_link=uri, protocol=uri.split('://')[0])
 
 
 def parse_clash_single(line: str) -> Optional[StandardProxy]:
     """解析 Clash 单行 YAML 代理 - {name: xx, server: xx, type: vless, ...}"""
     try:
-        # 尝试将其转为 JSON 处理
-        obj_str = line.strip()[1:].strip()  # 移除开头的 '-'
-        # 简单替换 YAML 风格的键值对为 JSON 风格（容错）
-        # 更可靠的方式是用 yaml 库，但这里为了轻量，手动处理常见情况
-        # 转换为 JSON 格式：去除注释，替换冒号+空格为 JSON
-        # 直接使用正则提取关键字段
         fields = {}
         for key in ['name', 'type', 'server', 'port', 'uuid', 'password', 'sni', 'servername']:
-            match = re.search(rf'{key}:\s*"?([^",\n}}]*)', line, re.IGNORECASE)
+            # 同样适用修复后的正则表达式
+            match = re.search(rf'{key}:\s*"?([^"]*?)"?(?=\s+\S+:|$)', line, re.IGNORECASE)
             if match:
                 fields[key] = match.group(1).strip().strip('"')
         if 'server' not in fields or 'port' not in fields:
@@ -412,23 +379,30 @@ def parse_clash_single(line: str) -> Optional[StandardProxy]:
 
 
 def parse_clash_multi(line: str) -> Optional[StandardProxy]:
-    """解析 Clash 多行 YAML 代理片段"""
+    """解析 Clash 多行 YAML 代理片段，同时兼容单行 YAML 格式。"""
     fields = {}
     for key in ['name', 'type', 'server', 'port', 'uuid', 'password', 'sni', 'servername']:
-        match = re.search(rf'{key}:\s*"?([^",\n}}]*)', line, re.IGNORECASE)
+        # --- 修复核心：使用非贪婪捕获并添加前瞻断言 ---
+        # 这个正则表达式会匹配键后面的值，并在遇到下一个键（非空格字符 + 冒号）或行尾时停止。
+        match = re.search(rf'{key}:\s*"?([^"]*?)"?(?=\s+\S+:|$)', line, re.IGNORECASE)
         if match:
             fields[key] = match.group(1).strip().strip('"')
+    
     if 'server' not in fields or 'port' not in fields:
         return None
-    proxy = StandardProxy(
-        protocol=fields.get('type', '').lower(),
-        server=fields['server'],
-        port=int(fields['port']),
-        uuid=fields.get('uuid', fields.get('password', '')),
-        remark=fields.get('name', ''),
-        raw_link=line
-    )
-    return proxy
+    
+    try:
+        proxy = StandardProxy(
+            protocol=fields.get('type', '').lower(),
+            server=fields['server'],
+            port=int(fields['port']),
+            uuid=fields.get('uuid', fields.get('password', '')),
+            remark=fields.get('name', ''),
+            raw_link=line
+        )
+        return proxy
+    except (ValueError, TypeError):
+        return None
 
 
 def parse_json_proxy(obj: dict) -> Optional[StandardProxy]:
@@ -460,10 +434,10 @@ def extract_and_parse(text: str, source_url: str = "") -> List[StandardProxy]:
     proxies = []
     for cand in candidates:
         p = parse_single_line(cand)
-        if p and p.server and p.port:   # 必须至少包含服务器和端口
+        if p and p.server and p.port:
             p.source_url = source_url
             proxies.append(p)
-        elif p and p.raw_link:  # 如果至少提取到了 raw_link，也可保留（测速时可用 raw_link）
+        elif p and p.raw_link:
             p.source_url = source_url
             proxies.append(p)
     return proxies
