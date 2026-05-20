@@ -1,10 +1,12 @@
-"""主入口，配置关键词列表并启动收集器"""
+"""主入口，配置关键词列表并启动收集器，最后调用测速"""
 
+import os
 from collector import Collector
 from tester import run_full_test
 
 QUERIES = [
 
+    # ==================== 4. 中文高频 ====================
     "免费节点",
     "免费clash订阅",
     "免费v2ray订阅",
@@ -29,26 +31,13 @@ QUERIES = [
 ]
 
 if __name__ == "__main__":
-    import os
     token = os.getenv("GITHUB_TOKEN", "")
     collector = Collector(token=token, queries=QUERIES)
     collector.run()
-    # ... 收集过程 ...
-    collector.run()
 
-    # 收集到的节点原始字符串列表
-    all_proxy_lines = list(collector.unique_nodes)
-
-    # 将字符串列表转换为 StandardProxy 对象列表（需要解析器）
-    from parsers import parse_line
-    proxies = []
-    for line in all_proxy_lines:
-        p = parse_line(line)
-        if p:
-            proxies.append(p)
-
-    # 启动测速模块
-    if proxies:
-        run_full_test(proxies)
+    # 提取节点字符串列表
+    node_strings = list(collector.unique_nodes)
+    if node_strings:
+        run_full_test(node_strings)
     else:
         print("无节点可供测速")
