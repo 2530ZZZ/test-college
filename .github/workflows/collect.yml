@@ -1,0 +1,45 @@
+name: 动态搜集 + su-ch精细测活测速 + si-bo延迟 + 重命名输出标准jd
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'   # 每6小时（UTC 4点/10点/16点/22点）-> 北京时间12/18/00/06
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      NODE_NO_WARNINGS: "1"
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: 拉取仓库代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装依赖
+        run: pip install requests
+
+      - name: 运行动态搜集
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python main.py
+
+      - name: 提交更改
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          BEIJING_TIME=$(date -u -d '+8 hours' +'%Y-%m-%d %H:%M:%S')
+          export GIT_AUTHOR_DATE="$BEIJING_TIME +0800"
+          export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
+          git add -A no/
+          git add no.txt no_li.txt no_w_li.txt ljck.txt repo_commit_cache.txt
+          git commit -m "自动更新 - $BEIJING_TIME CST" || echo "No changes"
+          git push
