@@ -12,10 +12,10 @@ from typing import Optional
 class StandardProxy:
     """标准化的代理节点数据结构"""
     # 核心字段
-    protocol: str                  # vmess, vless, trojan, ss, ssr, hysteria2, tuic, hy2 等
-    server: str                    # 服务器地址
-    port: int                      # 端口号
+    protocol: str = ""             # vmess, vless, trojan, ss, ssr, hysteria2, tuic, hy2 等
+    server: str = ""               # 服务器地址（默认空字符串）
     uuid: str = ""                 # 用户ID / 密码 / UUID
+    port: int = 0                  # 端口号（默认0，表示未知）
     security: str = ""             # 加密方式（如 auto, chacha20-ietf-poly1305）
     transport: str = "tcp"         # 传输协议 tcp/ws/grpc/h2
     tls: bool = False              # 是否启用 TLS
