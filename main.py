@@ -1,62 +1,10 @@
 """主入口，配置关键词列表并启动收集器"""
 
 from collector import Collector
+from tester import run_full_test
 
 QUERIES = [
-    # ==================== 1. 基础高频 ====================
-    "free nodes",
-    "free proxy nodes",
-    "free v2ray nodes",
-    "free clash nodes",
-    "free trojan nodes",
-    "free hysteria nodes",
-    "free vless nodes",
-    "free hysteria2 nodes",
-    "free tuic nodes",
-    "free reality nodes",
-    "free singbox nodes",
-    "free shadowsocks nodes",
-    "free wireguard nodes",
-    "free proxy list",
-    "free proxy subscription",
-    "free proxy config",
-    "free proxy yaml",
-    "free proxy json",
-    "free proxy base64",
-    # ==================== 2. 主流项目 ====================
-    "ACL4SSR",
-    "subconverter",
-    "v2rayN",
-    "v2rayNG",
-    "Clash.Meta",
-    "mihomo",
-    "Hiddify",
-    "Shadowrocket",
-    "Quantumult X",
-    "Stash",
-    "clash verge",
-    "clash verge rev",
-    "v2rayA",
-    "Nekoray",
-    "Nekobox",
-    "FlClash",
-    # ==================== 3. 订阅相关 ====================
-    "free subscription github",
-    "daily subscription",
-    "base64 subscription",
-    "free sub",
-    "v2ray sub",
-    "clash sub",
-    "trojan sub",
-    "ss sub",
-    "ssr sub",
-    "sing-box sub",
-    "hysteria sub",
-    "tuic sub",
-    "sub list",
-    "sub store",
-    "sub collection",
-    # ==================== 4. 中文高频 ====================
+
     "免费节点",
     "免费clash订阅",
     "免费v2ray订阅",
@@ -77,29 +25,7 @@ QUERIES = [
     "节点仓库",
     "每日节点",
     "免费节点合集",
-    # ==================== 5. 混合 OR 组合 ====================
-    "免费 (clash OR v2ray OR trojan) (订阅 OR 节点 OR 机场)",
-    "clash (订阅 OR 配置 OR 节点) github",
-    "v2ray (订阅 OR 配置 OR 节点) github",
-    "trojan (订阅 OR 配置 OR 节点) github",
-    "hysteria (订阅 OR 配置 OR 节点) github",
-    "hysteria2 (订阅 OR 配置 OR 节点) github",
-    "tuic (订阅 OR 配置 OR 节点) github",
-    "singbox (订阅 OR 配置 OR 节点) github",
-    # ==================== 6. 收集器/项目名 ====================
-    "TelegramV2rayCollector",
-    "ProxyCollector",
-    "V2RAY-CLASH-BASE64-Subscription",
-    "free airport nodes",
-    "free shadowrocket nodes",
-    "free hiddify nodes",
-    "free v2rayng nodes",
-    "free clash meta nodes",
-    "free mihomo nodes",
-    "free proxy scraper",
-    "free proxy spider",
-    "free proxy bot",
-    # ... 你可以继续添加更多关键词
+
 ]
 
 if __name__ == "__main__":
@@ -107,3 +33,22 @@ if __name__ == "__main__":
     token = os.getenv("GITHUB_TOKEN", "")
     collector = Collector(token=token, queries=QUERIES)
     collector.run()
+    # ... 收集过程 ...
+    collector.run()
+
+    # 收集到的节点原始字符串列表
+    all_proxy_lines = list(collector.unique_nodes)
+
+    # 将字符串列表转换为 StandardProxy 对象列表（需要解析器）
+    from parsers import parse_line
+    proxies = []
+    for line in all_proxy_lines:
+        p = parse_line(line)
+        if p:
+            proxies.append(p)
+
+    # 启动测速模块
+    if proxies:
+        run_full_test(proxies)
+    else:
+        print("无节点可供测速")
