@@ -1,4 +1,4 @@
-name: 动态搜集 + su-ch精细测活测速 + si-bo延迟 + 重命名输出标准jd
+name: 动态搜集
 
 on:
   schedule:
@@ -25,14 +25,16 @@ jobs:
           python-version: '3.12'
 
       - name: 安装依赖
-        run: pip install requests
+        run: |
+          pip install requests geoip2
+          # 如果不想使用 geoip2，可删除上面一行，程序会自动回退到域名推测
 
-      - name: 运行动态搜集
+      - name: 运行动态搜集+测速
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python main.py
 
-      - name: 提交更改
+      - name: 提交所有结果
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -41,5 +43,7 @@ jobs:
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
           git add -A no/
           git add no.txt no_li.txt no_w_li.txt ljck.txt repo_commit_cache.txt dr_commit_cache.txt
-          git commit -m "自动更新 - $BEIJING_TIME CST" || echo "No changes"
+          git add alive.txt fi_no.txt jd.txt fi_no_w_li.txt
+          git add GeoLite2-City.mmdb || true   # 若下载了数据库也提交
+          git commit -m "自动更新 + 测速 + 国旗排序 - $BEIJING_TIME CST" || echo "No changes"
           git push
