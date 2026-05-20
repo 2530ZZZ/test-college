@@ -1,38 +1,37 @@
 """
-全局配置 —— 可调参数集中管理
+全局配置 —— 所有可调参数集中管理
 """
 
 # ==================== 测速配置 ====================
-# mihomo 二进制版本（推荐稳定版）
 MIHOMO_VERSION = "v1.18.7"
-# 下载地址（根据平台自动选择，Linux amd64）
 MIHOMO_URL = f"https://github.com/MetaCubeX/mihomo/releases/download/{MIHOMO_VERSION}/mihomo-linux-amd64-{MIHOMO_VERSION}.gz"
-# 解压后的二进制文件名（脚本会自动处理）
 MIHOMO_BIN = "mihomo"
-# 本地代理端口（mihomo 启动的 HTTP 代理端口，用于测速时下载）
 MIXED_PORT = 7890
-# API 端口（用于控制测速）
 API_PORT = 9090
-# 测速用的 HTTP 延迟测试 URL（需稳定、快速）
+
+# 测速 URL
 LATENCY_TEST_URL = "https://www.gstatic.com/generate_204"
-# 测速用的下载 URL（推荐 10MB 文件，可更换为自建或公共测速文件）
 SPEED_TEST_URL = "https://speed.cloudflare.com/__down?bytes=10485760"
-# 超时设置（毫秒）
-LATENCY_TIMEOUT = 5000         # 延迟测试超时
-SPEED_TIMEOUT = 15000          # 速度测试超时
-# 最小下载字节数（5MB），低于此值视为测速失败
-MIN_DOWNLOAD_BYTES = 5 * 1024 * 1024
 
-# ==================== 过滤与输出 ====================
-# 延迟阈值（毫秒），超过此值丢弃
-MAX_LATENCY = 3000
-# 速度阈值（MB/s），低于此值丢弃
-MIN_SPEED_MB = 0.5             # 0.5 MB/s
+# 超时（毫秒）
+LATENCY_TIMEOUT = 5000
+SPEED_TIMEOUT = 15000
+MIN_DOWNLOAD_BYTES = 5 * 1024 * 1024   # 5MB
 
-# ==================== 路径配置 ====================
-# no 文件夹内的分片大小（每文件最多节点数）
+# ==================== 过滤阈值 ====================
+MAX_LATENCY = 3000          # 毫秒
+MIN_SPEED_MB = 0.5          # MB/s
+
+# ==================== GeoIP 国家识别 ====================
+# GeoLite2-City.mmdb 下载地址（免费数据库，需遵守 MaxMind 许可）
+GEOLITE_DB_URL = "https://git.io/GeoLite2-City.mmdb"   # 可能失效，请自行提供稳定链接
+# 本地文件名
+GEOLITE_DB_PATH = "GeoLite2-City.mmdb"
+# 若无法获取离线库，是否使用在线 API（ip-api.com，免费限额 45次/分钟）
+USE_ONLINE_IP_API = False   # 建议保持 False，使用离线库或域名推测
+
+# ==================== 输出配置 ====================
 CHUNK_SIZE = 10000
-# 输出文件名
-ALIVE_NODE_FILE = "alive.txt"          # 存活节点原始链接列表
-FILTERED_NODE_FILE = "fi_no.txt"        # 经过延迟和速度过滤后的节点文件
-FILTERED_LINKS_FILE = "fi_no_w_li.txt"  # 过滤后节点的分片链接索引
+ALIVE_NODE_FILE = "alive.txt"          # 存活节点名称列表（带国旗）
+FILTERED_NODE_FILE = "fi_no.txt"       # 过滤后的原始链接
+FINAL_OUTPUT_FILE = "jd.txt"           # 最终输出：国旗 国家_序号 | 原始链接
