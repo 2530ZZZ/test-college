@@ -2,7 +2,7 @@ name: 动态搜集 + su-ch精细测活测速 + si-bo延迟 + 重命名输出标�
 
 on:
   schedule:
-    - cron: '0 0 1 * *'   # 每6小时（UTC 4点/10点/16点/22点）-> 北京时间12/18/00/06
+    - cron: '0 0 1 * *'   # UTC 04:00,10:00,16:00,22:00 → 北京时间 12:00,18:00,00:00,06:00
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
       - name: 拉取仓库代码
         uses: actions/checkout@v4
 
-      - name: 设置 Python
+      - name: 设置 Python 环境
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -40,6 +40,6 @@ jobs:
           export GIT_AUTHOR_DATE="$BEIJING_TIME +0800"
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
           git add -A no/
-          git add no.txt no_li.txt no_w_li.txt ljck.txt repo_commit_cache.txt
+          git add no.txt no_li.txt no_w_li.txt ljck.txt repo_commit_cache.txt dr_commit_cache.txt
           git commit -m "自动更新 - $BEIJING_TIME CST" || echo "No changes"
           git push
