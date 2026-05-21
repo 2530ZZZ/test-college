@@ -8,14 +8,11 @@ from datetime import datetime, timezone, timedelta
 from collector import Collector
 from tester import run_full_test
 
-# -------------------- 动态生成搜索基准日期 --------------------
-# 取当前UTC时间的前一天日期（精确到天），作为 pushed:> 的边界
-# 这样可以覆盖最近24~48小时内的仓库，确保不遗漏更新
+# 基准日期（当前UTC日期的前一天，确保覆盖最近24小时推送的仓库）
 UTC_NOW = datetime.now(timezone.utc)
 BASE_DATE = (UTC_NOW - timedelta(days=1)).strftime('%Y-%m-%d')
 TIME_SUFFIX = f"pushed:>{BASE_DATE}"
 
-# 基础关键词（无时间限定，后面统一添加）
 BASE_QUERIES = [
     "免费节点",
     "免费clash订阅",
@@ -59,7 +56,6 @@ BASE_QUERIES = [
     "free proxy bot",
 ]
 
-# 最终查询列表：每个关键词后附加时间限定词
 QUERIES = [f"{q} {TIME_SUFFIX}" for q in BASE_QUERIES]
 
 if __name__ == "__main__":
@@ -70,7 +66,6 @@ if __name__ == "__main__":
     collector = Collector(token=token, queries=QUERIES)
     collector.run()
 
-    # 提取节点并测速
     node_strings = list(collector.unique_nodes)
     if node_strings:
         print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] 🔍 开始测速...", flush=True)
