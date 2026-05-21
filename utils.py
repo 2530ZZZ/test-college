@@ -1,4 +1,6 @@
-"""通用工具函数：网络请求、超时保护、Base64 解码等"""
+"""
+通用工具函数：网络请求、超时保护、Base64 解码等
+"""
 
 import requests
 import time
@@ -11,12 +13,9 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from typing import Optional, Dict
 
-# 北京时间时区
 beijing_tz = timezone(timedelta(hours=8))
 
-
 def create_session() -> requests.Session:
-    """创建带重试和连接池的 requests Session"""
     session = requests.Session()
     retry_strategy = Retry(
         total=2,
@@ -32,17 +31,12 @@ def create_session() -> requests.Session:
     session.mount("http://", adapter)
     return session
 
-
 def safe_get(url: str, headers: Dict[str, str], timeout=(8, 15), max_retries=2,
              operation_name="请求") -> Optional[requests.Response]:
-    """
-    安全 HTTP GET 请求，区分 403/409/404，限制等待时间。
-    """
     session = create_session()
     for attempt in range(1, max_retries + 1):
         try:
             resp = session.get(url, headers=headers, timeout=timeout)
-
             if resp.status_code == 200:
                 return resp
             if resp.status_code == 404:
@@ -52,25 +46,22 @@ def safe_get(url: str, headers: Dict[str, str], timeout=(8, 15), max_retries=2,
                 print(f"[{now_str()}] {operation_name} 409，跳过", flush=True)
                 return None
 
-            print(f"[{now_str()}] {operation_name} 返回 {resp.status_code} (尝试 {attempt}/{max_retries})",
-                  flush=True)
+            print(f"[{now_str()}] {operation_name} 返回 {resp.status_code} (尝试 {attempt}/{max_retries})", flush=True)
 
             if resp.status_code == 403:
                 reset_time = resp.headers.get('X-RateLimit-Reset')
                 if reset_time:
                     wait_seconds = int(reset_time) - int(time.time()) + 5
                     if wait_seconds > 120:
-                        print(f"[{now_str()}] 限流等待过长({wait_seconds}s)，放弃本次请求", flush=True)
+                        print(f"[{now_str()}] 限流等待过长({wait_seconds}s)，放弃", flush=True)
                         return None
                     print(f"[{now_str()}] 触发限流，等待 {wait_seconds}s ...", flush=True)
                     time.sleep(max(wait_seconds, 10))
                 else:
-                    print(f"[{now_str()}] 403，保守等待 30s ...", flush=True)
                     time.sleep(30)
                 continue
 
             wait = 3 + attempt * 2
-            print(f"[{now_str()}] {operation_name} 错误，等待 {wait}s 后重试...", flush=True)
             time.sleep(wait)
 
         except requests.exceptions.Timeout:
@@ -81,12 +72,9 @@ def safe_get(url: str, headers: Dict[str, str], timeout=(8, 15), max_retries=2,
             print(f"[{now_str()}] {operation_name} 异常: {e} (尝试 {attempt}/{max_retries})", flush=True)
             time.sleep(3 * attempt)
 
-    print(f"[{now_str()}] {operation_name} 多次失败，已跳过", flush=True)
     return None
 
-
 def safe_base64_decode(s: str) -> Optional[str]:
-    """安全解码 Base64，自动补全 padding，容错非标准字符"""
     s = s.strip().replace('-', '+').replace('_', '/')
     if not s:
         return None
@@ -98,17 +86,10 @@ def safe_base64_decode(s: str) -> Optional[str]:
     except Exception:
         return None
 
-
 def now_str() -> str:
-    """返回北京时间字符串，用于日志"""
     return datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')
 
-
 def timeout_decorator(seconds: int):
-    """
-    函数超时装饰器（仅 Linux，基于 signal.alarm）。
-    注意：不能嵌套使用。
-    """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
