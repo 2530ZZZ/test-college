@@ -1,4 +1,4 @@
-name: 动态搜集 + su-ch精细测活测速 + si-bo延迟 + 重命名输出标准jd
+name: 动态搜集
 
 on:
   schedule:
