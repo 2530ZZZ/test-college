@@ -1,7 +1,7 @@
 """
 GitHub 节点收集器 —— 负责搜索仓库、遍历文件树、提取节点。
 采用类封装，保留黑名单、仓库 SHA 缓存、文件 SHA 缓存、分片等全部功能。
-现已适配新版 parsers.py，直接产出 StandardProxy 并转为去重字符串集合。
+所有日志输出带精确到秒的北京时间戳，仓库和文件地址输出完整 HTTP 链接。
 """
 
 import os
@@ -57,24 +57,26 @@ class Collector:
         start_time = time.time()
 
         for idx, query in enumerate(self.queries, 1):
+            query_start = time.time()
             print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
             self.search_query(query)
+            print(f"[{now_str()}]   关键词耗时: {time.time() - query_start:.1f}s", flush=True)
 
         # 保存结果（同时清理过期缓存并写入文件）
         self.save_results()
 
         elapsed = time.time() - start_time
         print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f} 秒", flush=True)
-        print(f"  检查仓库数: {self.checked_count}")
-        print(f"  收集到源链接数: {len(self.all_links)}")
-        print(f"  去重节点总数: {len(self.unique_nodes)}")
+        print(f"[{now_str()}] 检查仓库数: {self.checked_count}", flush=True)
+        print(f"[{now_str()}] 收集到源链接数: {len(self.all_links)}", flush=True)
+        print(f"[{now_str()}] 去重节点总数: {len(self.unique_nodes)}", flush=True)
 
-    def search_query(self, query: str, max_pages: int = 10):
-        """对单个关键词进行多页搜索"""
+    def search_query(self, query: str, max_pages: int = 3):
+        """对单个关键词进行多页搜索（每页30条，最多3页）"""
         query_links_count = 0
         for page in range(1, max_pages + 1):
             url = (f"https://api.github.com/search/repositories"
-                   f"?q={query}&sort=updated&order=desc&per_page=100&page={page}")
+                   f"?q={query}&sort=updated&order=desc&per_page=30&page={page}")
             resp = safe_get(url, self.headers, timeout=(15, 30),
                             operation_name=f"搜索第{page}页")
             if not resp:
@@ -93,10 +95,10 @@ class Collector:
                 self.seen_repos.add(repo)
                 self.checked_count += 1
                 self.process_repo(repo)
-                time.sleep(1.2)  # 控制请求频率
+                time.sleep(0.5)
 
             page += 1
-            time.sleep(6)  # 翻页冷却
+            time.sleep(2)
 
         print(f"[{now_str()}] └─ 本关键词贡献 {query_links_count} 条有效链接", flush=True)
 
@@ -124,6 +126,7 @@ class Collector:
             return
 
         default_branch = repo_data.get("default_branch", "main")
+        print(f"[{now_str()}] 处理仓库: {github_url} (分支: {default_branch})", flush=True)
 
         # 获取仓库最近一次 commit
         commit_resp = safe_get(f"https://api.github.com/repos/{repo}/commits?per_page=1", self.headers)
@@ -147,11 +150,11 @@ class Collector:
                 cached_sha, cached_time = self.repo_cache[github_url]
                 if (cached_sha == commit_sha and
                         datetime.now(timezone.utc) - cached_time < timedelta(hours=24)):
-                    print(f"  [{now_str()}] 仓库 {repo} 无新提交（缓存命中），跳过", flush=True)
+                    print(f"[{now_str()}] 仓库 {github_url} 无新提交（缓存命中），跳过", flush=True)
                     return
 
         except Exception as e:
-            print(f"  [{now_str()}] 处理仓库 {repo} 异常: {e}", flush=True)
+            print(f"[{now_str()}] 处理仓库 {github_url} 异常: {e}", flush=True)
             return
 
         # 更新仓库缓存（记录当前 sha 与当前时间）
@@ -163,7 +166,7 @@ class Collector:
 
         # 如果未提取到任何节点，加入黑名单
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
-            print(f"  [{now_str()}] 仓库 {repo} 未提取到节点，加入黑名单", flush=True)
+            print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
             self.blacklist_repos.add(github_url)
             with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                 f.write(github_url + "\n")
@@ -224,23 +227,23 @@ class Collector:
             # 无法获取修改时间
             if file_time is None:
                 if item_type == "dir":
-                    print(f"   ➡️ 进入目录 {item_path}（无法获取修改时间）", flush=True)
+                    print(f"[{now_str()}] ➡️ 进入目录 https://github.com/{repo}/tree/{branch}/{item_path}（无法获取修改时间）", flush=True)
                     self.process_file_tree(repo, item_path, branch, has_nodes)
                 else:
-                    print(f"   ⏭️ 跳过文件 {item_path}：无法获取修改时间", flush=True)
+                    print(f"[{now_str()}] ⏭️ 跳过文件 https://github.com/{repo}/blob/{branch}/{item_path}：无法获取修改时间", flush=True)
                 continue
 
             # 检查是否在 24 小时内
             if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
-                print(f"   ⏭️ 跳过 {item_path}：最后更新超过 24 小时 "
-                      f"({file_time.strftime('%Y-%m-%d %H:%M')}, 来源：{time_source})", flush=True)
+                print(f"[{now_str()}] ⏭️ 跳过 https://github.com/{repo}/blob/{branch}/{item_path}：最后更新超过 24 小时 "
+                      f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, 来源：{time_source})", flush=True)
                 if item_type == "dir":
-                    print(f"   🚫 目录 {item_path} 过期，跳过递归", flush=True)
+                    print(f"[{now_str()}] 🚫 目录 https://github.com/{repo}/tree/{branch}/{item_path} 过期，跳过递归", flush=True)
                 continue
 
             # ---------- 24 小时内更新 ----------
-            print(f"   ✅ {item_path} 在 24 小时内更新 "
-                  f"({file_time.strftime('%Y-%m-%d %H:%M')}, 来源：{time_source})", flush=True)
+            print(f"[{now_str()}] ✅ https://github.com/{repo}/blob/{branch}/{item_path} 在 24 小时内更新 "
+                  f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, 来源：{time_source})", flush=True)
 
             if item_type == "dir":
                 self.process_file_tree(repo, item_path, branch, has_nodes)
@@ -252,15 +255,16 @@ class Collector:
                         cached_sha, cached_time = self.file_cache[file_url]
                         if (cached_sha == file_commit_sha and
                                 datetime.now(timezone.utc) - cached_time < timedelta(hours=24)):
-                            print(f"   ⏭️ 跳过文件 {file_url}：文件缓存命中（{file_commit_sha[:7]}）", flush=True)
+                            print(f"[{now_str()}] ⏭️ 跳过文件 {file_url}：文件缓存命中（{file_commit_sha[:7]}）", flush=True)
                             continue
                 # 下载文件并提取节点
-                print(f"   🔍 检查文件: {file_url}", flush=True)
+                print(f"[{now_str()}] 🔍 检查文件: {file_url}", flush=True)
                 file_resp = safe_get(file_url, self.headers, timeout=(10, 30))
                 if not file_resp:
                     continue
 
                 # 使用新解析器一次性提取并解析
+                parse_start = time.time()
                 proxies = extract_and_parse(file_resp.text, source_url=file_url)
                 new_nodes = []
                 for proxy in proxies:
@@ -272,9 +276,10 @@ class Collector:
                 if new_nodes:
                     self.all_links.append(file_url)
                     has_nodes[0] = True
-                    print(f"   📄 {file_url} ✅ 新增 {len(new_nodes)} 条节点", flush=True)
+                    print(f"[{now_str()}] 📄 {file_url} ✅ 新增 {len(new_nodes)} 条节点 "
+                          f"(解析耗时 {time.time() - parse_start:.2f}s)", flush=True)
                 else:
-                    print(f"   📄 {file_url} ❌ 无新节点", flush=True)
+                    print(f"[{now_str()}] 📄 {file_url} ❌ 无新节点", flush=True)
 
                 # 更新文件缓存（记录 commit sha 和当前时间）
                 if file_commit_sha is not None:
@@ -335,7 +340,6 @@ class Collector:
                                 pass
                         if timestamp is None:
                             timestamp = datetime.min.replace(tzinfo=timezone.utc)
-                        # 仅接受 raw.githubusercontent.com 的 URL
                         if "raw.githubusercontent.com" in url:
                             self.file_cache[url] = (sha, timestamp)
             print(f"[{now_str()}] 已加载 file 缓存 {len(self.file_cache)} 条", flush=True)
@@ -369,7 +373,7 @@ class Collector:
         if self.unique_nodes:
             with open("no.txt", "w", encoding="utf-8") as f:
                 f.write("\n".join(self.unique_nodes))
-            print(f"\n[{now_str()}] 已保存 {len(self.unique_nodes)} 条节点到 no.txt", flush=True)
+            print(f"[{now_str()}] 已保存 {len(self.unique_nodes)} 条节点到 no.txt", flush=True)
 
         # 2. 分片到 no/ 文件夹，生成 no_w_li.txt
         no_dir = "no"
