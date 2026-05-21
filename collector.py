@@ -1,15 +1,13 @@
 """
-GitHub 节点收集器 —— 负责搜索仓库、遍历文件树、提取节点。
-移除仓库级别的 commit 检查（因为搜索已限定 pushed:>date），
-保留文件缓存、黑名单、去重、分片等全部功能。
+GitHub 节点收集器 —— 使用 tree API 一次性获取文件树，按内容 SHA 去重。
+仅保留黑名单 (ljck.txt) 持久化，其余全部为运行时内存状态。
 """
 
 import os
 import time
 import shutil
 from datetime import datetime, timezone, timedelta
-from typing import List, Set, Dict, Tuple, Optional
-from email.utils import parsedate_to_datetime
+from typing import List, Set, Optional
 
 import utils
 from utils import safe_get, now_str, timeout_decorator, beijing_tz
@@ -18,7 +16,9 @@ from proxy_model import StandardProxy
 
 
 BLACKLIST_FILE = "ljck.txt"
-FILE_CACHE_FILE = "dr_commit_cache.txt"          # 仅文件缓存保留
+
+# 文件扩展名过滤：只处理这些类型的文件
+ALLOWED_EXTENSIONS = {'.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64'}
 
 
 class Collector:
@@ -30,19 +30,16 @@ class Collector:
         }
         self.queries = queries or []
 
-        # 状态变量
-        self.all_links: List[str] = []
-        self.unique_nodes: Set[str] = set()
-        self.seen_repos: Set[str] = set()                  # 本次运行已处理仓库
-        self.blacklist_repos: Set[str] = set()              # 永久黑名单
+        # 运行时状态
+        self.all_links: List[str] = []               # 本次收集到的源文件 raw URL
+        self.unique_nodes: Set[str] = set()          # 全局去重后的节点字符串
+        self.seen_repos: Set[str] = set()            # 本次已处理的仓库全名
+        self.blacklist_repos: Set[str] = set()       # 永久黑名单仓库
+        self.processed_shas: Set[str] = set()        # 已处理文件的 Git blob SHA（跨仓库去重）
         self.checked_count: int = 0
 
-        # 仅文件缓存 (key: raw_url, value: (commit_sha, timestamp))
-        self.file_cache: Dict[str, Tuple[str, datetime]] = {}
-
-        # 加载持久化数据
+        # 加载黑名单
         self.load_blacklist()
-        self.load_file_cache()
 
     # ==================== 主流程 ====================
     def run(self):
@@ -62,7 +59,7 @@ class Collector:
         print(f"[{now_str()}] 检查仓库: {self.checked_count}, 源链接: {len(self.all_links)}, 节点: {len(self.unique_nodes)}", flush=True)
 
     def search_query(self, query: str, max_pages: int = 3):
-        """搜索关键词，每页30条，最多3页"""
+        """搜索关键词，每页 30 条，最多 3 页"""
         for page in range(1, max_pages + 1):
             url = f"https://api.github.com/search/repositories?q={query}&sort=updated&order=desc&per_page=30&page={page}"
             resp = safe_get(url, self.headers, timeout=(15, 30), operation_name=f"搜索第{page}页")
@@ -84,15 +81,17 @@ class Collector:
             page += 1
             time.sleep(2)
 
-    # ==================== 仓库处理（简化） ====================
+    # ==================== 仓库处理（核心修改） ====================
     @timeout_decorator(60)
     def process_repo(self, repo: str):
-        """只获取默认分支，然后进入文件树遍历，不再检查仓库整体 commit"""
+        """
+        处理单个仓库：获取默认分支 → 尝试 tree API → 按 sha 去重下载文件
+        """
         github_url = f"https://github.com/{repo}"
         if github_url in self.blacklist_repos:
             return
 
-        # 获取仓库信息（为了得到默认分支）
+        # 1. 获取默认分支
         repo_info = safe_get(f"https://api.github.com/repos/{repo}", self.headers)
         if not repo_info:
             return
@@ -103,114 +102,91 @@ class Collector:
         default_branch = repo_data.get("default_branch", "main")
         print(f"[{now_str()}] 仓库 {github_url} (分支: {default_branch})", flush=True)
 
-        has_nodes_flag = [False]
-        self.process_file_tree(repo, "", default_branch, has_nodes_flag)
+        # 2. 获取递归文件树
+        tree_url = f"https://api.github.com/repos/{repo}/git/trees/{default_branch}?recursive=1"
+        tree_resp = safe_get(tree_url, self.headers, timeout=(12, 20), operation_name="tree API")
+        if not tree_resp:
+            print(f"[{now_str()}] ❌ tree API 请求失败，跳过仓库 {github_url}", flush=True)
+            return
 
-        if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
+        tree_data = tree_resp.json()
+        # 检查截断标志
+        if tree_data.get('truncated', False):
+            print(f"[{now_str()}] ❌ tree 数据被截断（仓库过大），跳过仓库 {github_url}", flush=True)
+            return
+
+        entries = tree_data.get('tree', [])
+        if not entries:
+            print(f"[{now_str()}] 📭 仓库文件树为空，跳过", flush=True)
+            return
+
+        # 3. 过滤需要处理的文件
+        files_to_process = []
+        for entry in entries:
+            if entry.get('type') != 'blob':
+                continue
+            size = entry.get('size', 0)
+            if size == 0:
+                continue
+            path = entry.get('path', '')
+            ext = os.path.splitext(path)[1].lower()
+            # 简单文件扩展名过滤（可自行调整）
+            if ext not in ALLOWED_EXTENSIONS:
+                continue
+            files_to_process.append({
+                'path': path,
+                'sha': entry['sha'],
+                'size': size
+            })
+
+        print(f"[{now_str()}] 📂 仓库文件 {len(entries)} 个, 需处理 {len(files_to_process)} 个", flush=True)
+
+        has_nodes_flag = False
+        # 4. 按 SHA 去重下载
+        for file_info in files_to_process:
+            sha = file_info['sha']
+            if sha in self.processed_shas:
+                continue
+            self.processed_shas.add(sha)          # 先标记为已处理，避免并发问题
+
+            file_path = file_info['path']
+            raw_url = f"https://raw.githubusercontent.com/{repo}/{default_branch}/{file_path}"
+            print(f"[{now_str()}] 🔍 下载: {raw_url}", flush=True)
+
+            file_resp = safe_get(raw_url, self.headers, timeout=(10, 30))
+            if not file_resp:
+                continue
+
+            parse_start = time.time()
+            try:
+                proxies = extract_and_parse(file_resp.text, source_url=raw_url)
+            except Exception as e:
+                print(f"[{now_str()}] ⚠️ 解析失败 {raw_url}: {e}", flush=True)
+                continue
+
+            new_nodes = []
+            for proxy in proxies:
+                node_str = proxy.to_node_line()
+                if node_str not in self.unique_nodes:
+                    self.unique_nodes.add(node_str)
+                    new_nodes.append(node_str)
+
+            if new_nodes:
+                self.all_links.append(raw_url)
+                has_nodes_flag = True
+                print(f"[{now_str()}] 📄 {raw_url} ✅ 新增 {len(new_nodes)} 条 "
+                      f"(解析耗时 {time.time() - parse_start:.2f}s)", flush=True)
+            else:
+                print(f"[{now_str()}] 📄 {raw_url} ❌ 无新节点", flush=True)
+
+        # 5. 如果仓库没有提取到任何节点，加入黑名单
+        if not has_nodes_flag and github_url not in self.blacklist_repos:
             print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
             self.blacklist_repos.add(github_url)
             with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                 f.write(github_url + "\n")
 
-    # ==================== 文件树遍历（不变，仍检查文件级 commit） ====================
-    def process_file_tree(self, repo: str, path: str, branch: str, has_nodes: List[bool]):
-        contents_url = f"https://api.github.com/repos/{repo}/contents/{path}" if path else f"https://api.github.com/repos/{repo}/contents"
-        resp = safe_get(contents_url, self.headers, timeout=(10, 20), operation_name=f"Contents API {path or '根'}")
-        if not resp:
-            return
-
-        items = resp.json()
-        for item in items:
-            item_path = item["path"]
-            item_type = item["type"]
-
-            file_time = None
-            time_source = None
-            file_commit_sha = None
-
-            # Commits API
-            commit_url = f"https://api.github.com/repos/{repo}/commits?path={item_path}&per_page=1"
-            c_resp = safe_get(commit_url, self.headers, timeout=(8, 12), operation_name=f"commit 查询 {item_path}")
-            if c_resp and c_resp.status_code == 200:
-                try:
-                    commit_list = c_resp.json()
-                    if commit_list:
-                        commit_obj = commit_list[0]
-                        file_commit_sha = commit_obj["sha"]
-                        time_str = commit_obj["commit"]["committer"]["date"]
-                        file_time = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
-                        time_source = "commits API"
-                except Exception:
-                    pass
-
-            # HEAD Last-Modified
-            if file_time is None and item_type == "file":
-                head_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{item_path}"
-                head_resp = safe_get(head_url, self.headers, timeout=(8, 10), operation_name=f"HEAD 请求 {item_path}", max_retries=1)
-                if head_resp and head_resp.status_code == 200:
-                    last_mod = head_resp.headers.get('Last-Modified')
-                    if last_mod:
-                        try:
-                            file_time = parsedate_to_datetime(last_mod).replace(tzinfo=timezone.utc)
-                            time_source = "Last-Modified"
-                        except Exception:
-                            pass
-
-            if file_time is None:
-                if item_type == "dir":
-                    print(f"[{now_str()}] ➡️ 进入目录 https://github.com/{repo}/tree/{branch}/{item_path} (无时间)", flush=True)
-                    self.process_file_tree(repo, item_path, branch, has_nodes)
-                else:
-                    print(f"[{now_str()}] ⏭️ 跳过文件 https://github.com/{repo}/blob/{branch}/{item_path} (无时间)", flush=True)
-                continue
-
-            if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
-                print(f"[{now_str()}] ⏭️ 跳过 https://github.com/{repo}/blob/{branch}/{item_path} "
-                      f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, {time_source})", flush=True)
-                if item_type == "dir":
-                    print(f"[{now_str()}] 🚫 目录过期，跳过递归", flush=True)
-                continue
-
-            print(f"[{now_str()}] ✅ https://github.com/{repo}/blob/{branch}/{item_path} "
-                  f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, {time_source})", flush=True)
-
-            if item_type == "dir":
-                self.process_file_tree(repo, item_path, branch, has_nodes)
-            elif item_type == "file":
-                file_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{item_path}"
-                # 文件缓存检查
-                if file_commit_sha and file_url in self.file_cache:
-                    cached_sha, cached_time = self.file_cache[file_url]
-                    if cached_sha == file_commit_sha and datetime.now(timezone.utc) - cached_time < timedelta(hours=24):
-                        print(f"[{now_str()}] ⏭️ 跳过文件 {file_url} (缓存命中 {file_commit_sha[:7]})", flush=True)
-                        continue
-
-                print(f"[{now_str()}] 🔍 检查文件: {file_url}", flush=True)
-                file_resp = safe_get(file_url, self.headers, timeout=(10, 30))
-                if not file_resp:
-                    continue
-
-                parse_start = time.time()
-                proxies = extract_and_parse(file_resp.text, source_url=file_url)
-                new_nodes = []
-                for proxy in proxies:
-                    node_str = proxy.to_node_line()
-                    if node_str not in self.unique_nodes:
-                        self.unique_nodes.add(node_str)
-                        new_nodes.append(node_str)
-
-                if new_nodes:
-                    self.all_links.append(file_url)
-                    has_nodes[0] = True
-                    print(f"[{now_str()}] 📄 {file_url} ✅ 新增 {len(new_nodes)} 条 "
-                          f"(解析耗时 {time.time() - parse_start:.2f}s)", flush=True)
-                else:
-                    print(f"[{now_str()}] 📄 {file_url} ❌ 无新节点", flush=True)
-
-                if file_commit_sha:
-                    self.file_cache[file_url] = (file_commit_sha, datetime.now(timezone.utc))
-
-    # ==================== 持久化 ====================
+    # ==================== 持久化（仅黑名单） ====================
     def load_blacklist(self):
         if os.path.exists(BLACKLIST_FILE):
             with open(BLACKLIST_FILE, "r", encoding="utf-8") as f:
@@ -218,37 +194,10 @@ class Collector:
                     line = line.strip()
                     if line.startswith("https://github.com/"):
                         self.blacklist_repos.add(line)
-            print(f"[{now_str()}] 加载黑名单: {len(self.blacklist_repos)} 个", flush=True)
-
-    def load_file_cache(self):
-        if os.path.exists(FILE_CACHE_FILE):
-            with open(FILE_CACHE_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = line.strip().split(maxsplit=2)
-                    if len(parts) >= 2 and "raw.githubusercontent.com" in parts[0]:
-                        url = parts[0]
-                        sha = parts[1]
-                        ts = datetime.min.replace(tzinfo=timezone.utc)
-                        if len(parts) >= 3:
-                            try:
-                                ts = datetime.fromisoformat(parts[2])
-                            except ValueError:
-                                pass
-                        self.file_cache[url] = (sha, ts)
-            print(f"[{now_str()}] 加载文件缓存: {len(self.file_cache)} 条", flush=True)
-
-    def clean_file_cache(self):
-        now = datetime.now(timezone.utc)
-        self.file_cache = {url: (sha, ts) for url, (sha, ts) in self.file_cache.items()
-                           if now - ts < timedelta(hours=24)}
-
-    def save_file_cache(self):
-        self.clean_file_cache()
-        with open(FILE_CACHE_FILE, "w", encoding="utf-8") as f:
-            for url, (sha, ts) in self.file_cache.items():
-                f.write(f"{url} {sha} {ts.isoformat()}\n")
+            print(f"[{now_str()}] 已加载黑名单: {len(self.blacklist_repos)} 个", flush=True)
 
     def save_results(self):
+        """保存 no.txt、分片、no_li.txt，不涉及任何缓存持久化"""
         # no.txt
         if self.unique_nodes:
             with open("no.txt", "w", encoding="utf-8") as f:
@@ -287,5 +236,4 @@ class Collector:
         with open("no_li.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(self.all_links))
 
-        self.save_file_cache()
-        print(f"[{now_str()}] 文件缓存已更新", flush=True)
+        print(f"[{now_str()}] 保存 no_li.txt ({len(self.all_links)} 条链接)", flush=True)
