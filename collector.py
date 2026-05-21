@@ -1,7 +1,7 @@
 """
 GitHub 节点收集器 —— 负责搜索仓库、遍历文件树、提取节点。
-采用类封装，保留黑名单、仓库 SHA 缓存、文件 SHA 缓存、分片等全部功能。
-所有日志输出带精确到秒的北京时间戳，仓库和文件地址输出完整 HTTP 链接。
+移除仓库级别的 commit 检查（因为搜索已限定 pushed:>date），
+保留文件缓存、黑名单、去重、分片等全部功能。
 """
 
 import os
@@ -13,14 +13,12 @@ from email.utils import parsedate_to_datetime
 
 import utils
 from utils import safe_get, now_str, timeout_decorator, beijing_tz
-from parsers import extract_and_parse          # 新解析器：一次调用完成提取+解析
+from parsers import extract_and_parse
 from proxy_model import StandardProxy
 
 
-# 持久化文件路径
 BLACKLIST_FILE = "ljck.txt"
-REPO_CACHE_FILE = "repo_commit_cache.txt"
-FILE_CACHE_FILE = "dr_commit_cache.txt"
+FILE_CACHE_FILE = "dr_commit_cache.txt"          # 仅文件缓存保留
 
 
 class Collector:
@@ -33,60 +31,47 @@ class Collector:
         self.queries = queries or []
 
         # 状态变量
-        self.all_links: List[str] = []                     # 本次收集到的所有源文件 raw URL
-        self.unique_nodes: Set[str] = set()                # 去重后的节点字符串（raw_link 或 json）
-        self.seen_repos: Set[str] = set()                  # 已检查过的仓库（避免重复处理）
-        self.blacklist_repos: Set[str] = set()             # 永久黑名单仓库
-        self.checked_count: int = 0                        # 已检查仓库总数
+        self.all_links: List[str] = []
+        self.unique_nodes: Set[str] = set()
+        self.seen_repos: Set[str] = set()                  # 本次运行已处理仓库
+        self.blacklist_repos: Set[str] = set()              # 永久黑名单
+        self.checked_count: int = 0
 
-        # 缓存：仓库 + 文件
-        # repo_cache: key = GitHub 仓库完整URL, value = (commit_sha, last_update_utc)
-        self.repo_cache: Dict[str, Tuple[str, datetime]] = {}
-        # file_cache: key = 文件 raw URL, value = (commit_sha, last_processed_utc)
+        # 仅文件缓存 (key: raw_url, value: (commit_sha, timestamp))
         self.file_cache: Dict[str, Tuple[str, datetime]] = {}
 
         # 加载持久化数据
         self.load_blacklist()
-        self.load_repo_cache()
         self.load_file_cache()
 
     # ==================== 主流程 ====================
     def run(self):
-        """启动收集流程"""
-        print(f"[{now_str()}] 🚀 程序启动，开始动态搜索...", flush=True)
+        print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
 
         for idx, query in enumerate(self.queries, 1):
-            query_start = time.time()
+            q_start = time.time()
             print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
             self.search_query(query)
-            print(f"[{now_str()}]   关键词耗时: {time.time() - query_start:.1f}s", flush=True)
+            print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
 
-        # 保存结果（同时清理过期缓存并写入文件）
         self.save_results()
 
         elapsed = time.time() - start_time
-        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f} 秒", flush=True)
-        print(f"[{now_str()}] 检查仓库数: {self.checked_count}", flush=True)
-        print(f"[{now_str()}] 收集到源链接数: {len(self.all_links)}", flush=True)
-        print(f"[{now_str()}] 去重节点总数: {len(self.unique_nodes)}", flush=True)
+        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f}s", flush=True)
+        print(f"[{now_str()}] 检查仓库: {self.checked_count}, 源链接: {len(self.all_links)}, 节点: {len(self.unique_nodes)}", flush=True)
 
     def search_query(self, query: str, max_pages: int = 3):
-        """对单个关键词进行多页搜索（每页30条，最多3页）"""
-        query_links_count = 0
+        """搜索关键词，每页30条，最多3页"""
         for page in range(1, max_pages + 1):
-            url = (f"https://api.github.com/search/repositories"
-                   f"?q={query}&sort=updated&order=desc&per_page=30&page={page}")
-            resp = safe_get(url, self.headers, timeout=(15, 30),
-                            operation_name=f"搜索第{page}页")
+            url = f"https://api.github.com/search/repositories?q={query}&sort=updated&order=desc&per_page=30&page={page}"
+            resp = safe_get(url, self.headers, timeout=(15, 30), operation_name=f"搜索第{page}页")
             if not resp:
                 break
-
             items = resp.json().get("items", [])
             if not items:
                 break
-
-            print(f"[{now_str()}] 第{page}页找到 {len(items)} 个仓库", flush=True)
+            print(f"[{now_str()}] 第{page}页 {len(items)} 个仓库", flush=True)
             for item in items:
                 repo = item["full_name"]
                 github_url = f"https://github.com/{repo}"
@@ -96,28 +81,18 @@ class Collector:
                 self.checked_count += 1
                 self.process_repo(repo)
                 time.sleep(0.5)
-
             page += 1
             time.sleep(2)
 
-        print(f"[{now_str()}] └─ 本关键词贡献 {query_links_count} 条有效链接", flush=True)
-
-    # ==================== 仓库处理 ====================
+    # ==================== 仓库处理（简化） ====================
     @timeout_decorator(60)
     def process_repo(self, repo: str):
-        """
-        处理单个仓库：
-        1. 检查黑名单
-        2. 获取默认分支
-        3. 检查仓库整体 commit 是否在 24 小时内
-        4. 利用仓库缓存跳过无新提交的仓库
-        5. 递归遍历文件树
-        """
+        """只获取默认分支，然后进入文件树遍历，不再检查仓库整体 commit"""
         github_url = f"https://github.com/{repo}"
         if github_url in self.blacklist_repos:
             return
 
-        # 获取仓库信息
+        # 获取仓库信息（为了得到默认分支）
         repo_info = safe_get(f"https://api.github.com/repos/{repo}", self.headers)
         if not repo_info:
             return
@@ -126,78 +101,36 @@ class Collector:
             return
 
         default_branch = repo_data.get("default_branch", "main")
-        print(f"[{now_str()}] 处理仓库: {github_url} (分支: {default_branch})", flush=True)
+        print(f"[{now_str()}] 仓库 {github_url} (分支: {default_branch})", flush=True)
 
-        # 获取仓库最近一次 commit
-        commit_resp = safe_get(f"https://api.github.com/repos/{repo}/commits?per_page=1", self.headers)
-        if not commit_resp:
-            return
-        try:
-            commits = commit_resp.json()
-            if not commits:
-                return
-            commit_data = commits[0]
-            commit_sha = commit_data["sha"]
-            commit_time_str = commit_data["commit"]["committer"]["date"]
-            commit_time = datetime.fromisoformat(commit_time_str.replace("Z", "+00:00"))
-
-            # 超过 24 小时直接丢弃
-            if datetime.now(timezone.utc) - commit_time >= timedelta(hours=24):
-                return
-
-            # 利用仓库缓存：如果 sha 未变且缓存时间还在 24 小时内，则跳过
-            if github_url in self.repo_cache:
-                cached_sha, cached_time = self.repo_cache[github_url]
-                if (cached_sha == commit_sha and
-                        datetime.now(timezone.utc) - cached_time < timedelta(hours=24)):
-                    print(f"[{now_str()}] 仓库 {github_url} 无新提交（缓存命中），跳过", flush=True)
-                    return
-
-        except Exception as e:
-            print(f"[{now_str()}] 处理仓库 {github_url} 异常: {e}", flush=True)
-            return
-
-        # 更新仓库缓存（记录当前 sha 与当前时间）
-        self.repo_cache[github_url] = (commit_sha, datetime.now(timezone.utc))
-
-        # 处理文件树，收集节点
         has_nodes_flag = [False]
         self.process_file_tree(repo, "", default_branch, has_nodes_flag)
 
-        # 如果未提取到任何节点，加入黑名单
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
             print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
             self.blacklist_repos.add(github_url)
             with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                 f.write(github_url + "\n")
 
-    # ==================== 文件树遍历（核心） ====================
+    # ==================== 文件树遍历（不变，仍检查文件级 commit） ====================
     def process_file_tree(self, repo: str, path: str, branch: str, has_nodes: List[bool]):
-        """
-        递归处理文件树，只进入 24 小时内更新的目录，只下载 24 小时内更新的文件。
-        同时使用文件缓存（dr_commit_cache）避免重复处理相同 commit 的文件。
-        """
-        contents_url = (f"https://api.github.com/repos/{repo}/contents/{path}"
-                        if path else f"https://api.github.com/repos/{repo}/contents")
-        resp = safe_get(contents_url, self.headers, timeout=(10, 20),
-                        operation_name=f"Contents API {path or '根'}")
+        contents_url = f"https://api.github.com/repos/{repo}/contents/{path}" if path else f"https://api.github.com/repos/{repo}/contents"
+        resp = safe_get(contents_url, self.headers, timeout=(10, 20), operation_name=f"Contents API {path or '根'}")
         if not resp:
             return
 
         items = resp.json()
         for item in items:
             item_path = item["path"]
-            item_type = item["type"]  # "file" 或 "dir"
+            item_type = item["type"]
 
-            # ---------- 获取该条目的最近 commit 时间 ----------
             file_time = None
             time_source = None
             file_commit_sha = None
 
-            # 方法1：通过 Commits API 获取
+            # Commits API
             commit_url = f"https://api.github.com/repos/{repo}/commits?path={item_path}&per_page=1"
-            c_resp = safe_get(commit_url, self.headers, timeout=(8, 12),
-                              operation_name=f"commit 查询 {item_path}")
+            c_resp = safe_get(commit_url, self.headers, timeout=(8, 12), operation_name=f"commit 查询 {item_path}")
             if c_resp and c_resp.status_code == 200:
                 try:
                     commit_list = c_resp.json()
@@ -210,11 +143,10 @@ class Collector:
                 except Exception:
                     pass
 
-            # 方法2：备选 HEAD 请求 Last-Modified（仅文件）
+            # HEAD Last-Modified
             if file_time is None and item_type == "file":
                 head_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{item_path}"
-                head_resp = safe_get(head_url, self.headers, timeout=(8, 10),
-                                     operation_name=f"HEAD 请求 {item_path}", max_retries=1)
+                head_resp = safe_get(head_url, self.headers, timeout=(8, 10), operation_name=f"HEAD 请求 {item_path}", max_retries=1)
                 if head_resp and head_resp.status_code == 200:
                     last_mod = head_resp.headers.get('Last-Modified')
                     if last_mod:
@@ -224,46 +156,40 @@ class Collector:
                         except Exception:
                             pass
 
-            # 无法获取修改时间
             if file_time is None:
                 if item_type == "dir":
-                    print(f"[{now_str()}] ➡️ 进入目录 https://github.com/{repo}/tree/{branch}/{item_path}（无法获取修改时间）", flush=True)
+                    print(f"[{now_str()}] ➡️ 进入目录 https://github.com/{repo}/tree/{branch}/{item_path} (无时间)", flush=True)
                     self.process_file_tree(repo, item_path, branch, has_nodes)
                 else:
-                    print(f"[{now_str()}] ⏭️ 跳过文件 https://github.com/{repo}/blob/{branch}/{item_path}：无法获取修改时间", flush=True)
+                    print(f"[{now_str()}] ⏭️ 跳过文件 https://github.com/{repo}/blob/{branch}/{item_path} (无时间)", flush=True)
                 continue
 
-            # 检查是否在 24 小时内
             if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
-                print(f"[{now_str()}] ⏭️ 跳过 https://github.com/{repo}/blob/{branch}/{item_path}：最后更新超过 24 小时 "
-                      f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, 来源：{time_source})", flush=True)
+                print(f"[{now_str()}] ⏭️ 跳过 https://github.com/{repo}/blob/{branch}/{item_path} "
+                      f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, {time_source})", flush=True)
                 if item_type == "dir":
-                    print(f"[{now_str()}] 🚫 目录 https://github.com/{repo}/tree/{branch}/{item_path} 过期，跳过递归", flush=True)
+                    print(f"[{now_str()}] 🚫 目录过期，跳过递归", flush=True)
                 continue
 
-            # ---------- 24 小时内更新 ----------
-            print(f"[{now_str()}] ✅ https://github.com/{repo}/blob/{branch}/{item_path} 在 24 小时内更新 "
-                  f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, 来源：{time_source})", flush=True)
+            print(f"[{now_str()}] ✅ https://github.com/{repo}/blob/{branch}/{item_path} "
+                  f"({file_time.strftime('%Y-%m-%d %H:%M:%S')}, {time_source})", flush=True)
 
             if item_type == "dir":
                 self.process_file_tree(repo, item_path, branch, has_nodes)
             elif item_type == "file":
                 file_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{item_path}"
-                # ---------- 文件缓存检查 ----------
-                if file_commit_sha is not None:
-                    if file_url in self.file_cache:
-                        cached_sha, cached_time = self.file_cache[file_url]
-                        if (cached_sha == file_commit_sha and
-                                datetime.now(timezone.utc) - cached_time < timedelta(hours=24)):
-                            print(f"[{now_str()}] ⏭️ 跳过文件 {file_url}：文件缓存命中（{file_commit_sha[:7]}）", flush=True)
-                            continue
-                # 下载文件并提取节点
+                # 文件缓存检查
+                if file_commit_sha and file_url in self.file_cache:
+                    cached_sha, cached_time = self.file_cache[file_url]
+                    if cached_sha == file_commit_sha and datetime.now(timezone.utc) - cached_time < timedelta(hours=24):
+                        print(f"[{now_str()}] ⏭️ 跳过文件 {file_url} (缓存命中 {file_commit_sha[:7]})", flush=True)
+                        continue
+
                 print(f"[{now_str()}] 🔍 检查文件: {file_url}", flush=True)
                 file_resp = safe_get(file_url, self.headers, timeout=(10, 30))
                 if not file_resp:
                     continue
 
-                # 使用新解析器一次性提取并解析
                 parse_start = time.time()
                 proxies = extract_and_parse(file_resp.text, source_url=file_url)
                 new_nodes = []
@@ -276,106 +202,60 @@ class Collector:
                 if new_nodes:
                     self.all_links.append(file_url)
                     has_nodes[0] = True
-                    print(f"[{now_str()}] 📄 {file_url} ✅ 新增 {len(new_nodes)} 条节点 "
+                    print(f"[{now_str()}] 📄 {file_url} ✅ 新增 {len(new_nodes)} 条 "
                           f"(解析耗时 {time.time() - parse_start:.2f}s)", flush=True)
                 else:
                     print(f"[{now_str()}] 📄 {file_url} ❌ 无新节点", flush=True)
 
-                # 更新文件缓存（记录 commit sha 和当前时间）
-                if file_commit_sha is not None:
+                if file_commit_sha:
                     self.file_cache[file_url] = (file_commit_sha, datetime.now(timezone.utc))
 
-    # ==================== 持久化加载/保存 ====================
+    # ==================== 持久化 ====================
     def load_blacklist(self):
-        """加载永久黑名单 ljck.txt"""
         if os.path.exists(BLACKLIST_FILE):
             with open(BLACKLIST_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line.startswith("https://github.com/"):
                         self.blacklist_repos.add(line)
-            print(f"[{now_str()}] 已加载 ljck.txt，黑名单仓库 {len(self.blacklist_repos)} 个", flush=True)
-
-    def load_repo_cache(self):
-        """加载仓库缓存 repo_commit_cache.txt，格式：url sha timestamp"""
-        if os.path.exists(REPO_CACHE_FILE):
-            with open(REPO_CACHE_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    parts = line.split(maxsplit=2)
-                    if len(parts) >= 2:
-                        url = parts[0]
-                        sha = parts[1]
-                        timestamp = None
-                        if len(parts) >= 3:
-                            try:
-                                timestamp = datetime.fromisoformat(parts[2])
-                            except ValueError:
-                                pass
-                        if timestamp is None:
-                            timestamp = datetime.min.replace(tzinfo=timezone.utc)
-                        if url.startswith("https://github.com/"):
-                            self.repo_cache[url] = (sha, timestamp)
-            print(f"[{now_str()}] 已加载 repo 缓存 {len(self.repo_cache)} 条", flush=True)
+            print(f"[{now_str()}] 加载黑名单: {len(self.blacklist_repos)} 个", flush=True)
 
     def load_file_cache(self):
-        """加载文件缓存 dr_commit_cache.txt，格式：raw_url sha timestamp"""
         if os.path.exists(FILE_CACHE_FILE):
             with open(FILE_CACHE_FILE, "r", encoding="utf-8") as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    parts = line.split(maxsplit=2)
-                    if len(parts) >= 2:
+                    parts = line.strip().split(maxsplit=2)
+                    if len(parts) >= 2 and "raw.githubusercontent.com" in parts[0]:
                         url = parts[0]
                         sha = parts[1]
-                        timestamp = None
+                        ts = datetime.min.replace(tzinfo=timezone.utc)
                         if len(parts) >= 3:
                             try:
-                                timestamp = datetime.fromisoformat(parts[2])
+                                ts = datetime.fromisoformat(parts[2])
                             except ValueError:
                                 pass
-                        if timestamp is None:
-                            timestamp = datetime.min.replace(tzinfo=timezone.utc)
-                        if "raw.githubusercontent.com" in url:
-                            self.file_cache[url] = (sha, timestamp)
-            print(f"[{now_str()}] 已加载 file 缓存 {len(self.file_cache)} 条", flush=True)
+                        self.file_cache[url] = (sha, ts)
+            print(f"[{now_str()}] 加载文件缓存: {len(self.file_cache)} 条", flush=True)
 
-    def clean_cache(self, cache: Dict[str, Tuple[str, datetime]]) -> Dict[str, Tuple[str, datetime]]:
-        """清理超过 24 小时的缓存条目，返回新的字典"""
+    def clean_file_cache(self):
         now = datetime.now(timezone.utc)
-        cleaned = {}
-        for key, (sha, ts) in cache.items():
-            if now - ts < timedelta(hours=24):
-                cleaned[key] = (sha, ts)
-        return cleaned
-
-    def save_repo_cache(self):
-        """写入仓库缓存（先清理过期）"""
-        cleaned = self.clean_cache(self.repo_cache)
-        with open(REPO_CACHE_FILE, "w", encoding="utf-8") as f:
-            for url, (sha, ts) in cleaned.items():
-                f.write(f"{url} {sha} {ts.isoformat()}\n")
+        self.file_cache = {url: (sha, ts) for url, (sha, ts) in self.file_cache.items()
+                           if now - ts < timedelta(hours=24)}
 
     def save_file_cache(self):
-        """写入文件缓存（先清理过期）"""
-        cleaned = self.clean_cache(self.file_cache)
+        self.clean_file_cache()
         with open(FILE_CACHE_FILE, "w", encoding="utf-8") as f:
-            for url, (sha, ts) in cleaned.items():
+            for url, (sha, ts) in self.file_cache.items():
                 f.write(f"{url} {sha} {ts.isoformat()}\n")
 
     def save_results(self):
-        """保存所有结果并持久化缓存（包含过期清理）"""
-        # 1. 保存 no.txt
+        # no.txt
         if self.unique_nodes:
             with open("no.txt", "w", encoding="utf-8") as f:
                 f.write("\n".join(self.unique_nodes))
-            print(f"[{now_str()}] 已保存 {len(self.unique_nodes)} 条节点到 no.txt", flush=True)
+            print(f"[{now_str()}] 保存 no.txt ({len(self.unique_nodes)} 条)", flush=True)
 
-        # 2. 分片到 no/ 文件夹，生成 no_w_li.txt
+        # 分片 no/ 和 no_w_li.txt
         no_dir = "no"
         if os.path.exists(no_dir):
             shutil.rmtree(no_dir)
@@ -395,21 +275,17 @@ class Collector:
             filepath = os.path.join(no_dir, filename)
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write("\n".join(chunk))
-            raw_url = f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{filename}"
-            no_w_links.append(raw_url)
+            no_w_links.append(f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{filename}")
 
         with open("no_w_li.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(no_w_links))
-        print(f"[{now_str()}] 已生成 no_w_li.txt ({file_count} 个分片)", flush=True)
+        print(f"[{now_str()}] 保存 no_w_li.txt ({file_count} 分片)", flush=True)
 
-        # 3. 保存 no_li.txt（包含 no.txt 自身的 raw 链接）
-        no_txt_raw = f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no.txt"
-        self.all_links.append(no_txt_raw)
-        self.all_links = list(dict.fromkeys(self.all_links))  # 去重
+        # no_li.txt
+        self.all_links.append(f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no.txt")
+        self.all_links = list(dict.fromkeys(self.all_links))
         with open("no_li.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(self.all_links))
 
-        # 4. 清理并保存缓存
-        self.save_repo_cache()
         self.save_file_cache()
-        print(f"[{now_str()}] 缓存已更新（已清理超过 24 小时的记录）", flush=True)
+        print(f"[{now_str()}] 文件缓存已更新", flush=True)
