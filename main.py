@@ -1,12 +1,22 @@
-"""主入口，配置关键词列表并启动收集器，最后调用测速"""
+"""
+主入口：动态生成带时间限定词的搜索关键词，启动收集与测速。
+"""
 
 import os
+import time
+from datetime import datetime, timezone, timedelta
 from collector import Collector
 from tester import run_full_test
 
-QUERIES = [
+# -------------------- 动态生成搜索基准日期 --------------------
+# 取当前UTC时间的前一天日期（精确到天），作为 pushed:> 的边界
+# 这样可以覆盖最近24~48小时内的仓库，确保不遗漏更新
+UTC_NOW = datetime.now(timezone.utc)
+BASE_DATE = (UTC_NOW - timedelta(days=1)).strftime('%Y-%m-%d')
+TIME_SUFFIX = f"pushed:>{BASE_DATE}"
 
-    # ==================== 4. 中文高频 ====================
+# 基础关键词（无时间限定，后面统一添加）
+BASE_QUERIES = [
     "免费节点",
     "免费clash订阅",
     "免费v2ray订阅",
@@ -14,30 +24,59 @@ QUERIES = [
     "节点订阅",
     "免费机场",
     "科学上网",
-    "梯子",
     "代理",
     "免费ssr节点",
     "免费vless节点",
     "免费reality节点",
     "免费tuic节点",
     "免费singbox节点",
-    "免费翻墙",
     "公益节点",
     "节点分享",
     "节点仓库",
     "每日节点",
     "免费节点合集",
-
+    "clash订阅",
+    "v2ray订阅",
+    "trojan订阅",
+    "hysteria2订阅",
+    "free nodes",
+    "free v2ray nodes",
+    "free clash nodes",
+    "free trojan nodes",
+    "free proxy list",
+    "free proxy subscription",
+    "subconverter",
+    "ACL4SSR",
+    "v2rayN",
+    "mihomo",
+    "Clash.Meta",
+    "Shadowrocket",
+    "Hiddify",
+    "Nekoray",
+    "ProxyCollector",
+    "TelegramV2rayCollector",
+    "free proxy scraper",
+    "free proxy bot",
 ]
 
+# 最终查询列表：每个关键词后附加时间限定词
+QUERIES = [f"{q} {TIME_SUFFIX}" for q in BASE_QUERIES]
+
 if __name__ == "__main__":
+    start_time = time.time()
     token = os.getenv("GITHUB_TOKEN", "")
+
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] 🚀 程序启动，基准日期：{BASE_DATE}", flush=True)
     collector = Collector(token=token, queries=QUERIES)
     collector.run()
 
-    # 提取节点字符串列表
+    # 提取节点并测速
     node_strings = list(collector.unique_nodes)
     if node_strings:
+        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] 🔍 开始测速...", flush=True)
         run_full_test(node_strings)
     else:
-        print("无节点可供测速")
+        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] ⚠️ 无节点可供测速", flush=True)
+
+    elapsed = time.time() - start_time
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] 🎉 全部完成，总耗时 {elapsed:.1f} 秒", flush=True)
