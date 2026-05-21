@@ -1,8 +1,8 @@
-name: 动态搜集 + su-ch精细测活测速 + si-bo延迟 + 重命名输出标准jd
+name: 动态搜集
 
 on:
   schedule:
-    - cron: '0 0 1 * *'   # UTC 04:00,10:00,16:00,22:00 → 北京时间 12:00,18:00,00:00,06:00
+    - cron: '0 0 1 * *'
   workflow_dispatch:
 
 jobs:
@@ -40,7 +40,7 @@ jobs:
           export GIT_AUTHOR_DATE="$BEIJING_TIME +0800"
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
           git add -A no/
-          git add no.txt no_li.txt no_w_li.txt ljck.txt dr_commit_cache.txt
+          git add no.txt no_li.txt no_w_li.txt ljck.txt
           git add alive.txt fi_no.txt jd.txt fi_no_w_li.txt GeoLite2-City.mmdb || true
           git commit -m "自动更新 + 测速 + 国旗排序 - $BEIJING_TIME CST" || echo "No changes"
           git push
