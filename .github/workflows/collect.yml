@@ -1,4 +1,4 @@
-name: 动态搜集 + TCP预筛选 + mihomo延迟测速 + 速度测试
+name: 动态搜集
 
 on:
   schedule:
