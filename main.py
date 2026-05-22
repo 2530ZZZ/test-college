@@ -7,6 +7,7 @@ from collector import Collector
 from tester import run_full_test
 
 # 动态生成 pushed 限定词（UTC 前一天的日期）
+# 确保覆盖最近 24~48 小时内推送过的仓库
 UTC_NOW = datetime.now(timezone.utc)
 BASE_DATE = (UTC_NOW - timedelta(days=1)).strftime('%Y-%m-%d')
 TIME_SUFFIX = f"pushed:>{BASE_DATE}"
