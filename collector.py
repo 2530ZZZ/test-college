@@ -16,6 +16,7 @@ from config import CHUNK_SIZE
 
 BLACKLIST_FILE = "ljck.txt"
 ALLOWED_EXTENSIONS = {'.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64'}
+MAX_FILE_SIZE = 1_000_000   # 1MB，超过此大小的文件直接跳过
 
 
 class Collector:
@@ -27,7 +28,7 @@ class Collector:
         }
         self.queries = queries or []
         self.all_links: List[str] = []
-        self.unique_nodes: Set[str] = set()          # 标准化 URI 节点集合
+        self.unique_nodes: Set[str] = set()
         self.seen_repos: Set[str] = set()
         self.blacklist_repos: Set[str] = set()
         self.checked_count: int = 0
@@ -44,7 +45,8 @@ class Collector:
             self.search_query(query)
             print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
         self.save_results()
-        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {time.time() - start_time:.0f}s", flush=True)
+        elapsed = time.time() - start_time
+        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f}s", flush=True)
         print(f"[{now_str()}] 检查仓库: {self.checked_count}, 源链接: {len(self.all_links)}, 节点: {len(self.unique_nodes)}", flush=True)
 
     def search_query(self, query: str, max_pages: int = 3):
@@ -69,7 +71,7 @@ class Collector:
             page += 1
             time.sleep(2)
 
-    @timeout_decorator(60)
+    @timeout_decorator(120)   # 将超时时间提高到 120 秒作为安全网
     def process_repo(self, repo: str):
         github_url = f"https://github.com/{repo}"
         if github_url in self.blacklist_repos:
@@ -157,7 +159,13 @@ class Collector:
                 if not file_resp:
                     continue
 
-                candidates = extract_raw_candidates(file_resp.text)
+                # 跳过超大文件（广告规则、日志等）
+                content = file_resp.text
+                if len(content) > MAX_FILE_SIZE:
+                    print(f"[{now_str()}] ⚠️ 文件过大 ({len(content)} 字节)，跳过", flush=True)
+                    continue
+
+                candidates = extract_raw_candidates(content)
                 new_nodes = 0
                 for cand in candidates:
                     if cand not in self.unique_nodes:
