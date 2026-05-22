@@ -1,6 +1,4 @@
-"""
-主入口：动态生成带时间限定词的搜索关键词，启动收集与测速。
-"""
+"""主入口：动态生成搜索关键词，启动收集与测速。"""
 
 import os
 import time
@@ -8,52 +6,23 @@ from datetime import datetime, timezone, timedelta
 from collector import Collector
 from tester import run_full_test
 
-# 基准日期（当前UTC日期的前一天，确保覆盖最近24小时推送的仓库）
+# 动态生成 pushed 限定词（UTC 前一天的日期）
 UTC_NOW = datetime.now(timezone.utc)
 BASE_DATE = (UTC_NOW - timedelta(days=1)).strftime('%Y-%m-%d')
 TIME_SUFFIX = f"pushed:>{BASE_DATE}"
 
 BASE_QUERIES = [
-    "免费节点",
-    "免费clash订阅",
-    "免费v2ray订阅",
-    "免费机场节点",
-    "节点订阅",
-    "免费机场",
-    "科学上网",
-    "代理",
-    "免费ssr节点",
-    "免费vless节点",
-    "免费reality节点",
-    "免费tuic节点",
-    "免费singbox节点",
-    "公益节点",
-    "节点分享",
-    "节点仓库",
-    "每日节点",
-    "免费节点合集",
-    "clash订阅",
-    "v2ray订阅",
-    "trojan订阅",
-    "hysteria2订阅",
-    "free nodes",
-    "free v2ray nodes",
-    "free clash nodes",
-    "free trojan nodes",
-    "free proxy list",
-    "free proxy subscription",
-    "subconverter",
-    "ACL4SSR",
-    "v2rayN",
-    "mihomo",
-    "Clash.Meta",
-    "Shadowrocket",
-    "Hiddify",
-    "Nekoray",
-    "ProxyCollector",
-    "TelegramV2rayCollector",
-    "free proxy scraper",
-    "free proxy bot",
+    "免费节点", "免费clash订阅", "免费v2ray订阅", "免费机场节点",
+    "节点订阅", "免费机场", "科学上网", "代理",
+    "免费ssr节点", "免费vless节点", "免费reality节点", "免费tuic节点", "免费singbox节点",
+    "公益节点", "节点分享", "节点仓库", "每日节点", "免费节点合集",
+    "clash订阅", "v2ray订阅", "trojan订阅", "hysteria2订阅",
+    "free nodes", "free v2ray nodes", "free clash nodes", "free trojan nodes",
+    "free proxy list", "free proxy subscription",
+    "subconverter", "ACL4SSR", "v2rayN", "mihomo", "Clash.Meta",
+    "Shadowrocket", "Hiddify", "Nekoray",
+    "ProxyCollector", "TelegramV2rayCollector",
+    "free proxy scraper", "free proxy bot",
 ]
 
 QUERIES = [f"{q} {TIME_SUFFIX}" for q in BASE_QUERIES]
@@ -61,8 +30,8 @@ QUERIES = [f"{q} {TIME_SUFFIX}" for q in BASE_QUERIES]
 if __name__ == "__main__":
     start_time = time.time()
     token = os.getenv("GITHUB_TOKEN", "")
-
     print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] 🚀 程序启动，基准日期：{BASE_DATE}", flush=True)
+
     collector = Collector(token=token, queries=QUERIES)
     collector.run()
 
