@@ -1,5 +1,14 @@
 """
 测速模块 —— TCP 预筛选 + mihomo 延迟测试 + 下载速度测试。
+
+所有可调参数统一由 config.py 管理，包括：
+  - MIHOMO_URL/MIHOMO_BIN/MIXED_PORT/API_PORT：mihomo 连接配置
+  - LATENCY_TEST_URL/LATENCY_TIMEOUT/SPEED_TEST_URL/SPEED_TIMEOUT：测速目标与超时
+  - MIN_DOWNLOAD_BYTES/MAX_LATENCY/MIN_SPEED_MB：过滤阈值
+  - TCP_SCAN_ENABLED/TCP_SCAN_TIMEOUT/TCP_SCAN_WORKERS：TCP 预筛选参数
+  - TEST_BATCH_SIZE：每批送入 mihomo 的节点数
+  - ALIVE_NODE_FILE/MIHOMO_OUTPUT_FILE/MIHOMO_TEMPLATE_FILE：输出文件路径
+
 输出 alive.txt（标准 URI）和 mihomo.yaml（订阅配置文件）。
 """
 
@@ -27,7 +36,17 @@ from utils import now_str
 # ==================== 辅助函数 ====================
 
 def parse_host_port(node_str: str) -> Tuple[Optional[str], Optional[int]]:
-    """从节点 URI 中提取 host 和 port。"""
+    """
+    从节点 URI 中提取 host 和 port。
+
+    支持的格式：
+      - ss://base64@host:port
+      - vmess://base64
+      - vless://uuid@host:port?params
+      - trojan://password@host:port?params
+      - hysteria2://password@host:port?params
+      - tuic://uuid:password@host:port?params
+    """
     if "://" not in node_str:
         return None, None
     try:
@@ -49,7 +68,12 @@ def parse_host_port(node_str: str) -> Tuple[Optional[str], Optional[int]]:
 
 
 def tcp_check(host: str, port: int) -> bool:
-    """TCP 端口连通性检查。"""
+    """
+    TCP 端口连通性检查。
+
+    超时由 config.TCP_SCAN_TIMEOUT 控制（默认 1.5 秒）。
+    连接成功返回 True，失败或异常返回 False。
+    """
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(TCP_SCAN_TIMEOUT)
@@ -61,7 +85,13 @@ def tcp_check(host: str, port: int) -> bool:
 
 
 def tcp_prescreen(node_list: List[str]) -> List[str]:
-    """多线程 TCP 端口预筛选，返回端口可达的节点列表。"""
+    """
+    多线程 TCP 端口预筛选。
+
+    并发数由 config.TCP_SCAN_WORKERS 控制（默认 200）。
+    返回端口可达的节点列表。
+    无法解析 host:port 的节点直接保留（交给 mihomo 判断）。
+    """
     print(f"[{now_str()}] 🔍 TCP 端口预筛选 ({len(node_list)} 个节点)...", flush=True)
     alive = []
     tasks = {}
@@ -71,7 +101,7 @@ def tcp_prescreen(node_list: List[str]) -> List[str]:
             if host and port:
                 tasks[executor.submit(tcp_check, host, port)] = node
             else:
-                alive.append(node)  # 无法解析的保留，交给 mihomo 判断
+                alive.append(node)
         for future in as_completed(tasks):
             node = tasks[future]
             try:
@@ -84,7 +114,12 @@ def tcp_prescreen(node_list: List[str]) -> List[str]:
 
 
 def download_mihomo(bin_path: str):
-    """下载并解压 mihomo 二进制。"""
+    """
+    下载并解压 mihomo 二进制。
+
+    下载地址由 config.MIHOMO_URL 控制（自动拼接最新版本号）。
+    如果本地已存在则跳过。
+    """
     if os.path.exists(bin_path):
         return
     print(f"[{now_str()}] 下载 mihomo ...", flush=True)
@@ -108,13 +143,21 @@ def download_mihomo(bin_path: str):
 
 def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
     """
-    测试一批节点：生成临时配置 -> 启动 mihomo -> 延迟测试 -> 速度测试（仅存活） -> 停止 mihomo。
-    返回 {node_raw: {latency, speed, alive}}。
+    测试一批节点。
+
+    流程：
+      1. 生成临时 mihomo 配置（仅包含本批节点）
+      2. 启动 mihomo
+      3. 延迟测试：通过 API GET /proxies/{name}/delay 逐个测试
+      4. 速度测试：仅对延迟合格的节点，通过本地代理下载测速文件
+      5. 停止 mihomo 并清理临时配置文件
+
+    返回：
+      {node_raw: {latency, speed, alive}}
     """
     results = {}
     bin_path = os.path.join(os.getcwd(), MIHOMO_BIN)
 
-    # 生成最小配置
     config = {
         "mixed-port": MIXED_PORT,
         "external-controller": f"127.0.0.1:{API_PORT}",
@@ -123,7 +166,8 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
         "log-level": "error",
         "proxies": [],
         "proxy-groups": [
-            {"name": "auto", "type": "url-test", "proxies": [], "url": LATENCY_TEST_URL, "interval": 3600}
+            {"name": "auto", "type": "url-test", "proxies": [],
+             "url": LATENCY_TEST_URL, "interval": 3600}
         ]
     }
     name_map = {}
@@ -135,10 +179,10 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
 
     tmp_conf = os.path.join(os.getcwd(), f"mihomo_batch_{batch_id}.yaml")
     with open(tmp_conf, "w", encoding="utf-8") as f:
-        json.dump(config, f)  # 临时用 JSON，mihomo 兼容
+        json.dump(config, f)
 
-    # 启动 mihomo
-    proc = subprocess.Popen([bin_path, "-f", tmp_conf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen([bin_path, "-f", tmp_conf],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(3)
     if proc.poll() is not None:
         print(f"[{now_str()}] mihomo 批次 {batch_id} 启动失败", flush=True)
@@ -160,7 +204,11 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
     for name in node_names:
         raw = name_map.get(name, "")
         try:
-            r = requests.get(f"{api_base}/proxies/{name}/delay?url={LATENCY_TEST_URL}&timeout={LATENCY_TIMEOUT}", timeout=8)
+            r = requests.get(
+                f"{api_base}/proxies/{name}/delay"
+                f"?url={LATENCY_TEST_URL}&timeout={LATENCY_TIMEOUT}",
+                timeout=8
+            )
             if r.status_code == 200:
                 lat = r.json().get("delay", -1)
                 results[raw] = {"latency": lat, "speed": -1.0, "alive": lat > 0}
@@ -176,10 +224,14 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
         try:
             requests.put(f"{api_base}/proxies/auto", json={"name": name}, timeout=5)
             time.sleep(0.3)
-            proxies = {"http": f"http://127.0.0.1:{MIXED_PORT}", "https": f"http://127.0.0.1:{MIXED_PORT}"}
+            proxies = {
+                "http": f"http://127.0.0.1:{MIXED_PORT}",
+                "https": f"http://127.0.0.1:{MIXED_PORT}"
+            }
             start = time.time()
             downloaded = 0
-            r = requests.get(SPEED_TEST_URL, proxies=proxies, timeout=SPEED_TIMEOUT, stream=True)
+            r = requests.get(SPEED_TEST_URL, proxies=proxies,
+                             timeout=SPEED_TIMEOUT, stream=True)
             r.raise_for_status()
             for chunk in r.iter_content(8192):
                 downloaded += len(chunk)
@@ -207,11 +259,12 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
 def generate_mihomo_yaml(nodes: List[str], template_path: str, output_path: str):
     """
     使用用户提供的模板 new.yaml 生成 mihomo 订阅文件。
-    模板中 proxies 列表会被替换为存活节点，proxy-groups 中的 auto 组也会同步更新。
+
+    模板中 proxies 列表会被替换为存活节点，
+    proxy-groups 中的 auto 组也会同步更新。
     如果模板不存在，则使用默认最小配置。
     """
     if not os.path.exists(template_path):
-        # 模板不存在时生成一个极简模板
         default_config = {
             "mixed-port": 7890,
             "allow-lan": False,
@@ -219,7 +272,8 @@ def generate_mihomo_yaml(nodes: List[str], template_path: str, output_path: str)
             "log-level": "error",
             "proxies": [],
             "proxy-groups": [
-                {"name": "auto", "type": "url-test", "proxies": [], "url": LATENCY_TEST_URL, "interval": 3600}
+                {"name": "auto", "type": "url-test", "proxies": [],
+                 "url": LATENCY_TEST_URL, "interval": 3600}
             ]
         }
         with open(template_path, "w", encoding="utf-8") as f:
@@ -228,19 +282,15 @@ def generate_mihomo_yaml(nodes: List[str], template_path: str, output_path: str)
     try:
         with open(template_path, "r", encoding="utf-8") as f:
             template_text = f.read()
-
-        # 尝试解析为 YAML，如果 PyYAML 不可用则回退 JSON
         try:
             import yaml
             config = yaml.safe_load(template_text)
         except ImportError:
             config = json.loads(template_text)
 
-        # 确保 proxies 字段存在
         if "proxies" not in config:
             config["proxies"] = []
 
-        # 用存活节点填充 proxies 列表
         proxy_names = []
         new_proxies = []
         for idx, raw in enumerate(nodes):
@@ -249,13 +299,11 @@ def generate_mihomo_yaml(nodes: List[str], template_path: str, output_path: str)
             proxy_names.append(name)
         config["proxies"] = new_proxies
 
-        # 更新 proxy-groups 中的 auto 组（如果存在）
         if "proxy-groups" in config and isinstance(config["proxy-groups"], list):
             for group in config["proxy-groups"]:
                 if group.get("name") == "auto":
                     group["proxies"] = proxy_names
 
-        # 输出为 YAML 格式（优先 PyYAML，否则 JSON）
         try:
             import yaml
             with open(output_path, "w", encoding="utf-8") as f:
@@ -265,7 +313,6 @@ def generate_mihomo_yaml(nodes: List[str], template_path: str, output_path: str)
                 json.dump(config, f, indent=2, ensure_ascii=False)
 
         print(f"[{now_str()}] 已生成 mihomo.yaml ({len(nodes)} 个节点)", flush=True)
-
     except Exception as e:
         print(f"[{now_str()}] 生成 mihomo.yaml 失败: {e}", flush=True)
 
@@ -274,10 +321,14 @@ def generate_mihomo_yaml(nodes: List[str], template_path: str, output_path: str)
 
 def run_full_test(node_strings: List[str], work_dir: str = "."):
     """
-    测速主入口：
-    1. TCP 端口预筛选（可选）
-    2. 分批测延迟+速度
-    3. 过滤存活节点，输出 alive.txt 和 mihomo.yaml
+    测速主入口。
+
+    流程：
+      1. 下载 mihomo 二进制（如尚未下载）
+      2. TCP 端口预筛选（config.TCP_SCAN_ENABLED 控制是否启用）
+      3. 分批测延迟+速度（每批 config.TEST_BATCH_SIZE 个节点）
+      4. 过滤存活节点（按 config.MAX_LATENCY 和 config.MIN_SPEED_MB）
+      5. 输出 alive.txt 和 mihomo.yaml
     """
     if not node_strings:
         print(f"[{now_str()}] 无节点可供测速", flush=True)
@@ -286,7 +337,6 @@ def run_full_test(node_strings: List[str], work_dir: str = "."):
     bin_path = os.path.join(os.getcwd(), MIHOMO_BIN)
     download_mihomo(bin_path)
 
-    # TCP 预筛选
     if TCP_SCAN_ENABLED:
         nodes = tcp_prescreen(node_strings)
     else:
@@ -294,12 +344,10 @@ def run_full_test(node_strings: List[str], work_dir: str = "."):
 
     if not nodes:
         print(f"[{now_str()}] 无存活节点", flush=True)
-        # 生成空文件
         open(ALIVE_NODE_FILE, "w").close()
         generate_mihomo_yaml([], MIHOMO_TEMPLATE_FILE, MIHOMO_OUTPUT_FILE)
         return
 
-    # 分批测试
     all_results = {}
     for i in range(0, len(nodes), TEST_BATCH_SIZE):
         batch = nodes[i:i + TEST_BATCH_SIZE]
@@ -308,7 +356,7 @@ def run_full_test(node_strings: List[str], work_dir: str = "."):
         results = _test_one_batch(batch, batch_id)
         all_results.update(results)
 
-    # 过滤出同时满足延迟和速度要求的节点
+    # 过滤：延迟和速度均需满足 config 中的阈值
     filtered_raws = []
     for raw, info in all_results.items():
         if not info["alive"]:
@@ -325,10 +373,8 @@ def run_full_test(node_strings: List[str], work_dir: str = "."):
         generate_mihomo_yaml([], MIHOMO_TEMPLATE_FILE, MIHOMO_OUTPUT_FILE)
         return
 
-    # 写入 alive.txt
     with open(ALIVE_NODE_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(filtered_raws))
     print(f"[{now_str()}] 保存 alive.txt ({len(filtered_raws)} 个节点)", flush=True)
 
-    # 生成 mihomo.yaml
     generate_mihomo_yaml(filtered_raws, MIHOMO_TEMPLATE_FILE, MIHOMO_OUTPUT_FILE)
