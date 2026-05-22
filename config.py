@@ -13,10 +13,7 @@ from utils import now_str
 # ==================== 自动获取最新版本 ====================
 
 def _fetch_latest_mihomo_version() -> str:
-    """
-    从 mihomo 的 version.txt 端点获取最新稳定版本号。
-    返回格式如 "v1.19.24"。
-    """
+    """从 mihomo 的 version.txt 端点获取最新稳定版本号。"""
     url = "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt"
     try:
         resp = requests.get(url, timeout=15)
@@ -27,15 +24,11 @@ def _fetch_latest_mihomo_version() -> str:
             return version
     except Exception as e:
         print(f"[{now_str()}] 获取 mihomo 最新版本失败: {e}，回退到 v1.18.7", flush=True)
-    return "v1.18.7"  # 回退版本
+    return "v1.18.7"
 
 
 def _fetch_latest_subconverter_version() -> str:
-    """
-    从 GitHub API 获取 subconverter 的最新 release 版本号。
-    返回格式如 "v0.9.0"。
-    """
-    # 优先使用 subconverter 的 Rust 重写版 (更轻量)
+    """从 GitHub API 获取 subconverter 的最新 release 版本号。"""
     url = "https://api.github.com/repos/sub-store-org/subconverter-rs/releases/latest"
     try:
         resp = requests.get(url, timeout=15)
@@ -75,7 +68,7 @@ MAX_LATENCY = 3000              # 最大允许延迟（毫秒）
 MIN_SPEED_MB = 0.5              # 最低允许速度（MB/s）
 
 # ==================== TCP 端口预筛选 ====================
-TCP_SCAN_ENABLED = True         # 是否启用 TCP 预筛选（强烈建议开启）
+TCP_SCAN_ENABLED = True         # 是否启用 TCP 预筛选
 TCP_SCAN_TIMEOUT = 1.5          # TCP 连接超时（秒）
 TCP_SCAN_WORKERS = 200          # TCP 扫描并发线程数
 
@@ -84,6 +77,6 @@ TEST_BATCH_SIZE = 3000          # 每批送入 mihomo 的节点数
 
 # ==================== 输出文件 ====================
 CHUNK_SIZE = 10000
-ALIVE_NODE_FILE = "alive.txt"
-FILTERED_NODE_FILE = "fi_no.txt"
-FINAL_OUTPUT_FILE = "jd.txt"
+ALIVE_NODE_FILE = "alive.txt"               # 存活节点原始 URI 列表
+MIHOMO_OUTPUT_FILE = "mihomo.yaml"          # 最终生成的 mihomo 订阅文件
+MIHOMO_TEMPLATE_FILE = "new.yaml"           # 用户编写的模板文件（根目录下）
