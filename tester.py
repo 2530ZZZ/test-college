@@ -1,7 +1,6 @@
 """
-测速模块 —— 基于 Clash.Meta (mihomo)
-集成延迟测试、速度测试、国家识别（离线/在线）、排序输出。
-输出文件：alive.txt (存活节点名), fi_no.txt (原始链接), jd.txt (国旗+编号+链接)
+测速模块 —— TCP 预筛选 + mihomo 延迟测试 + 下载速度测试。
+采用多级漏斗过滤，支持分批测速避免 mihomo 崩溃。
 """
 
 import os
@@ -9,421 +8,314 @@ import time
 import json
 import gzip
 import shutil
+import socket
 import subprocess
 import requests
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Set, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from config import (
     MIHOMO_URL, MIHOMO_BIN, MIXED_PORT, API_PORT,
-    LATENCY_TEST_URL, LATENCY_TIMEOUT,
-    SPEED_TEST_URL, SPEED_TIMEOUT, MIN_DOWNLOAD_BYTES,
-    MAX_LATENCY, MIN_SPEED_MB,
-    CHUNK_SIZE, ALIVE_NODE_FILE, FILTERED_NODE_FILE, FINAL_OUTPUT_FILE,
-    GEOLITE_DB_URL, GEOLITE_DB_PATH, USE_ONLINE_IP_API
+    LATENCY_TEST_URL, LATENCY_TIMEOUT, SPEED_TEST_URL, SPEED_TIMEOUT,
+    MIN_DOWNLOAD_BYTES, MAX_LATENCY, MIN_SPEED_MB,
+    TCP_SCAN_ENABLED, TCP_SCAN_TIMEOUT, TCP_SCAN_WORKERS,
+    TEST_BATCH_SIZE, CHUNK_SIZE,
+    ALIVE_NODE_FILE, FILTERED_NODE_FILE, FINAL_OUTPUT_FILE
 )
 from utils import now_str
 
-# 尝试导入 geoip2，若失败则使用域名推测
-try:
-    import geoip2.database
-    GEOIP2_AVAILABLE = True
-except ImportError:
-    GEOIP2_AVAILABLE = False
-
-
-# ==================== 国旗与国家代码映射 ====================
+# ==================== 国旗映射 ====================
 COUNTRY_FLAG = {
     "US": "🇺🇸", "GB": "🇬🇧", "DE": "🇩🇪", "JP": "🇯🇵", "KR": "🇰🇷",
     "SG": "🇸🇬", "HK": "🇭🇰", "TW": "🇹🇼", "CN": "🇨🇳", "FR": "🇫🇷",
     "CA": "🇨🇦", "AU": "🇦🇺", "IN": "🇮🇳", "NL": "🇳🇱", "RU": "🇷🇺",
     "BR": "🇧🇷", "IT": "🇮🇹", "ES": "🇪🇸", "CH": "🇨🇭", "SE": "🇸🇪",
-    "NO": "🇳🇴", "DK": "🇩🇰", "FI": "🇫🇮", "PL": "🇵🇱", "TR": "🇹🇷",
-    "UA": "🇺🇦", "VN": "🇻🇳", "TH": "🇹🇭", "ID": "🇮🇩", "MY": "🇲🇾",
-    "PH": "🇵🇭", "AE": "🇦🇪", "SA": "🇸🇦", "EG": "🇪🇬", "ZA": "🇿🇦",
-    "AR": "🇦🇷", "CL": "🇨🇱", "CO": "🇨🇴", "MX": "🇲🇽",
-    # 可根据需要继续扩展
 }
 
+
 def get_flag(country_code: str) -> str:
-    """根据两位国家代码返回国旗emoji，未知返回🏳️"""
     return COUNTRY_FLAG.get(country_code.upper(), "🏳️")
 
 
-# ==================== 国家识别类 ====================
-class GeoIdentifier:
-    def __init__(self):
-        self.reader = None
-        if GEOIP2_AVAILABLE:
-            self.load_geolite_db()
+def parse_host_port(node_str: str) -> Tuple[Optional[str], Optional[int]]:
+    """从节点 URI 中提取 host 和 port。"""
+    if "://" not in node_str:
+        return None, None
+    try:
+        rest = node_str.split("://", 1)[1]
+        if "#" in rest:
+            rest = rest.split("#")[0]
+        if "?" in rest:
+            rest = rest.split("?")[0]
+        if "@" in rest:
+            hostport = rest.split("@")[1]
+        else:
+            hostport = rest
+        if ":" in hostport:
+            host, port_str = hostport.rsplit(":", 1)
+            return host, int(port_str)
+    except Exception:
+        pass
+    return None, None
 
-    def load_geolite_db(self):
-        """加载离线数据库（若存在），否则尝试下载"""
-        if os.path.exists(GEOLITE_DB_PATH):
-            try:
-                self.reader = geoip2.database.Reader(GEOLITE_DB_PATH)
-                print(f"[{now_str()}] 已加载 GeoLite2 离线数据库", flush=True)
-                return
-            except Exception as e:
-                print(f"[{now_str()}] 加载离线数据库失败: {e}", flush=True)
 
-        # 尝试下载
-        print(f"[{now_str()}] 未找到 GeoLite2 数据库，尝试下载...", flush=True)
-        try:
-            resp = requests.get(GEOLITE_DB_URL, timeout=30)
-            if resp.status_code == 200:
-                with open(GEOLITE_DB_PATH, "wb") as f:
-                    f.write(resp.content)
-                self.reader = geoip2.database.Reader(GEOLITE_DB_PATH)
-                print(f"[{now_str()}] 下载成功", flush=True)
+def tcp_check(host: str, port: int) -> bool:
+    """TCP 端口连通性检查。"""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(TCP_SCAN_TIMEOUT)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
+
+
+def tcp_prescreen(node_list: List[str]) -> List[str]:
+    """多线程 TCP 端口预筛选，返回端口可达的节点列表。"""
+    print(f"[{now_str()}] 🔍 TCP 端口预筛选 ({len(node_list)} 个节点)...", flush=True)
+    alive = []
+    tasks = {}
+    with ThreadPoolExecutor(max_workers=TCP_SCAN_WORKERS) as executor:
+        for node in node_list:
+            host, port = parse_host_port(node)
+            if host and port:
+                tasks[executor.submit(tcp_check, host, port)] = node
             else:
-                print(f"[{now_str()}] 下载失败（状态码：{resp.status_code}），将使用域名推测", flush=True)
-        except Exception as e:
-            print(f"[{now_str()}] 下载异常: {e}，将使用域名推测", flush=True)
-
-    def lookup(self, ip_or_host: str) -> str:
-        """
-        查询 IP 或主机名对应的两位国家代码。
-        优先使用离线数据库，其次域名推测，最后在线 API（若启用）。
-        """
-        # 尝试使用离线数据库
-        if self.reader:
+                alive.append(node)  # 无法解析的保留，交给 mihomo 判断
+        for future in as_completed(tasks):
+            node = tasks[future]
             try:
-                response = self.reader.city(ip_or_host)
-                return response.country.iso_code or "未知"
+                if future.result():
+                    alive.append(node)
             except Exception:
                 pass
-
-        # 域名推测：根据顶级域或常见后缀
-        host = ip_or_host.split("/")[0] if "/" in ip_or_host else ip_or_host
-        if "." in host:
-            parts = host.split(".")
-            tld = parts[-1].upper()
-            tld_map = {
-                "US": "US", "UK": "GB", "DE": "DE", "JP": "JP", "KR": "KR",
-                "SG": "SG", "HK": "HK", "TW": "TW", "CN": "CN", "FR": "FR",
-                "CA": "CA", "AU": "AU", "IN": "IN", "NL": "NL", "RU": "RU",
-                "BR": "BR", "IT": "IT", "ES": "ES", "CH": "CH", "SE": "SE",
-                "COM": None, "NET": None, "ORG": None, "INFO": None
-            }
-            if tld in tld_map and tld_map[tld]:
-                return tld_map[tld]
-            # 如果二级域名为国别 (例如 example.co.jp)
-            if len(parts) >= 3 and parts[-2].upper() in COUNTRY_FLAG:
-                return parts[-2].upper()
-
-        # 在线 API（若启用）
-        if USE_ONLINE_IP_API:
-            try:
-                resp = requests.get(f"http://ip-api.com/json/{ip_or_host}?fields=countryCode", timeout=3)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    return data.get("countryCode", "未知")
-            except Exception:
-                pass
-
-        return "未知"
+    print(f"[{now_str()}] TCP 预筛选后存活: {len(alive)}/{len(node_list)}", flush=True)
+    return alive
 
 
-# ==================== 测速核心类 ====================
-class MihomoTester:
-    def __init__(self, proxies: List[str], work_dir: str = "."):
-        """
-        proxies: 节点字符串列表（URI 或 JSON，mihomo 可识别的格式）
-        """
-        self.proxies = proxies
-        self.work_dir = os.path.abspath(work_dir)
-        self.bin_path = os.path.join(self.work_dir, MIHOMO_BIN)
-        self.config_path = os.path.join(self.work_dir, "mihomo_config.yaml")
-        self.process: Optional[subprocess.Popen] = None
-        self.api_base = f"http://127.0.0.1:{API_PORT}"
-        self.geo = GeoIdentifier()
+def download_mihomo(bin_path: str):
+    """下载并解压 mihomo 二进制。"""
+    if os.path.exists(bin_path):
+        return
+    print(f"[{now_str()}] 下载 mihomo ...", flush=True)
+    gz_path = bin_path + ".gz"
+    try:
+        resp = requests.get(MIHOMO_URL, timeout=120, stream=True)
+        resp.raise_for_status()
+        with open(gz_path, "wb") as f:
+            shutil.copyfileobj(resp.raw, f)
+        with gzip.open(gz_path, "rb") as f_in:
+            with open(bin_path, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        os.chmod(bin_path, 0o755)
+        os.remove(gz_path)
+        print(f"[{now_str()}] mihomo 就绪", flush=True)
+    except Exception as e:
+        raise RuntimeError(f"下载 mihomo 失败: {e}")
 
-    def download_mihomo(self):
-        """下载并解压 mihomo 二进制"""
-        if os.path.exists(self.bin_path):
-            return
-        print(f"[{now_str()}] 下载 mihomo ...", flush=True)
-        gz_path = self.bin_path + ".gz"
-        try:
-            resp = requests.get(MIHOMO_URL, timeout=120, stream=True)
-            resp.raise_for_status()
-            with open(gz_path, "wb") as f:
-                shutil.copyfileobj(resp.raw, f)
-            with gzip.open(gz_path, "rb") as f_in:
-                with open(self.bin_path, "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            os.chmod(self.bin_path, 0o755)
-            os.remove(gz_path)
-            print(f"[{now_str()}] mihomo 就绪", flush=True)
-        except Exception as e:
-            raise RuntimeError(f"下载 mihomo 失败: {e}")
 
-    def generate_config(self):
-        """生成 mihomo 配置文件，包含所有节点"""
-        config = {
-            "mixed-port": MIXED_PORT,
-            "external-controller": f"127.0.0.1:{API_PORT}",
-            "allow-lan": False,
-            "mode": "rule",
-            "log-level": "error",
-            "proxies": [],
-            "proxy-groups": [
-                {
-                    "name": "auto",
-                    "type": "url-test",
-                    "proxies": [],
-                    "url": LATENCY_TEST_URL,
-                    "interval": 3600,
-                }
-            ],
-        }
-        for i, raw in enumerate(self.proxies):
-            name = f"node_{i}"
-            proxy_item = {"name": name, "link": raw}
-            config["proxies"].append(proxy_item)
-            config["proxy-groups"][0]["proxies"].append(name)
+def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
+    """
+    测试一批节点：
+    1. 生成临时配置
+    2. 启动 mihomo
+    3. 延迟测试（先）
+    4. 速度测试（后，仅对延迟合格的节点）
+    5. 停止 mihomo
+    返回 {node_raw: {latency, speed, alive}}
+    """
+    results = {}
+    bin_path = os.path.join(os.getcwd(), MIHOMO_BIN)
 
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
-        print(f"[{now_str()}] 配置已生成，共 {len(self.proxies)} 个节点", flush=True)
+    # 生成配置
+    config = {
+        "mixed-port": MIXED_PORT,
+        "external-controller": f"127.0.0.1:{API_PORT}",
+        "allow-lan": False,
+        "mode": "rule",
+        "log-level": "error",
+        "proxies": [],
+        "proxy-groups": [
+            {"name": "auto", "type": "url-test", "proxies": [], "url": LATENCY_TEST_URL, "interval": 3600}
+        ]
+    }
+    name_map = {}
+    for i, raw in enumerate(nodes_batch):
+        name = f"n{batch_id}_{i}"
+        config["proxies"].append({"name": name, "link": raw})
+        config["proxy-groups"][0]["proxies"].append(name)
+        name_map[name] = raw
 
-    def start_mihomo(self):
-        """启动 mihomo 进程"""
-        if self.process:
-            return
-        cmd = [self.bin_path, "-f", self.config_path]
-        self.process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(2)
-        if self.process.poll() is not None:
-            raise RuntimeError("mihomo 启动失败")
-        print(f"[{now_str()}] mihomo 已启动 (PID: {self.process.pid})", flush=True)
+    tmp_conf = os.path.join(os.getcwd(), f"mihomo_batch_{batch_id}.yaml")
+    with open(tmp_conf, "w", encoding="utf-8") as f:
+        json.dump(config, f)
 
-    def stop_mihomo(self):
-        """停止 mihomo"""
-        if self.process:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-            self.process = None
-            print(f"[{now_str()}] mihomo 已停止", flush=True)
-
-    def _api_get(self, path, timeout=10) -> Optional[dict]:
-        try:
-            resp = requests.get(f"{self.api_base}{path}", timeout=timeout)
-            if resp.status_code == 200:
-                return resp.json()
-        except Exception:
-            pass
-        return None
-
-    def measure_latency(self, proxy_name: str) -> int:
-        """返回延迟（毫秒），失败返回 -1"""
-        path = f"/proxies/{requests.utils.quote(proxy_name)}/delay?url={requests.utils.quote(LATENCY_TEST_URL)}&timeout={LATENCY_TIMEOUT}"
-        result = self._api_get(path, timeout=LATENCY_TIMEOUT // 1000 + 3)
-        if result and "delay" in result:
-            return result["delay"]
-        return -1
-
-    def measure_speed(self, proxy_name: str) -> float:
-        """返回速度（MB/s），失败返回 -1"""
-        proxies = {
-            "http": f"http://127.0.0.1:{MIXED_PORT}",
-            "https": f"http://127.0.0.1:{MIXED_PORT}"
-        }
-        switch_path = f"/proxies/auto"
-        put_data = json.dumps({"name": proxy_name})
-        try:
-            requests.put(f"{self.api_base}{switch_path}", data=put_data, timeout=5)
-        except Exception:
-            return -1
-
-        time.sleep(0.5)
-        start = time.time()
-        downloaded = 0
-        try:
-            with requests.get(SPEED_TEST_URL, proxies=proxies, timeout=SPEED_TIMEOUT / 1000, stream=True) as r:
-                r.raise_for_status()
-                for chunk in r.iter_content(chunk_size=8192):
-                    downloaded += len(chunk)
-                    if time.time() - start > SPEED_TIMEOUT / 1000:
-                        break
-        except Exception:
-            return -1
-
-        elapsed = time.time() - start
-        if elapsed <= 0 or downloaded < MIN_DOWNLOAD_BYTES:
-            return -1
-        return round(downloaded / (1024 * 1024) / elapsed, 2)
-
-    def test_all(self) -> Dict[str, Dict]:
-        """测试所有节点，返回 {name: {latency, speed, alive}}"""
-        proxies_info = self._api_get("/proxies")
-        if not proxies_info:
-            return {}
-
-        all_proxies = proxies_info.get("proxies", {})
-        node_names = [n for n in all_proxies if n not in ("GLOBAL", "DIRECT", "auto")]
-
-        results = {}
-        total = len(node_names)
-        print(f"[{now_str()}] 延迟测试（共 {total} 个）...", flush=True)
-        for idx, name in enumerate(node_names, 1):
-            lat = self.measure_latency(name)
-            alive = lat > 0
-            results[name] = {"latency": lat, "speed": -1.0, "alive": alive}
-            status = f"{lat}ms" if alive else "超时"
-            print(f"  [{idx:4d}/{total}] {name:20s} 延迟: {status}", flush=True)
-
-        alive_nodes = [n for n, v in results.items() if v["alive"]]
-        print(f"[{now_str()}] 速度测试（{len(alive_nodes)} 个存活）...", flush=True)
-        for idx, name in enumerate(alive_nodes, 1):
-            spd = self.measure_speed(name)
-            results[name]["speed"] = spd
-            status = f"{spd:.2f} MB/s" if spd > 0 else "测速失败"
-            print(f"  [{idx:4d}/{len(alive_nodes)}] {name:20s} 速度: {status}", flush=True)
-
+    # 启动 mihomo
+    proc = subprocess.Popen([bin_path, "-f", tmp_conf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(3)
+    if proc.poll() is not None:
+        print(f"[{now_str()}] mihomo 批次 {batch_id} 启动失败", flush=True)
+        os.remove(tmp_conf)
         return results
 
-    def filter_and_save(self, results: Dict[str, Dict], original_list: List[str]):
-        """
-        过滤、国家识别、排序，保存最终文件
-        """
-        # 创建 name -> original_link 映射
-        name_map = {}
-        for i, raw in enumerate(original_list):
-            name_map[f"node_{i}"] = raw
+    api_base = f"http://127.0.0.1:{API_PORT}"
+    try:
+        resp = requests.get(f"{api_base}/proxies", timeout=5)
+        all_proxies = resp.json().get("proxies", {})
+        node_names = [n for n in all_proxies if n not in ("GLOBAL", "DIRECT", "auto")]
+    except Exception:
+        proc.terminate()
+        proc.wait()
+        os.remove(tmp_conf)
+        return results
 
-        # 初步过滤
-        filtered = []
-        for name, info in results.items():
-            if not info["alive"]:
-                continue
-            if info["latency"] > MAX_LATENCY:
-                continue
-            if info["speed"] != -1 and info["speed"] < MIN_SPEED_MB:
-                continue
-            filtered.append((name, info["latency"], info["speed"]))
+    # 延迟测试
+    for name in node_names:
+        raw = name_map.get(name, "")
+        try:
+            r = requests.get(f"{api_base}/proxies/{name}/delay?url={LATENCY_TEST_URL}&timeout={LATENCY_TIMEOUT}", timeout=8)
+            if r.status_code == 200:
+                lat = r.json().get("delay", -1)
+                results[raw] = {"latency": lat, "speed": -1.0, "alive": lat > 0}
+            else:
+                results[raw] = {"latency": -1, "speed": -1.0, "alive": False}
+        except Exception:
+            results[raw] = {"latency": -1, "speed": -1.0, "alive": False}
 
-        if not filtered:
-            print(f"[{now_str()}] 无存活节点通过过滤", flush=True)
-            open(ALIVE_NODE_FILE, "w").close()
-            open(FILTERED_NODE_FILE, "w").close()
-            open(FINAL_OUTPUT_FILE, "w").close()
-            return
+    # 速度测试（仅存活节点）
+    alive_nodes = [(name, raw) for name, raw in name_map.items()
+                   if raw in results and results[raw]["alive"]]
+    for name, raw in alive_nodes:
+        try:
+            requests.put(f"{api_base}/proxies/auto", json={"name": name}, timeout=5)
+            time.sleep(0.3)
+            proxies = {"http": f"http://127.0.0.1:{MIXED_PORT}", "https": f"http://127.0.0.1:{MIXED_PORT}"}
+            start = time.time()
+            downloaded = 0
+            r = requests.get(SPEED_TEST_URL, proxies=proxies, timeout=SPEED_TIMEOUT, stream=True)
+            r.raise_for_status()
+            for chunk in r.iter_content(8192):
+                downloaded += len(chunk)
+                if time.time() - start > SPEED_TIMEOUT:
+                    break
+            elapsed = time.time() - start
+            if elapsed > 0 and downloaded >= MIN_DOWNLOAD_BYTES:
+                results[raw]["speed"] = round(downloaded / (1024 * 1024) / elapsed, 2)
+        except Exception:
+            pass
 
-        # 国家识别 + 结构化
-        proxy_entries = []
-        for name, lat, spd in filtered:
-            raw = name_map.get(name, "")
-            # 提取服务器地址（简单提取 host）
-            server = "未知"
-            if "://" in raw:
-                try:
-                    uri = raw.split("://", 1)[1]
-                    if "#" in uri:
-                        uri = uri.split("#")[0]
-                    if "?" in uri:
-                        uri = uri.split("?")[0]
-                    if "@" in uri:
-                        host = uri.split("@")[1]
-                    else:
-                        host = uri
-                    if ":" in host and not host.startswith("["):
-                        server = host.rsplit(":", 1)[0]
-                    else:
-                        server = host
-                except Exception:
-                    pass
-            country_code = self.geo.lookup(server)
-            proxy_entries.append({
-                "name": name,
-                "lat": lat,
-                "spd": spd,
-                "raw": raw,
-                "country": country_code,
-                "server": server
-            })
-
-        # 按国家排序，同一国家内按延迟升序
-        proxy_entries.sort(key=lambda x: (x["country"], x["lat"]))
-
-        # 国家内编号
-        country_counts = {}
-        final_lines = []       # jd.txt
-        alive_names = []       # alive.txt
-        filtered_links = []    # fi_no.txt
-        for entry in proxy_entries:
-            cc = entry["country"]
-            country_counts[cc] = country_counts.get(cc, 0) + 1
-            idx = country_counts[cc]
-            flag = get_flag(cc)
-            alias = f"{flag} {cc}_{idx}"
-            alive_names.append(alias)
-            filtered_links.append(entry["raw"])
-            final_lines.append(f"{alias} | {entry['raw']}")
-
-        with open(ALIVE_NODE_FILE, "w", encoding="utf-8") as f:
-            f.write("\n".join(alive_names))
-        with open(FILTERED_NODE_FILE, "w", encoding="utf-8") as f:
-            f.write("\n".join(filtered_links))
-        with open(FINAL_OUTPUT_FILE, "w", encoding="utf-8") as f:
-            f.write("\n".join(final_lines))
-
-        print(f"[{now_str()}] 最终存活节点: {len(alive_names)} 个", flush=True)
-        print(f"[{now_str()}] 输出文件: {ALIVE_NODE_FILE}, {FILTERED_NODE_FILE}, {FINAL_OUTPUT_FILE}", flush=True)
-
-        # 可选分片输出
-        self.save_chunks(filtered_links)
-
-    def save_chunks(self, links: List[str]):
-        """分片保存过滤后的原始链接，生成 fi_no_w_li.txt"""
-        chunk_dir = "fi_no_chunks"
-        if os.path.exists(chunk_dir):
-            shutil.rmtree(chunk_dir)
-        os.makedirs(chunk_dir, exist_ok=True)
-
-        chunk_size = CHUNK_SIZE
-        file_count = 0
-        w_links = []
-        repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
-        branch_name = os.getenv("GITHUB_REF_NAME", "main")
-
-        for i in range(0, len(links), chunk_size):
-            chunk = links[i:i + chunk_size]
-            file_count += 1
-            filename = f"{file_count}.txt"
-            filepath = os.path.join(chunk_dir, filename)
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write("\n".join(chunk))
-            raw_url = f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/fi_no_chunks/{filename}"
-            w_links.append(raw_url)
-
-        with open("fi_no_w_li.txt", "w", encoding="utf-8") as f:
-            f.write("\n".join(w_links))
-        print(f"[{now_str()}] 分片索引保存至 fi_no_w_li.txt", flush=True)
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+    if os.path.exists(tmp_conf):
+        os.remove(tmp_conf)
+    return results
 
 
 def run_full_test(node_strings: List[str], work_dir: str = "."):
-    """主流程：下载、配置、测速、过滤、输出"""
-    tester = MihomoTester(node_strings, work_dir)
-    try:
-        tester.download_mihomo()
-        tester.generate_config()
-        tester.start_mihomo()
+    """
+    主测速入口：
+    1. TCP 端口预筛选（可选）
+    2. 分批测延迟+速度
+    3. 过滤、排序、输出 jd.txt 等文件
+    """
+    if not node_strings:
+        print(f"[{now_str()}] 无节点可供测速", flush=True)
+        return
 
-        for _ in range(10):
-            if tester._api_get("/version"):
-                break
-            time.sleep(1)
-        else:
-            raise RuntimeError("mihomo API 未就绪")
+    # 下载 mihomo
+    bin_path = os.path.join(os.getcwd(), MIHOMO_BIN)
+    download_mihomo(bin_path)
 
-        results = tester.test_all()
-        if results:
-            tester.filter_and_save(results, node_strings)
-        else:
-            print(f"[{now_str()}] 无测试结果", flush=True)
-    finally:
-        tester.stop_mihomo()
+    # TCP 预筛选
+    if TCP_SCAN_ENABLED:
+        nodes = tcp_prescreen(node_strings)
+    else:
+        nodes = node_strings
+
+    if not nodes:
+        print(f"[{now_str()}] 无存活节点", flush=True)
+        return
+
+    # 分批测试
+    all_results = {}
+    for i in range(0, len(nodes), TEST_BATCH_SIZE):
+        batch = nodes[i:i + TEST_BATCH_SIZE]
+        batch_id = i // TEST_BATCH_SIZE + 1
+        print(f"[{now_str()}] 测速批次 {batch_id}: {len(batch)} 个节点", flush=True)
+        results = _test_one_batch(batch, batch_id)
+        all_results.update(results)
+
+    # 过滤
+    filtered = []
+    for raw, info in all_results.items():
+        if not info["alive"]:
+            continue
+        if info["latency"] > MAX_LATENCY:
+            continue
+        if info["speed"] != -1 and info["speed"] < MIN_SPEED_MB:
+            continue
+        filtered.append((raw, info["latency"], info["speed"]))
+
+    if not filtered:
+        print(f"[{now_str()}] 无节点通过过滤", flush=True)
+        for fname in [ALIVE_NODE_FILE, FILTERED_NODE_FILE, FINAL_OUTPUT_FILE]:
+            open(fname, "w").close()
+        return
+
+    # 简单域名推测国家
+    def guess_country(raw: str) -> str:
+        host, _ = parse_host_port(raw)
+        if not host:
+            return "未知"
+        parts = host.split(".")
+        tld = parts[-1].upper() if parts else "未知"
+        tld_map = {"US": "US", "UK": "GB", "DE": "DE", "JP": "JP", "KR": "KR",
+                    "SG": "SG", "HK": "HK", "TW": "TW", "CN": "CN", "FR": "FR",
+                    "CA": "CA", "AU": "AU", "IN": "IN", "NL": "NL", "RU": "RU",
+                    "BR": "BR", "IT": "IT", "ES": "ES", "CH": "CH", "SE": "SE"}
+        return tld_map.get(tld, "未知")
+
+    # 排序（国家 → 延迟）
+    filtered.sort(key=lambda x: (guess_country(x[0]), x[1]))
+
+    # 写文件
+    country_counts: Dict[str, int] = {}
+    alive_lines, fi_lines, jd_lines = [], [], []
+    for raw, lat, spd in filtered:
+        cc = guess_country(raw)
+        country_counts[cc] = country_counts.get(cc, 0) + 1
+        idx = country_counts[cc]
+        alias = f"{get_flag(cc)} {cc}_{idx}"
+        alive_lines.append(alias)
+        fi_lines.append(raw)
+        jd_lines.append(f"{alias} | {raw}")
+
+    with open(ALIVE_NODE_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(alive_lines))
+    with open(FILTERED_NODE_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(fi_lines))
+    with open(FINAL_OUTPUT_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(jd_lines))
+    print(f"[{now_str()}] 最终存活: {len(alive_lines)} 个 → {ALIVE_NODE_FILE}, {FILTERED_NODE_FILE}, {FINAL_OUTPUT_FILE}", flush=True)
+
+    # 分片
+    chunk_dir = "fi_no_chunks"
+    if os.path.exists(chunk_dir):
+        shutil.rmtree(chunk_dir)
+    os.makedirs(chunk_dir, exist_ok=True)
+    repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
+    branch_name = os.getenv("GITHUB_REF_NAME", "main")
+    w_links = []
+    for i in range(0, len(fi_lines), CHUNK_SIZE):
+        chunk = fi_lines[i:i + CHUNK_SIZE]
+        fname = f"{i // CHUNK_SIZE + 1}.txt"
+        with open(os.path.join(chunk_dir, fname), "w", encoding="utf-8") as f:
+            f.write("\n".join(chunk))
+        w_links.append(f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/fi_no_chunks/{fname}")
+    with open("fi_no_w_li.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(w_links))
