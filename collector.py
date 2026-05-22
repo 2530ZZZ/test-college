@@ -157,9 +157,7 @@ class Collector:
                 if not file_resp:
                     continue
 
-                # 提取候选块（不解析协议）
                 candidates = extract_raw_candidates(file_resp.text)
-                # 候选块直接加入节点集合（等待后续 subconverter 解析）
                 new_nodes = 0
                 for cand in candidates:
                     if cand not in self.unique_nodes:
