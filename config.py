@@ -1,6 +1,6 @@
 """
 全局配置 —— 集中管理所有可调参数和外部工具版本。
-mihomo 和 subconverter 均使用 GitHub API 自动获取最新稳定版。
+mihomo 使用 GitHub API 自动获取最新稳定版。
 """
 
 import os
@@ -27,23 +27,8 @@ def _fetch_latest_mihomo_version() -> str:
     return "v1.18.7"
 
 
-def _fetch_latest_subconverter_version() -> str:
-    """从 GitHub API 获取 subconverter 的最新 release 版本号。"""
-    url = "https://api.github.com/repos/sub-store-org/subconverter-rs/releases/latest"
-    try:
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        version = resp.json().get("tag_name", "")
-        if version:
-            print(f"[{now_str()}] 获取到 subconverter 最新版本: {version}", flush=True)
-            return version
-    except Exception as e:
-        print(f"[{now_str()}] 获取 subconverter 最新版本失败: {e}，回退到 v0.9.0", flush=True)
-    return "v0.9.0"
-
 
 MIHOMO_VERSION = os.getenv("MIHOMO_VERSION") or _fetch_latest_mihomo_version()
-SUBCONVERTER_VERSION = os.getenv("SUBCONVERTER_VERSION") or _fetch_latest_subconverter_version()
 
 # ==================== mihomo 配置 ====================
 MIHOMO_URL = (
