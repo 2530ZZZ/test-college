@@ -1,6 +1,7 @@
 """
 GitHub 节点收集器 —— Contents API 逐层递归 + 目录/文件 SHA 内存去重。
-收集到的候选块将作为原始节点数据，后续由 mihomo 进行解析和测试。
+收集到的候选块后续由 mihomo 进行解析和测试。
+新增累计限流监控，若限流等待超过阈值则主动停止搜索，直接进入测速。
 """
 
 import os
@@ -10,13 +11,13 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Set, Optional
 
 import utils
-from utils import safe_get, now_str, timeout_decorator, beijing_tz
+from utils import safe_get, now_str, timeout_decorator, beijing_tz, check_rate_limit
 from parsers import extract_raw_candidates
 from config import CHUNK_SIZE
 
 BLACKLIST_FILE = "ljck.txt"
 ALLOWED_EXTENSIONS = {'.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64'}
-MAX_FILE_SIZE = 1_000_000   # 1MB，超过此大小的文件直接跳过
+MAX_FILE_SIZE = 1_000_000   # 1MB
 
 
 class Collector:
@@ -40,20 +41,27 @@ class Collector:
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
         for idx, query in enumerate(self.queries, 1):
+            # 检查限流状态，若超限则退出循环
+            if utils.total_rate_limit_wait >= utils.MAX_TOTAL_RATE_LIMIT_WAIT:
+                print(f"[{now_str()}] ⚠️ 累计限流等待已达 {utils.total_rate_limit_wait:.0f}s，终止搜索", flush=True)
+                break
             q_start = time.time()
             print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
             self.search_query(query)
             print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
+
         self.save_results()
         elapsed = time.time() - start_time
         print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f}s", flush=True)
         print(f"[{now_str()}] 检查仓库: {self.checked_count}, 源链接: {len(self.all_links)}, 节点: {len(self.unique_nodes)}", flush=True)
+        print(f"[{now_str()}] 累计限流等待: {utils.total_rate_limit_wait:.0f} 秒", flush=True)
 
     def search_query(self, query: str, max_pages: int = 3):
         for page in range(1, max_pages + 1):
             url = f"https://api.github.com/search/repositories?q={query}&sort=updated&order=desc&per_page=30&page={page}"
             resp = safe_get(url, self.headers, timeout=(15, 30), operation_name=f"搜索第{page}页")
             if not resp:
+                check_rate_limit()  # 若是限流超限，这里会抛出异常中断搜索
                 break
             items = resp.json().get("items", [])
             if not items:
@@ -66,12 +74,16 @@ class Collector:
                     continue
                 self.seen_repos.add(repo)
                 self.checked_count += 1
-                self.process_repo(repo)
+                try:
+                    self.process_repo(repo)
+                except RuntimeError:
+                    print(f"[{now_str()}] ⚠️ 限流超限，停止处理仓库", flush=True)
+                    return
                 time.sleep(0.5)
             page += 1
             time.sleep(2)
 
-    @timeout_decorator(120)   # 将超时时间提高到 120 秒作为安全网
+    @timeout_decorator(120)
     def process_repo(self, repo: str):
         github_url = f"https://github.com/{repo}"
         if github_url in self.blacklist_repos:
@@ -85,7 +97,10 @@ class Collector:
         default_branch = repo_data.get("default_branch", "main")
         print(f"[{now_str()}] 仓库 {github_url} (分支: {default_branch})", flush=True)
         has_nodes_flag = [False]
-        self.process_file_tree(repo, "", default_branch, has_nodes_flag)
+        try:
+            self.process_file_tree(repo, "", default_branch, has_nodes_flag)
+        except RuntimeError:
+            raise
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
             print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
             self.blacklist_repos.add(github_url)
@@ -96,6 +111,7 @@ class Collector:
         contents_url = f"https://api.github.com/repos/{repo}/contents/{path}" if path else f"https://api.github.com/repos/{repo}/contents"
         resp = safe_get(contents_url, self.headers, timeout=(10, 20), operation_name=f"Contents API {path or '根'}")
         if not resp:
+            check_rate_limit()
             return
         items = resp.json()
         for item in items:
@@ -111,7 +127,7 @@ class Collector:
                 c_resp = safe_get(commit_url, self.headers, timeout=(8, 12), operation_name=f"commit 查询目录 {item_path}")
                 if not c_resp:
                     self.processed_dir_shas.add(item_sha)
-                    print(f"[{now_str()}] ⚠️ 目录 {item_path} 查询 commits 失败，跳过", flush=True)
+                    check_rate_limit()
                     continue
                 try:
                     commit_list = c_resp.json()
@@ -124,9 +140,7 @@ class Collector:
                     dir_time = None
                 self.processed_dir_shas.add(item_sha)
                 if dir_time is None or datetime.now(timezone.utc) - dir_time >= timedelta(hours=24):
-                    print(f"[{now_str()}] ⏭️ 跳过目录 https://github.com/{repo}/tree/{branch}/{item_path} (超过24h)", flush=True)
                     continue
-                print(f"[{now_str()}] ✅ 进入目录 https://github.com/{repo}/tree/{branch}/{item_path}", flush=True)
                 self.process_file_tree(repo, item_path, branch, has_nodes)
 
             elif item_type == "file":
@@ -139,6 +153,7 @@ class Collector:
                 c_resp = safe_get(commit_url, self.headers, timeout=(8, 12), operation_name=f"commit 查询文件 {item_path}")
                 if not c_resp:
                     self.processed_file_shas.add(item_sha)
+                    check_rate_limit()
                     continue
                 try:
                     commit_list = c_resp.json()
@@ -157,9 +172,9 @@ class Collector:
                 print(f"[{now_str()}] 🔍 下载: {file_url}", flush=True)
                 file_resp = safe_get(file_url, self.headers, timeout=(10, 30))
                 if not file_resp:
+                    check_rate_limit()
                     continue
 
-                # 跳过超大文件（广告规则、日志等）
                 content = file_resp.text
                 if len(content) > MAX_FILE_SIZE:
                     print(f"[{now_str()}] ⚠️ 文件过大 ({len(content)} 字节)，跳过", flush=True)
