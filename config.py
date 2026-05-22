@@ -6,6 +6,7 @@ mihomo 使用 GitHub API 自动获取最新稳定版。
   - 所有可调参数集中在此文件，外部模块通过 import 引用。
   - 每个参数均有详细注释，说明含义、默认值、调整建议。
   - 版本号自动获取，失败时回退到硬编码的稳定版本。
+  - 本模块不再依赖 utils 模块，避免循环导入。
 
 config.py（唯一配置源）
   ├── MIHOMO_URL, MIHOMO_BIN, MIXED_PORT, API_PORT → tester.py
@@ -24,11 +25,22 @@ config.py（唯一配置源）
   └── MIHOMO_VERSION → 自动获取
 """
 
+
 import os
-import re
 import json
 import requests
-from utils import now_str
+from datetime import datetime, timezone, timedelta
+
+
+# ==================== 内部工具 ====================
+
+# 北京时间时区（用于日志输出）
+_BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _now_str() -> str:
+    """返回北京时间字符串，格式：YYYY-MM-DD HH:MM:SS，用于模块内日志。"""
+    return datetime.now(_BEIJING_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
 
 # ==================== 自动获取最新版本 ====================
@@ -47,10 +59,10 @@ def _fetch_latest_mihomo_version() -> str:
         resp.raise_for_status()
         version = resp.text.strip()
         if version:
-            print(f"[{now_str()}] 获取到 mihomo 最新版本: {version}", flush=True)
+            print(f"[{_now_str()}] 获取到 mihomo 最新版本: {version}", flush=True)
             return version
     except Exception as e:
-        print(f"[{now_str()}] 获取 mihomo 最新版本失败: {e}，回退到 v1.18.7", flush=True)
+        print(f"[{_now_str()}] 获取 mihomo 最新版本失败: {e}，回退到 v1.18.7", flush=True)
     return "v1.18.7"  # 回退版本：经过验证的稳定版
 
 
