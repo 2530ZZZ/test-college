@@ -1,5 +1,5 @@
 """
-通用工具函数：网络请求、超时保护、Base64 解码等
+通用工具函数：网络请求、超时保护、Base64 解码、北京时间格式化等。
 """
 
 import requests
@@ -15,21 +15,15 @@ from typing import Optional, Dict
 
 beijing_tz = timezone(timedelta(hours=8))
 
+
 def create_session() -> requests.Session:
     session = requests.Session()
-    retry_strategy = Retry(
-        total=2,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-    )
-    adapter = HTTPAdapter(
-        max_retries=retry_strategy,
-        pool_connections=10,
-        pool_maxsize=10
-    )
+    retry_strategy = Retry(total=2, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=10, pool_maxsize=10)
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
+
 
 def safe_get(url: str, headers: Dict[str, str], timeout=(8, 15), max_retries=2,
              operation_name="请求") -> Optional[requests.Response]:
@@ -45,9 +39,7 @@ def safe_get(url: str, headers: Dict[str, str], timeout=(8, 15), max_retries=2,
             if resp.status_code == 409:
                 print(f"[{now_str()}] {operation_name} 409，跳过", flush=True)
                 return None
-
             print(f"[{now_str()}] {operation_name} 返回 {resp.status_code} (尝试 {attempt}/{max_retries})", flush=True)
-
             if resp.status_code == 403:
                 reset_time = resp.headers.get('X-RateLimit-Reset')
                 if reset_time:
@@ -60,10 +52,7 @@ def safe_get(url: str, headers: Dict[str, str], timeout=(8, 15), max_retries=2,
                 else:
                     time.sleep(30)
                 continue
-
-            wait = 3 + attempt * 2
-            time.sleep(wait)
-
+            time.sleep(3 + attempt * 2)
         except requests.exceptions.Timeout:
             print(f"[{now_str()}] {operation_name} 超时 (尝试 {attempt}/{max_retries})", flush=True)
         except requests.exceptions.ConnectionError:
@@ -71,8 +60,8 @@ def safe_get(url: str, headers: Dict[str, str], timeout=(8, 15), max_retries=2,
         except Exception as e:
             print(f"[{now_str()}] {operation_name} 异常: {e} (尝试 {attempt}/{max_retries})", flush=True)
             time.sleep(3 * attempt)
-
     return None
+
 
 def safe_base64_decode(s: str) -> Optional[str]:
     s = s.strip().replace('-', '+').replace('_', '/')
@@ -86,8 +75,10 @@ def safe_base64_decode(s: str) -> Optional[str]:
     except Exception:
         return None
 
+
 def now_str() -> str:
     return datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')
+
 
 def timeout_decorator(seconds: int):
     def decorator(func):
