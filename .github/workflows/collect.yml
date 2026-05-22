@@ -1,4 +1,4 @@
-name: 动态搜集
+name: 动态搜集 + TCP预筛选 + mihomo延迟测速 + 速度测试
 
 on:
   schedule:
@@ -25,7 +25,7 @@ jobs:
           python-version: '3.12'
 
       - name: 安装依赖
-        run: pip install requests geoip2
+        run: pip install requests
 
       - name: 运行动态搜集+测速
         env:
@@ -41,6 +41,6 @@ jobs:
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
           git add -A no/
           git add no.txt no_li.txt no_w_li.txt ljck.txt
-          git add alive.txt fi_no.txt jd.txt fi_no_w_li.txt GeoLite2-City.mmdb || true
+          git add alive.txt fi_no.txt jd.txt fi_no_w_li.txt || true
           git commit -m "自动更新 + 测速 + 国旗排序 - $BEIJING_TIME CST" || echo "No changes"
           git push
