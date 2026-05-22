@@ -1,6 +1,6 @@
 """
 测速模块 —— TCP 预筛选 + mihomo 延迟测试 + 下载速度测试。
-采用多级漏斗过滤，支持分批测速避免 mihomo 崩溃。
+输出 alive.txt（标准 URI）和 mihomo.yaml（订阅配置文件）。
 """
 
 import os
@@ -11,7 +11,7 @@ import shutil
 import socket
 import subprocess
 import requests
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import (
@@ -19,23 +19,12 @@ from config import (
     LATENCY_TEST_URL, LATENCY_TIMEOUT, SPEED_TEST_URL, SPEED_TIMEOUT,
     MIN_DOWNLOAD_BYTES, MAX_LATENCY, MIN_SPEED_MB,
     TCP_SCAN_ENABLED, TCP_SCAN_TIMEOUT, TCP_SCAN_WORKERS,
-    TEST_BATCH_SIZE, CHUNK_SIZE,
-    ALIVE_NODE_FILE, FILTERED_NODE_FILE, FINAL_OUTPUT_FILE
+    TEST_BATCH_SIZE, ALIVE_NODE_FILE, MIHOMO_OUTPUT_FILE, MIHOMO_TEMPLATE_FILE,
 )
 from utils import now_str
 
-# ==================== 国旗映射 ====================
-COUNTRY_FLAG = {
-    "US": "🇺🇸", "GB": "🇬🇧", "DE": "🇩🇪", "JP": "🇯🇵", "KR": "🇰🇷",
-    "SG": "🇸🇬", "HK": "🇭🇰", "TW": "🇹🇼", "CN": "🇨🇳", "FR": "🇫🇷",
-    "CA": "🇨🇦", "AU": "🇦🇺", "IN": "🇮🇳", "NL": "🇳🇱", "RU": "🇷🇺",
-    "BR": "🇧🇷", "IT": "🇮🇹", "ES": "🇪🇸", "CH": "🇨🇭", "SE": "🇸🇪",
-}
 
-
-def get_flag(country_code: str) -> str:
-    return COUNTRY_FLAG.get(country_code.upper(), "🏳️")
-
+# ==================== 辅助函数 ====================
 
 def parse_host_port(node_str: str) -> Tuple[Optional[str], Optional[int]]:
     """从节点 URI 中提取 host 和 port。"""
@@ -115,20 +104,17 @@ def download_mihomo(bin_path: str):
         raise RuntimeError(f"下载 mihomo 失败: {e}")
 
 
+# ==================== 分批测试核心 ====================
+
 def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
     """
-    测试一批节点：
-    1. 生成临时配置
-    2. 启动 mihomo
-    3. 延迟测试（先）
-    4. 速度测试（后，仅对延迟合格的节点）
-    5. 停止 mihomo
-    返回 {node_raw: {latency, speed, alive}}
+    测试一批节点：生成临时配置 -> 启动 mihomo -> 延迟测试 -> 速度测试（仅存活） -> 停止 mihomo。
+    返回 {node_raw: {latency, speed, alive}}。
     """
     results = {}
     bin_path = os.path.join(os.getcwd(), MIHOMO_BIN)
 
-    # 生成配置
+    # 生成最小配置
     config = {
         "mixed-port": MIXED_PORT,
         "external-controller": f"127.0.0.1:{API_PORT}",
@@ -149,7 +135,7 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
 
     tmp_conf = os.path.join(os.getcwd(), f"mihomo_batch_{batch_id}.yaml")
     with open(tmp_conf, "w", encoding="utf-8") as f:
-        json.dump(config, f)
+        json.dump(config, f)  # 临时用 JSON，mihomo 兼容
 
     # 启动 mihomo
     proc = subprocess.Popen([bin_path, "-f", tmp_conf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -183,7 +169,7 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
         except Exception:
             results[raw] = {"latency": -1, "speed": -1.0, "alive": False}
 
-    # 速度测试（仅存活节点）
+    # 速度测试（仅对延迟合格的节点）
     alive_nodes = [(name, raw) for name, raw in name_map.items()
                    if raw in results and results[raw]["alive"]]
     for name, raw in alive_nodes:
@@ -216,18 +202,87 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
     return results
 
 
+# ==================== mihomo.yaml 生成 ====================
+
+def generate_mihomo_yaml(nodes: List[str], template_path: str, output_path: str):
+    """
+    使用用户提供的模板 new.yaml 生成 mihomo 订阅文件。
+    模板中 proxies 列表会被替换为存活节点，proxy-groups 中的 auto 组也会同步更新。
+    如果模板不存在，则使用默认最小配置。
+    """
+    if not os.path.exists(template_path):
+        # 模板不存在时生成一个极简模板
+        default_config = {
+            "mixed-port": 7890,
+            "allow-lan": False,
+            "mode": "rule",
+            "log-level": "error",
+            "proxies": [],
+            "proxy-groups": [
+                {"name": "auto", "type": "url-test", "proxies": [], "url": LATENCY_TEST_URL, "interval": 3600}
+            ]
+        }
+        with open(template_path, "w", encoding="utf-8") as f:
+            json.dump(default_config, f, indent=2)
+
+    try:
+        with open(template_path, "r", encoding="utf-8") as f:
+            template_text = f.read()
+
+        # 尝试解析为 YAML，如果 PyYAML 不可用则回退 JSON
+        try:
+            import yaml
+            config = yaml.safe_load(template_text)
+        except ImportError:
+            config = json.loads(template_text)
+
+        # 确保 proxies 字段存在
+        if "proxies" not in config:
+            config["proxies"] = []
+
+        # 用存活节点填充 proxies 列表
+        proxy_names = []
+        new_proxies = []
+        for idx, raw in enumerate(nodes):
+            name = f"alive_{idx}"
+            new_proxies.append({"name": name, "link": raw})
+            proxy_names.append(name)
+        config["proxies"] = new_proxies
+
+        # 更新 proxy-groups 中的 auto 组（如果存在）
+        if "proxy-groups" in config and isinstance(config["proxy-groups"], list):
+            for group in config["proxy-groups"]:
+                if group.get("name") == "auto":
+                    group["proxies"] = proxy_names
+
+        # 输出为 YAML 格式（优先 PyYAML，否则 JSON）
+        try:
+            import yaml
+            with open(output_path, "w", encoding="utf-8") as f:
+                yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+        except ImportError:
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+
+        print(f"[{now_str()}] 已生成 mihomo.yaml ({len(nodes)} 个节点)", flush=True)
+
+    except Exception as e:
+        print(f"[{now_str()}] 生成 mihomo.yaml 失败: {e}", flush=True)
+
+
+# ==================== 主测试流程 ====================
+
 def run_full_test(node_strings: List[str], work_dir: str = "."):
     """
-    主测速入口：
+    测速主入口：
     1. TCP 端口预筛选（可选）
     2. 分批测延迟+速度
-    3. 过滤、排序、输出 jd.txt 等文件
+    3. 过滤存活节点，输出 alive.txt 和 mihomo.yaml
     """
     if not node_strings:
         print(f"[{now_str()}] 无节点可供测速", flush=True)
         return
 
-    # 下载 mihomo
     bin_path = os.path.join(os.getcwd(), MIHOMO_BIN)
     download_mihomo(bin_path)
 
@@ -239,6 +294,9 @@ def run_full_test(node_strings: List[str], work_dir: str = "."):
 
     if not nodes:
         print(f"[{now_str()}] 无存活节点", flush=True)
+        # 生成空文件
+        open(ALIVE_NODE_FILE, "w").close()
+        generate_mihomo_yaml([], MIHOMO_TEMPLATE_FILE, MIHOMO_OUTPUT_FILE)
         return
 
     # 分批测试
@@ -250,8 +308,8 @@ def run_full_test(node_strings: List[str], work_dir: str = "."):
         results = _test_one_batch(batch, batch_id)
         all_results.update(results)
 
-    # 过滤
-    filtered = []
+    # 过滤出同时满足延迟和速度要求的节点
+    filtered_raws = []
     for raw, info in all_results.items():
         if not info["alive"]:
             continue
@@ -259,63 +317,18 @@ def run_full_test(node_strings: List[str], work_dir: str = "."):
             continue
         if info["speed"] != -1 and info["speed"] < MIN_SPEED_MB:
             continue
-        filtered.append((raw, info["latency"], info["speed"]))
+        filtered_raws.append(raw)
 
-    if not filtered:
+    if not filtered_raws:
         print(f"[{now_str()}] 无节点通过过滤", flush=True)
-        for fname in [ALIVE_NODE_FILE, FILTERED_NODE_FILE, FINAL_OUTPUT_FILE]:
-            open(fname, "w").close()
+        open(ALIVE_NODE_FILE, "w").close()
+        generate_mihomo_yaml([], MIHOMO_TEMPLATE_FILE, MIHOMO_OUTPUT_FILE)
         return
 
-    # 简单域名推测国家
-    def guess_country(raw: str) -> str:
-        host, _ = parse_host_port(raw)
-        if not host:
-            return "未知"
-        parts = host.split(".")
-        tld = parts[-1].upper() if parts else "未知"
-        tld_map = {"US": "US", "UK": "GB", "DE": "DE", "JP": "JP", "KR": "KR",
-                    "SG": "SG", "HK": "HK", "TW": "TW", "CN": "CN", "FR": "FR",
-                    "CA": "CA", "AU": "AU", "IN": "IN", "NL": "NL", "RU": "RU",
-                    "BR": "BR", "IT": "IT", "ES": "ES", "CH": "CH", "SE": "SE"}
-        return tld_map.get(tld, "未知")
-
-    # 排序（国家 → 延迟）
-    filtered.sort(key=lambda x: (guess_country(x[0]), x[1]))
-
-    # 写文件
-    country_counts: Dict[str, int] = {}
-    alive_lines, fi_lines, jd_lines = [], [], []
-    for raw, lat, spd in filtered:
-        cc = guess_country(raw)
-        country_counts[cc] = country_counts.get(cc, 0) + 1
-        idx = country_counts[cc]
-        alias = f"{get_flag(cc)} {cc}_{idx}"
-        alive_lines.append(alias)
-        fi_lines.append(raw)
-        jd_lines.append(f"{alias} | {raw}")
-
+    # 写入 alive.txt
     with open(ALIVE_NODE_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(alive_lines))
-    with open(FILTERED_NODE_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(fi_lines))
-    with open(FINAL_OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(jd_lines))
-    print(f"[{now_str()}] 最终存活: {len(alive_lines)} 个 → {ALIVE_NODE_FILE}, {FILTERED_NODE_FILE}, {FINAL_OUTPUT_FILE}", flush=True)
+        f.write("\n".join(filtered_raws))
+    print(f"[{now_str()}] 保存 alive.txt ({len(filtered_raws)} 个节点)", flush=True)
 
-    # 分片
-    chunk_dir = "fi_no_chunks"
-    if os.path.exists(chunk_dir):
-        shutil.rmtree(chunk_dir)
-    os.makedirs(chunk_dir, exist_ok=True)
-    repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
-    branch_name = os.getenv("GITHUB_REF_NAME", "main")
-    w_links = []
-    for i in range(0, len(fi_lines), CHUNK_SIZE):
-        chunk = fi_lines[i:i + CHUNK_SIZE]
-        fname = f"{i // CHUNK_SIZE + 1}.txt"
-        with open(os.path.join(chunk_dir, fname), "w", encoding="utf-8") as f:
-            f.write("\n".join(chunk))
-        w_links.append(f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/fi_no_chunks/{fname}")
-    with open("fi_no_w_li.txt", "w", encoding="utf-8") as f:
-        f.write("\n".join(w_links))
+    # 生成 mihomo.yaml
+    generate_mihomo_yaml(filtered_raws, MIHOMO_TEMPLATE_FILE, MIHOMO_OUTPUT_FILE)
