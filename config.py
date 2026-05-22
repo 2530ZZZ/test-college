@@ -6,6 +6,22 @@ mihomo 使用 GitHub API 自动获取最新稳定版。
   - 所有可调参数集中在此文件，外部模块通过 import 引用。
   - 每个参数均有详细注释，说明含义、默认值、调整建议。
   - 版本号自动获取，失败时回退到硬编码的稳定版本。
+
+config.py（唯一配置源）
+  ├── MIHOMO_URL, MIHOMO_BIN, MIXED_PORT, API_PORT → tester.py
+  ├── LATENCY_TEST_URL, SPEED_TEST_URL, *_TIMEOUT → tester.py
+  ├── MAX_LATENCY, MIN_SPEED_MB, TCP_SCAN_* → tester.py
+  ├── TEST_BATCH_SIZE → tester.py
+  ├── MAX_TOTAL_RATE_LIMIT_WAIT → utils.py, collector.py
+  ├── MAX_PAGES, PER_PAGE → collector.py
+  ├── REPO_SLEEP_SECONDS, PAGE_SLEEP_SECONDS → collector.py
+  ├── REPO_TIMEOUT_SECONDS → collector.py
+  ├── MAX_FILE_SIZE, ALLOWED_EXTENSIONS, BLACKLIST_FILE → collector.py
+  ├── SEARCH_TIMEOUT, REPO_INFO_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
+  │   CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT → collector.py
+  ├── CHUNK_SIZE → collector.py
+  ├── ALIVE_NODE_FILE, MIHOMO_OUTPUT_FILE, MIHOMO_TEMPLATE_FILE → tester.py
+  └── MIHOMO_VERSION → 自动获取
 """
 
 import os
