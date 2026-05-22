@@ -1,17 +1,15 @@
 project/
 
-├── config.py            # 测速参数
+├── main.py                  # 主入口
 
-├── tester.py            # 测速模块
+├── config.py                # 全局配置（Sub-Store/mihomo版本/测速参数）
 
-├── proxy_model.py       # 统一数据模型（已有）
+├── collector.py             # GitHub 搜索 + 文件树遍历 + 节点提取
 
-├── parsers.py           # 解析器（已有）
+├── parsers.py               # 纯文本提取（不再负责协议解析）
 
-├── utils.py             # 工具函数（已有）
+├── tester.py                # TCP预筛选 + mihomo延迟测试 + 下载速度测试
 
-├── collector.py         # 搜集模块（已有）
+├── utils.py                 # 通用工具函数
 
-├── main.py              # 入口，调用搜集 + 测速
-
-└── .github/workflows/collect.yml
+└── .github/workflows/collect.yml  # GitHub Actions 工作流
