@@ -1,6 +1,6 @@
 """
 GitHub 节点收集器 —— Contents API 逐层递归 + 目录/文件 SHA 内存去重。
-收集到的候选块通过 subconverter 解析为标准化 URI 节点。
+收集到的候选块将作为原始节点数据，后续由 mihomo 进行解析和测试。
 """
 
 import os
