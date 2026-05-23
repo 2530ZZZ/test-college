@@ -11,6 +11,9 @@ GitHub 节点收集器 —— Contents API 逐层递归 + 目录/文件 SHA 内�
 import os
 import time
 import shutil
+import signal
+import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone, timedelta
 from typing import List, Set, Optional
 
@@ -21,7 +24,8 @@ from parsers import extract_raw_candidates
 # 从统一配置源导入所有可调参数
 from config import (
     CHUNK_SIZE, MAX_PAGES, PER_PAGE, REPO_SLEEP_SECONDS, PAGE_SLEEP_SECONDS,
-    REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, ALLOWED_EXTENSIONS, BLACKLIST_FILE,
+    REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, FILE_PROCESS_TIMEOUT,
+    ALLOWED_EXTENSIONS, BLACKLIST_FILE,
     SEARCH_TIMEOUT, REPO_INFO_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT,
 )
@@ -36,7 +40,7 @@ class Collector:
       - PER_PAGE: 每页返回仓库数
       - REPO_SLEEP_SECONDS / PAGE_SLEEP_SECONDS: 请求间隔
       - REPO_TIMEOUT_SECONDS: 单仓库处理超时
-      - MAX_FILE_SIZE: 下载文件大小上限
+      - MAX_FILE_SIZE: 下载文件大小上限（None 则不限制）
       - ALLOWED_EXTENSIONS: 允许处理的文件扩展名
       - BLACKLIST_FILE: 黑名单持久化文件路径
       - *_TIMEOUT: 各类 API 请求超时
@@ -71,7 +75,11 @@ class Collector:
                 break
             q_start = time.time()
             print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
-            self.search_query(query)
+            try:
+                self.search_query(query)
+            except RuntimeError:
+                print(f"[{now_str()}] ⚠️ 限流超限，立即终止所有搜索", flush=True)
+                break
             print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
 
         self.save_results()
@@ -130,14 +138,13 @@ class Collector:
             # config.PAGE_SLEEP_SECONDS 默认 2 秒
             time.sleep(PAGE_SLEEP_SECONDS)
 
-    @timeout_decorator(REPO_TIMEOUT_SECONDS)
     def process_repo(self, repo: str):
         """
         处理单个仓库。
 
         超时保护：
           - 由 config.REPO_TIMEOUT_SECONDS 控制（默认 120 秒）
-          - 使用 @timeout_decorator 装饰器实现
+          - 使用 signal.alarm 装饰器实现
           - 防止因大文件或网络问题导致单个仓库永久卡住
 
         处理流程：
@@ -163,9 +170,18 @@ class Collector:
 
         has_nodes_flag = [False]
         try:
-            self.process_file_tree(repo, "", default_branch, has_nodes_flag)
+            # 如果配置了仓库超时，则应用超时保护
+            if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
+                @timeout_decorator(REPO_TIMEOUT_SECONDS)
+                def _process():
+                    self.process_file_tree(repo, "", default_branch, has_nodes_flag)
+                _process()
+            else:
+                self.process_file_tree(repo, "", default_branch, has_nodes_flag)
         except RuntimeError:
             raise
+        except Exception as e:
+            print(f"[{now_str()}] 仓库 {github_url} 处理异常: {e}", flush=True)
 
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
             print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
@@ -181,7 +197,7 @@ class Collector:
           1. 目录/文件 SHA 内存去重：相同 SHA 只处理一次
           2. 逐层 commits API 时间过滤：只深入 24 小时内更新的目录
           3. 文件扩展名过滤：config.ALLOWED_EXTENSIONS
-          4. 文件大小过滤：config.MAX_FILE_SIZE（默认 1MB）
+          4. 文件大小过滤：config.MAX_FILE_SIZE（None 则不限制）
 
         超时参数（均来自 config.py）：
           - CONTENTS_API_TIMEOUT：目录内容请求超时
@@ -264,12 +280,29 @@ class Collector:
                     continue
 
                 content = file_resp.text
-                # 文件大小保护：超过 config.MAX_FILE_SIZE 跳过
-                if len(content) > MAX_FILE_SIZE:
-                    print(f"[{now_str()}] ⚠️ 文件过大 ({len(content)} 字节)，跳过", flush=True)
+                # 文件大小保护：如果配置了 MAX_FILE_SIZE 且文件超过限制，跳过
+                if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
+                    print(f"[{now_str()}] ⚠️ 文件过大 ({len(content)} 字节，"
+                          f"限制 {MAX_FILE_SIZE} 字节)，跳过", flush=True)
                     continue
 
-                candidates = extract_raw_candidates(content)
+                # 文件处理超时保护：如果配置了 FILE_PROCESS_TIMEOUT，则在子线程中执行提取
+                def extract():
+                    return extract_raw_candidates(content)
+                try:
+                    if FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
+                        with ThreadPoolExecutor(max_workers=1) as executor:
+                            future = executor.submit(extract)
+                            candidates = future.result(timeout=FILE_PROCESS_TIMEOUT)
+                    else:
+                        candidates = extract()
+                except FutureTimeoutError:
+                    print(f"[{now_str()}] ⚠️ 文件处理超时 ({FILE_PROCESS_TIMEOUT}s)，跳过", flush=True)
+                    continue
+                except Exception as e:
+                    print(f"[{now_str()}] ⚠️ 文件处理异常: {e}，跳过", flush=True)
+                    continue
+
                 new_nodes = 0
                 for cand in candidates:
                     if cand not in self.unique_nodes:
