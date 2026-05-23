@@ -146,17 +146,30 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
     测试一批节点。
 
     流程：
-      1. 生成临时 mihomo 配置（仅包含本批节点）
-      2. 启动 mihomo
-      3. 延迟测试：通过 API GET /proxies/{name}/delay 逐个测试
-      4. 速度测试：仅对延迟合格的节点，通过本地代理下载测速文件
-      5. 停止 mihomo 并清理临时配置文件
+      1. 过滤无效节点（空名称或空链接）
+      2. 生成临时 mihomo 配置（仅包含本批节点）
+      3. 启动 mihomo（捕获 stderr 以诊断启动失败原因）
+      4. 延迟测试：通过 API GET /proxies/{name}/delay 逐个测试
+      5. 速度测试：仅对延迟合格的节点，通过本地代理下载测速文件
+      6. 停止 mihomo 并清理临时配置文件
 
     返回：
       {node_raw: {latency, speed, alive}}
     """
     results = {}
     bin_path = os.path.join(os.getcwd(), MIHOMO_BIN)
+
+    # 过滤无效节点：确保每个节点都有有效的 link（非空且包含协议头）
+    valid_nodes = []
+    for raw in nodes_batch:
+        if not raw or not raw.strip():
+            continue
+        stripped = raw.strip()
+        if "://" in stripped:
+            valid_nodes.append(stripped)
+    if not valid_nodes:
+        print(f"[{now_str()}] mihomo 批次 {batch_id}: 无有效节点，跳过", flush=True)
+        return results
 
     config = {
         "mixed-port": MIXED_PORT,
@@ -171,7 +184,7 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
         ]
     }
     name_map = {}
-    for i, raw in enumerate(nodes_batch):
+    for i, raw in enumerate(valid_nodes):
         name = f"n{batch_id}_{i}"
         config["proxies"].append({"name": name, "link": raw})
         config["proxy-groups"][0]["proxies"].append(name)
@@ -181,11 +194,20 @@ def _test_one_batch(nodes_batch: List[str], batch_id: int) -> Dict[str, Dict]:
     with open(tmp_conf, "w", encoding="utf-8") as f:
         json.dump(config, f)
 
-    proc = subprocess.Popen([bin_path, "-f", tmp_conf],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # 启动 mihomo，捕获 stderr
+    proc = subprocess.Popen(
+        [bin_path, "-f", tmp_conf],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True
+    )
     time.sleep(3)
     if proc.poll() is not None:
+        # 读取 stderr 获取错误信息
+        stderr_output = proc.stderr.read() if proc.stderr else ""
         print(f"[{now_str()}] mihomo 批次 {batch_id} 启动失败", flush=True)
+        if stderr_output:
+            print(f"[{now_str()}] mihomo 错误输出: {stderr_output[:500]}", flush=True)
         os.remove(tmp_conf)
         return results
 
