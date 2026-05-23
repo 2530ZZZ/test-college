@@ -87,6 +87,12 @@ ALLOWED_EXTENSIONS = {
 }
 BLACKLIST_FILE = "ljck.txt"
 
+# ==================== HEAD 请求优化参数 ====================
+# HEAD 请求并发线程数，复用连接，大幅提升处理速度
+HEAD_CONCURRENCY = 20
+# 单仓库最大 HEAD 请求数，超过此数量的文件直接跳过。None 表示不限制。
+MAX_HEAD_PER_REPO = None
+
 # ==================== API 请求超时 ====================
 SEARCH_TIMEOUT = (15, 30)
 REPO_INFO_TIMEOUT = (8, 15)
