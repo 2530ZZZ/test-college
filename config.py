@@ -83,14 +83,12 @@ MAX_TOTAL_RATE_LIMIT_WAIT = 600
 MAX_FILE_SIZE = None               # None 则不限制
 FILE_PROCESS_TIMEOUT = 30          # 单文件处理超时（秒），用于控制正则执行
 ALLOWED_EXTENSIONS = {
-    '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64'
+    '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64', ''
 }
 BLACKLIST_FILE = "ljck.txt"
 
 # ==================== HEAD 请求优化参数 ====================
-# HEAD 请求并发线程数，复用连接，大幅提升处理速度
 HEAD_CONCURRENCY = 20
-# 单仓库最大 HEAD 请求数，超过此数量的文件直接跳过。None 表示不限制。
 MAX_HEAD_PER_REPO = None
 
 # ==================== API 请求超时 ====================
@@ -102,7 +100,6 @@ COMMITS_API_TIMEOUT = (8, 12)
 TREE_API_TIMEOUT = (12, 20)
 
 # ==================== 树 API 策略 ====================
-# 是否优先使用 git/trees?recursive=1 一次性获取文件树，而不是逐层 Contents API
 USE_RECURSIVE_TREE = True
 
 # ==================== 输出文件 ====================
