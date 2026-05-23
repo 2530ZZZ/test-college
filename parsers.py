@@ -1,12 +1,12 @@
 """
 节点候选提取模块 —— 只负责从任意文本中提取"看起来像节点"的候选块。
-
 本模块不做协议解析，所有解析工作由 mihomo 的 link 字段自动完成。
+
 支持从以下格式中提取：
   - 协议 URI（ss://, vmess://, vless://, trojan://, hysteria2://, tuic:// 等）
   - Markdown 代码块（递归处理）
   - Base64 编码的整段订阅（递归解码）
-  - Clash YAML 单行/多行代理
+  - Clash YAML 单行/多行代理（含花括号和不带花括号两种单行格式）
   - Surge/Loon 格式（Proxy = ss, server, port, ...）
   - JSON proxies/outbounds 数组
   - 整份 JSON 配置（Clash / Sing-box）
@@ -61,6 +61,13 @@ CLASH_SINGLE_RE = re.compile(
 CLASH_MULTI_RE = re.compile(
     r'-\s*name:[^\n]*\n'
     r'(?:\s+[a-zA-Z_-]+:[^\n]*\n){2,20}',
+    re.DOTALL
+)
+
+# Clash 单行代理（不带花括号）：- name: 名称 type: 协议 server: IP port: 端口 ...
+# 用于匹配 clash.yaml 中连续排列、无换行无花括号的代理节点
+CLASH_INLINE_RE = re.compile(
+    r'- name:\s*\S[^\n]{0,2000}',
     re.DOTALL
 )
 
@@ -159,7 +166,7 @@ def extract_raw_candidates(text: str) -> List[str]:
 
     # ---- 第三阶段：结构化格式提取 ----
 
-    # 3.1 Clash YAML 单行代理
+    # 3.1 Clash YAML 单行代理（花括号格式）
     for m in CLASH_SINGLE_RE.findall(text):
         clean = re.sub(r'\s+', ' ', m.strip())
         if len(clean) > 30 and clean not in seen:
@@ -170,6 +177,14 @@ def extract_raw_candidates(text: str) -> List[str]:
     for m in CLASH_MULTI_RE.findall(text):
         clean = re.sub(r'\s+', ' ', m.strip())
         if len(clean) > 30 and ('server:' in clean.lower() or 'type:' in clean.lower()):
+            if clean not in seen:
+                seen.add(clean)
+                candidates.append(clean)
+
+    # 3.2b Clash 单行代理（不带花括号，如 - name: xx type: ss server: 1.2.3.4 port: 123 ...）
+    for m in CLASH_INLINE_RE.findall(text):
+        clean = re.sub(r'\s+', ' ', m.strip())
+        if len(clean) > 30 and ('name:' in clean.lower() and ('server:' in clean.lower() or 'type:' in clean.lower())):
             if clean not in seen:
                 seen.add(clean)
                 candidates.append(clean)
@@ -249,7 +264,6 @@ def extract_raw_candidates(text: str) -> List[str]:
             continue
         # 过滤掉明显不是节点的普通网址（避免误提）
         if c.startswith('http://') or c.startswith('https://'):
-            # 保留 raw.githubusercontent.com 的链接（可能是订阅源）
             if 'raw.githubusercontent.com' not in c:
                 continue
         if c in seen:
