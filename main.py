@@ -6,11 +6,10 @@ from datetime import datetime, timezone, timedelta
 from collector import Collector
 from tester import run_full_test
 
-# 动态生成 pushed 限定词（UTC 前一天的日期）
-# 确保覆盖最近 24~48 小时内推送过的仓库
+# 使用最近 24 小时的精确时间戳
 UTC_NOW = datetime.now(timezone.utc)
-BASE_DATE = (UTC_NOW - timedelta(days=1)).strftime('%Y-%m-%d')
-TIME_SUFFIX = f"pushed:>{BASE_DATE}"
+TIME_LIMIT = (UTC_NOW - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')
+TIME_SUFFIX = f"pushed:>{TIME_LIMIT}"
 
 BASE_QUERIES = [
     "免费节点", "免费clash订阅", "免费v2ray订阅", "免费机场节点",
@@ -31,7 +30,7 @@ QUERIES = [f"{q} {TIME_SUFFIX}" for q in BASE_QUERIES]
 if __name__ == "__main__":
     start_time = time.time()
     token = os.getenv("GITHUB_TOKEN", "")
-    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] 🚀 程序启动，基准日期：{BASE_DATE}", flush=True)
+    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] 🚀 程序启动，时间基准：{TIME_LIMIT}", flush=True)
 
     collector = Collector(token=token, queries=QUERIES)
     collector.run()
