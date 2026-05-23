@@ -197,8 +197,16 @@ def timeout_decorator(seconds: int):
     """
     函数超时装饰器（基于 signal.alarm，仅 Linux 可用）。
     注意：不能嵌套使用，不能在多线程环境中使用。
-    config.py 中的 REPO_TIMEOUT_SECONDS 控制单仓库处理超时。
+    如果 seconds 为 None 或 <= 0，则不应用超时。
     """
+    if seconds is None or seconds <= 0:
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+            return wrapper
+        return decorator
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
