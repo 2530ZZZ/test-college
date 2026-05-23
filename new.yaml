@@ -1,0 +1,77 @@
+
+# ==============代理节点组(策略组)配置==================
+proxy-groups:
+  #主代理组
+  - name: 🌐 PROXY
+    type: select
+    include-all: true
+    proxies:
+      - ⚖️ n来源-n代理-n目标
+      - ⚖️ n来源-1代理-1目标
+      - ⚖️ 1来源-1代理-1目标
+
+  - name: ⚖️ n来源-n代理-n目标
+    type: load-balance
+    include-all: true
+    strategy: round-robin
+
+  - name: ⚖️ n来源-1代理-1目标
+    type: load-balance
+    include-all: true
+    strategy: consistent-hashing
+
+  - name: ⚖️ 1来源-1代理-1目标
+    type: load-balance
+    include-all: true
+    strategy: sticky-sessions
+
+# =============== 规则系统 ================
+rule-providers:
+  # 🔒私有网络
+  private:
+    url: "https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/private.txt"
+    path: ./rules/private.yaml
+    behavior: domain          # 🎯域名匹配
+    interval: 86400           # 🔄每日更新
+    type: http                # ✅ 必须声明类型
+    format: text              # 📜 显式声明文本格式
+    strategy: DIRECT          # 强制直连下载规则文件
+    health-check: false       # 当规则文件更新时 不触发 代理节点的健康检查 避免规则更新与节点检测产生循环依赖
+
+  # 🇨🇳国内域名
+  cn_domain:
+    type: http         # ✅ 必须声明类型,type必须首行,下同
+    behavior: domain
+    url: "https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/direct.txt"
+    path: ./rules/cn_domain.yaml
+    interval: 172800  # 🔄每2天更新
+    format: text    # 📜 显式声明文本格式
+    health-check: false       # 当规则文件更新时 不触发 代理节点的健康检查 避免规则更新与节点检测产生循环依赖
+
+  # 🌍海外域名
+  geolocation:
+    type: http         # ✅ 必须声明类型
+    behavior: domain
+    url: "https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/proxy.txt"
+    path: ./rules/geolocation.yaml
+    interval: 86400
+    format: text    # 📜 显式声明文本格式
+    health-check: false       # 当规则文件更新时 不触发 代理节点的健康检查 避免规则更新与节点检测产生循环依赖
+
+  # 🇨🇳国内IP
+  cn_ip:
+    type: http         # ✅ 必须声明类型
+    behavior: ipcidr  # 🌐IP段匹配
+    url: "https://gh-proxy.com/https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/cncidr.txt"
+    path: ./rules/cn_ip.yaml
+    interval: 259200  # 🔄3天更新
+    format: text    # 📜 显式声明文本格式
+    health-check: false       # 当规则文件更新时 不触发 代理节点的健康检查 避免规则更新与节点检测产生循环依赖
+
+rules:
+  - RULE-SET,private,DIRECT  # 🔒私有网络直连
+  - GEOIP,CN,DIRECT  # 🇨🇳国内IP直连
+  - RULE-SET,cn_domain,DIRECT  # 🏠国内域名
+  - RULE-SET,cn_ip,DIRECT  # 🌐国内IP段
+  - RULE-SET,geolocation,🌐 PROXY  # 🌍海外流量
+  - MATCH,🌐 PROXY  # 🚦剩余流量代理
