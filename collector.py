@@ -1,15 +1,17 @@
 """
 GitHub 节点收集器 —— 支持优先使用 git/trees API 获取递归文件树，
-并用 HEAD 请求获取文件修改时间，彻底避免 /commits API 调用。
+并用并发 HEAD 请求获取文件修改时间，彻底避免 /commits API 调用。
 若 tree API 不可用则回退到原 Contents 逐层递归 + commits 查询。
 """
 
 import os
 import time
 import shutil
+import requests
 from datetime import datetime, timezone, timedelta
-from typing import List, Set, Optional, Dict
 from email.utils import parsedate_to_datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
+from typing import List, Set, Optional
 
 import utils
 from utils import safe_get, now_str, timeout_decorator, beijing_tz, check_rate_limit
@@ -21,7 +23,7 @@ from config import (
     ALLOWED_EXTENSIONS, BLACKLIST_FILE,
     SEARCH_TIMEOUT, REPO_INFO_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
-    USE_RECURSIVE_TREE,
+    USE_RECURSIVE_TREE, HEAD_CONCURRENCY, MAX_HEAD_PER_REPO,
 )
 
 
@@ -113,11 +115,7 @@ class Collector:
         # 优先尝试递归树 API
         if USE_RECURSIVE_TREE:
             success = self._process_with_recursive_tree(repo, default_branch, has_nodes_flag)
-            if success:
-                # 处理完成
-                pass
-            else:
-                # 回退到旧方法
+            if not success:
                 print(f"[{now_str()}] 树 API 失败，回退到 Contents API 逐层过滤", flush=True)
                 try:
                     if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
@@ -130,7 +128,6 @@ class Collector:
                 except RuntimeError:
                     raise
         else:
-            # 直接使用旧方法
             try:
                 if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
                     @timeout_decorator(REPO_TIMEOUT_SECONDS)
@@ -151,7 +148,7 @@ class Collector:
     # ----------------- 递归树 API 处理 -----------------
     def _process_with_recursive_tree(self, repo: str, branch: str, has_nodes: List[bool]) -> bool:
         """
-        使用 git/trees?recursive=1 一次性获取所有文件，结合 HEAD 请求判断时间。
+        使用 git/trees?recursive=1 一次性获取所有文件，结合并发 HEAD 请求判断时间。
         成功处理返回 True，否则返回 False（触发回退）。
         """
         tree_url = f"https://api.github.com/repos/{repo}/git/trees/{branch}?recursive=1"
@@ -167,7 +164,7 @@ class Collector:
         if not entries:
             return True
 
-        # 只处理 blob 类型文件，扩展名符合
+        # 筛选候选文件：只处理 blob 类型、允许的扩展名、且 SHA 未处理过的
         files_to_check = []
         for e in entries:
             if e.get('type') != 'blob':
@@ -184,72 +181,107 @@ class Collector:
         if not files_to_check:
             return True
 
-        print(f"[{now_str()}] 递归树获取到 {len(files_to_check)} 个候选文件", flush=True)
+        # 限制最大处理数量（MAX_HEAD_PER_REPO 为 None 则不限制）
+        if MAX_HEAD_PER_REPO is not None and len(files_to_check) > MAX_HEAD_PER_REPO:
+            print(f"[{now_str()}] ⚠️ 候选文件过多 ({len(files_to_check)} 个)，"
+                  f"仅处理前 {MAX_HEAD_PER_REPO} 个", flush=True)
+            files_to_check = files_to_check[:MAX_HEAD_PER_REPO]
 
-        for file_path, sha in files_to_check:
-            # HEAD 获取修改时间
-            raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
-            head_resp = safe_get(raw_url, self.headers, timeout=(8, 10),
-                                 operation_name=f"HEAD {file_path}", max_retries=1)
-            if head_resp is None:
-                # 失败时保守跳过，但也可尝试下载（此处跳过）
-                self.processed_file_shas.add(sha)
-                continue
-            last_mod = head_resp.headers.get('Last-Modified')
-            file_time = None
-            if last_mod:
+        print(f"[{now_str()}] 递归树获取到 {len(files_to_check)} 个候选文件，"
+              f"并发 {HEAD_CONCURRENCY} 线程处理", flush=True)
+
+        # 创建 Session 复用连接
+        session = requests.Session()
+        session.headers.update(self.headers)
+
+        # 构建 HEAD 任务
+        head_tasks = {}
+        with ThreadPoolExecutor(max_workers=HEAD_CONCURRENCY) as executor:
+            for file_path, sha in files_to_check:
+                raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
+                future = executor.submit(
+                    self._head_one_file, session, raw_url, file_path, sha
+                )
+                head_tasks[future] = (file_path, sha)
+
+            for future in as_completed(head_tasks):
+                file_path, sha = head_tasks[future]
                 try:
-                    file_time = parsedate_to_datetime(last_mod).replace(tzinfo=timezone.utc)
+                    file_time, success = future.result()
                 except Exception:
-                    pass
-            if file_time is None or datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
-                self.processed_file_shas.add(sha)
-                continue
+                    file_time, success = None, False
 
-            # 下载内容
-            file_resp = safe_get(raw_url, self.headers, timeout=FILE_DOWNLOAD_TIMEOUT)
-            if not file_resp:
-                self.processed_file_shas.add(sha)
-                check_rate_limit()
-                continue
-            content = file_resp.text
-            if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
-                self.processed_file_shas.add(sha)
-                continue
+                if not success or file_time is None:
+                    self.processed_file_shas.add(sha)
+                    continue
 
-            # 提取节点
-            def extract():
-                return extract_raw_candidates(content)
-            try:
-                if FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
-                    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-                    with ThreadPoolExecutor(max_workers=1) as executor:
-                        future = executor.submit(extract)
-                        candidates = future.result(timeout=FILE_PROCESS_TIMEOUT)
+                # 检查是否在 24 小时内
+                if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
+                    self.processed_file_shas.add(sha)
+                    continue
+
+                # 下载文件并提取节点
+                raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
+                file_resp = safe_get(raw_url, self.headers, timeout=FILE_DOWNLOAD_TIMEOUT)
+                if not file_resp:
+                    self.processed_file_shas.add(sha)
+                    check_rate_limit()
+                    continue
+
+                content = file_resp.text
+                if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
+                    self.processed_file_shas.add(sha)
+                    continue
+
+                def extract():
+                    return extract_raw_candidates(content)
+                try:
+                    if FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
+                        with ThreadPoolExecutor(max_workers=1) as executor2:
+                            extract_future = executor2.submit(extract)
+                            candidates = extract_future.result(timeout=FILE_PROCESS_TIMEOUT)
+                    else:
+                        candidates = extract()
+                except FutureTimeoutError:
+                    print(f"[{now_str()}] ⚠️ 文件处理超时，跳过 {raw_url}", flush=True)
+                    self.processed_file_shas.add(sha)
+                    continue
+                except Exception:
+                    self.processed_file_shas.add(sha)
+                    continue
+
+                new_nodes = 0
+                for cand in candidates:
+                    if cand not in self.unique_nodes:
+                        self.unique_nodes.add(cand)
+                        new_nodes += 1
+                if new_nodes:
+                    self.all_links.append(raw_url)
+                    has_nodes[0] = True
+                    print(f"[{now_str()}] 📄 {raw_url} ✅ 提取 {new_nodes} 个候选块", flush=True)
                 else:
-                    candidates = extract()
-            except FutureTimeoutError:
-                print(f"[{now_str()}] ⚠️ 文件处理超时，跳过 {raw_url}", flush=True)
-                self.processed_file_shas.add(sha)
-                continue
-            except Exception as e:
-                self.processed_file_shas.add(sha)
-                continue
+                    print(f"[{now_str()}] 📄 {raw_url} ❌ 无新节点", flush=True)
 
-            new_nodes = 0
-            for cand in candidates:
-                if cand not in self.unique_nodes:
-                    self.unique_nodes.add(cand)
-                    new_nodes += 1
-            if new_nodes:
-                self.all_links.append(raw_url)
-                has_nodes[0] = True
-                print(f"[{now_str()}] 📄 {raw_url} ✅ 提取 {new_nodes} 个候选块", flush=True)
-            else:
-                print(f"[{now_str()}] 📄 {raw_url} ❌ 无新节点", flush=True)
+                self.processed_file_shas.add(sha)
 
-            self.processed_file_shas.add(sha)
+        session.close()
         return True
+
+    def _head_one_file(self, session, raw_url, file_path, sha):
+        """单个文件的 HEAD 请求，返回 (file_time, success)。"""
+        try:
+            head_resp = session.head(raw_url, timeout=(8, 10))
+            if head_resp.status_code == 200:
+                last_mod = head_resp.headers.get('Last-Modified')
+                if last_mod:
+                    try:
+                        file_time = parsedate_to_datetime(last_mod).replace(tzinfo=timezone.utc)
+                        return file_time, True
+                    except Exception:
+                        pass
+            return None, False
+        except Exception:
+            return None, False
 
     # ----------------- 原 Contents 递归 + commits 逻辑（回退） -----------------
     def process_file_tree(self, repo: str, path: str, branch: str, has_nodes: List[bool]):
