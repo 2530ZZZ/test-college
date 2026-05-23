@@ -26,6 +26,7 @@ config.py（唯一配置源）
 """
 
 
+
 import os
 import json
 import requests
@@ -169,6 +170,7 @@ PAGE_SLEEP_SECONDS = 2
 
 # 单个仓库处理的超时时间（秒）
 # 防止因大文件、死循环等问题导致单个仓库处理永久卡住
+# 设为 None 则不限制
 REPO_TIMEOUT_SECONDS = 120
 
 
@@ -187,7 +189,13 @@ MAX_TOTAL_RATE_LIMIT_WAIT = 600
 # 最大允许下载的文件大小（字节）
 # 超过此大小的文件将被跳过，避免下载大型日志、广告规则等无效文件
 # 代理订阅文件通常只有几十 KB 到几百 KB
-MAX_FILE_SIZE = 1_000_000  # 1MB
+# 设为 None 则不限制文件大小
+MAX_FILE_SIZE = None
+
+# 单文件处理时长限制（秒）
+# 超过此时长的文件处理将被终止并跳过
+# 设为 None 则不限制
+FILE_PROCESS_TIMEOUT = 30
 
 # 允许处理的文件扩展名
 # 只处理这些类型的文件，减少对图片、二进制等无关文件的下载
