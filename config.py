@@ -80,16 +80,17 @@ REPO_TIMEOUT_SECONDS = 120
 MAX_TOTAL_RATE_LIMIT_WAIT = 600
 
 # ==================== 文件收集配置 ====================
-MAX_FILE_SIZE = None               # None 则不限制
-FILE_PROCESS_TIMEOUT = 30          # 单文件处理超时（秒），用于控制正则执行
+MAX_FILE_SIZE = None
+FILE_PROCESS_TIMEOUT = 30
 ALLOWED_EXTENSIONS = {
     '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64', ''
 }
 BLACKLIST_FILE = "ljck.txt"
 
 # ==================== HEAD 请求优化参数 ====================
-HEAD_CONCURRENCY = 20
-MAX_HEAD_PER_REPO = None
+HEAD_CONCURRENCY = 20                       # HEAD 请求并发线程数
+MAX_HEAD_PER_REPO = None                    # 单仓库最大 HEAD 请求数（None 不限制）
+MIN_FILES_FOR_CONCURRENCY = 50              # 候选文件数低于此阈值时不启用并发，串行处理
 
 # ==================== API 请求超时 ====================
 SEARCH_TIMEOUT = (15, 30)
