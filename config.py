@@ -307,31 +307,22 @@ BASE_QUERIES = [
 # 这些词代表与代理节点无关的常见仓库类型，搜索时会以“-keyword”形式排除。
 # 例如 "-adblock -filter -blocklist -domain -asn ..."
 # 如果不需要否定关键词，设置为空列表 [] 即可。
+# 否定关键词本身不消耗额外配额。搜索 API 的限流是按“请求次数”计算的，不是按查询的复杂程度。你在一次搜索请求里加上 100 个否定关键词，仍然只算 1 次搜索请求。
+# 数量没有硬性限制。GitHub 搜索查询字符串的最大长度是 256 个字符，但不适用于 API 查询？实际上 GitHub API 的查询字符串也有长度限制（通常约 8KB），但对于否定关键词来说，几百个词完全没问题。
 SEARCH_NEGATIVE_KEYWORDS = [
-    "adblock",      # 广告拦截
-    "adguard",      # AdGuard 过滤规则
-    "filter",       # 通用过滤规则
-    "blocklist",    # 黑名单列表
-    "blacklist",    # 黑名单
-    "domain",       # 域名列表（非节点）
-    "asn",          # ASN 列表
-    "iptv",         # IPTV 频道列表
-    "dns",          # DNS 配置
-    "geosite",      # GeoSite 数据
-    "geoip",        # GeoIP 数据库
-    "rule",         # 通用规则
-    "regex",        # 正则表达式规则
-    "firewall",     # 防火墙规则
-    "parental",     # 家长控制
-    "phishing",     # 钓鱼检测
-    "malware",      # 恶意软件
-    "tracker",      # 跟踪器列表
-    "spam",         # 垃圾邮件
-    "telemetry",    # 遥测
-    "crypto",       # 加密货币钱包/挖矿
-    "mining",       # 挖矿
-    "bot",          # 机器人
-    "scraper",      # 爬虫
+    "高速机场推荐",      # 高速机场推荐
+    "飞鸟加速",
+    "机场推荐",
+    "免费试用",
+    "节点推荐",
+    "星辰VPN",
+    "西游云",
+    "老村长机场",
+    "农夫山泉",
+    "狗狗加速",
+    "注册地址",
+    "试用",
+    "注册",
 ]
 
 # --- 搜索后缀常量 ---
