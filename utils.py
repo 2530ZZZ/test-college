@@ -183,7 +183,8 @@ def safe_base64_decode(s: str) -> Optional[str]:
     if padding:
         s += '=' * (4 - padding)
     try:
-        return base64.b64decode(s, validate=True).decode('utf-8', errors='replace')
+        # validate=False 跳过无效字符检查,兼容填充不规范的 Base64
+        return base64.b64decode(s, validate=False).decode('utf-8', errors='replace')
     except Exception:
         return None
 
