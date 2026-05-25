@@ -11,7 +11,7 @@
   - JSON proxies/outbounds 数组
   - 整份 JSON 配置（Clash / Sing-box）
   - 混杂在中文/英文等文本中的链接
-  - 一行多个 URI 用分隔符（|, ;, 逗号）分隔的情况
+  - 一行多个 URI 用分隔符（空格, |, ;, 逗号等）分隔的情况
 """
 
 import re
@@ -86,12 +86,13 @@ JSON_PROXY_ARRAY_RE = re.compile(
     re.IGNORECASE
 )
 
-# 一行中多个 URI 的分隔符
-MULTI_URI_SEP_RE = re.compile(r'[|,;\n]+')
+# 前瞻分割连续 URI（解决多个节点用空格粘连的问题）
+# 匹配下一个 scheme:// 之前的位置
+CONCAT_URI_SPLIT_RE = re.compile(rf'(?={URI_SCHEMES}://)')
 
 
 def _is_proxy_uri(line: str) -> bool:
-    """快速判断一行文本是否是代理协议 URI。"""
+    """快速判断一行文本是否是一个完整的代理协议 URI（从头开始）。"""
     lower = line.lower()
     return any(lower.startswith(f'{p}://') for p in [
         'vmess', 'vless', 'trojan', 'ss', 'ssr',
@@ -100,15 +101,18 @@ def _is_proxy_uri(line: str) -> bool:
     ])
 
 
-def _split_multi_uri_line(line: str) -> List[str]:
-    """将一行中包含多个 URI 的文本拆分成独立的 URI 列表。"""
-    parts = MULTI_URI_SEP_RE.split(line)
-    result = []
+def _split_concatenated_uris(text: str) -> List[str]:
+    """
+    使用前瞻断言将粘连在一起的多个 URI 切割成独立 URI 列表。
+    例如 "vless://... vmess://... ss://..." 会被切割为三个独立链接。
+    """
+    parts = CONCAT_URI_SPLIT_RE.split(text)
+    uris = []
     for part in parts:
         part = part.strip()
-        if _is_proxy_uri(part):
-            result.append(part)
-    return result
+        if part and _is_proxy_uri(part):
+            uris.append(part)
+    return uris
 
 
 def extract_raw_candidates(text: str) -> List[str]:
@@ -149,20 +153,35 @@ def extract_raw_candidates(text: str) -> List[str]:
         if line.startswith('#') or line.startswith('//'):
             continue
 
-        # 检测一行中是否包含多个 URI（用 |、;、逗号等分隔）
-        if len(line) > 100 and '://' in line and any(sep in line for sep in ['|', ';', ',']):
-            uris = _split_multi_uri_line(line)
-            for uri in uris:
-                if uri not in seen:
-                    seen.add(uri)
-                    candidates.append(uri)
-            continue
+        # 如果这一行看起来可能包含节点（含有 ://），先尝试用前瞻分割
+        if '://' in line:
+            uris = _split_concatenated_uris(line)
+            # 如果成功切割出多个 URI，或者只切出一个（本身就是完整单个 URI）
+            if uris:
+                for uri in uris:
+                    if uri not in seen:
+                        seen.add(uri)
+                        candidates.append(uri)
+                continue
+            # 如果没有切割出来（可能 line 不是以协议开头，但中间有 :// 非节点链接），
+            # 但为了安全，仍用旧的多分隔符逻辑再尝试一次
+            if len(line) > 100 and any(sep in line for sep in ['|', ';', ',']):
+                # 回退到基于字符集的分割
+                parts = re.split(r'[|,;\s]+', line)
+                for part in parts:
+                    part = part.strip()
+                    if _is_proxy_uri(part):
+                        if part not in seen:
+                            seen.add(part)
+                            candidates.append(part)
+                continue
 
-        # 标准协议 URI（整行就是一个节点）
-        if _is_proxy_uri(line):
-            if line not in seen:
-                seen.add(line)
-                candidates.append(line)
+        # 对于没有 :// 的行，如果它是纯 Base64 且长度较长，尝试解码后处理
+        if len(line) > 100 and not _is_proxy_uri(line):
+            decoded = safe_base64_decode(line)
+            if decoded and '://' in decoded:
+                candidates.extend(extract_raw_candidates(decoded))
+                continue
 
     # ---- 第三阶段：结构化格式提取 ----
 
