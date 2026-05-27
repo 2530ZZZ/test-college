@@ -113,29 +113,7 @@ USE_RECURSIVE_TREE = True
 
 # --- 基础关键词列表 ---
 BASE_QUERIES = [
-    # 中文高频
-    "免费节点",
-    "免费clash订阅",
-    "免费v2ray订阅",
-    "免费机场节点",
-    "节点订阅",
-    "免费机场",
-    "科学上网",
-    "代理",
-    "免费ssr节点",
-    "免费vless节点",
-    "免费reality节点",
-    "免费tuic节点",
-    "免费singbox节点",
-    "公益节点",
-    "节点分享",
-    "节点仓库",
-    "每日节点",
-    "免费节点合集",
-    "clash订阅",
-    "v2ray订阅",
-    "trojan订阅",
-    "hysteria2订阅",
+
     # 英文
     "free nodes",
     "free v2ray nodes",
