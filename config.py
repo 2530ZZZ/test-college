@@ -135,10 +135,6 @@ BASE_QUERIES = [
 
 # --- 否定关键词列表 ---
 SEARCH_NEGATIVE_KEYWORDS = [
-    "adblock", "adguard", "filter", "blocklist", "domain",
-    "asn", "iptv", "dns", "geosite", "geoip", "firewall",
-    "malware", "phishing", "tracker", "spam", "telemetry",
-    "crypto", "mining", "scraper",
     "飞鸟加速", "星辰VPN",
 ]
 
