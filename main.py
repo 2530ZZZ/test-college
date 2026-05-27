@@ -15,6 +15,7 @@ TIME_SUFFIX = f"pushed:>{TIME_LIMIT}"
 # 构建最终搜索查询列表
 QUERIES = []
 for q in BASE_QUERIES:
+    # 如果配置了搜索范围，拼接 "in:name,description" 等
     if SEARCH_IN:
         final_query = f"{q} in:{SEARCH_IN} {TIME_SUFFIX}{SEARCH_SUFFIX}"
     else:
