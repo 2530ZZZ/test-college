@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from collector import Collector
 from tester import run_full_test
-from config import BASE_QUERIES, SEARCH_SUFFIX, SEARCH_IN_NAME_DESCRIPTION
+from config import BASE_QUERIES, SEARCH_SUFFIX, SEARCH_IN
 
 # 生成精确到小时的 pushed 限定词，确保覆盖最近 24 小时活跃仓库
 UTC_NOW = datetime.now(timezone.utc)
@@ -18,11 +18,9 @@ TIME_SUFFIX = f"pushed:>{TIME_LIMIT}"
 # 构建最终搜索查询列表
 QUERIES = []
 for q in BASE_QUERIES:
-    # 如果配置为限制搜索范围在 name,description，则包裹限定符
-    if SEARCH_IN_NAME_DESCRIPTION:
-        # 注意：如果有多个词，需要加引号？简单起见，直接用空格分隔
-        # 例如 "免费节点 in:name,description pushed:>... fork:true ..."
-        final_query = f"{q} in:name,description {TIME_SUFFIX}{SEARCH_SUFFIX}"
+    # 如果配置了搜索范围，拼接 "in:name,description" 等
+    if SEARCH_IN:
+        final_query = f"{q} in:{SEARCH_IN} {TIME_SUFFIX}{SEARCH_SUFFIX}"
     else:
         final_query = f"{q} {TIME_SUFFIX}{SEARCH_SUFFIX}"
     QUERIES.append(final_query)
