@@ -2,14 +2,12 @@
 GitHub 节点收集器 —— 支持优先使用 git/trees API 获取递归文件树，
 并用 HEAD 请求获取文件修改时间，彻底避免 /commits API 调用。
 根据候选文件数量自动切换串行/并发处理，避免小文件集的开销。
-修复了搜索 URL 编码问题。
 """
 
 import os
 import time
 import shutil
 import requests
-import urllib.parse
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
@@ -73,10 +71,10 @@ class Collector:
 
     def search_query(self, query: str):
         for page in range(1, MAX_PAGES + 1):
-            # 关键修复：对查询字符串进行 URL 编码
+            # 直接使用构建好的 query 字符串，不再进行 URL 编码
             url = (
                 f"https://api.github.com/search/repositories"
-                f"?q={encoded_query}&sort=updated&order=desc"
+                f"?q={query}&sort=updated&order=desc"
                 f"&per_page={PER_PAGE}&page={page}"
             )
             resp = safe_get(url, self.headers, timeout=SEARCH_TIMEOUT,
