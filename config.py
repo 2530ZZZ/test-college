@@ -113,25 +113,26 @@ USE_RECURSIVE_TREE = True
 
 # --- 基础关键词列表（中英文全覆盖） ---
 BASE_QUERIES = [
+
     # 英文
-    "free nodes",
-    "free v2ray nodes",
-    "free clash nodes",
-    "free trojan nodes",
-    "free proxy list",
-    "free proxy subscription",
-    "subconverter",
-    "ACL4SSR",
-    "v2rayN",
-    "mihomo",
-    "Clash.Meta",
-    "Shadowrocket",
-    "Hiddify",
-    "Nekoray",
-    "ProxyCollector",
-    "TelegramV2rayCollector",
-    "free proxy scraper",
-    "free proxy bot",
+    "free nodes in:name,description",
+    "free v2ray nodes in:name,description",
+    "free clash nodes in:name,description",
+    "free trojan nodes in:name,description",
+    "free proxy list in:name,description",
+    "free proxy subscription in:name,description",
+    "subconverter in:name,description",
+    "ACL4SSR in:name,description",
+    "v2rayN in:name,description",
+    "mihomo in:name,description",
+    "Clash.Meta in:name,description",
+    "Shadowrocket in:name,description",
+    "Hiddify in:name,description",
+    "Nekoray in:name,description",
+    "ProxyCollector in:name,description",
+    "TelegramV2rayCollector in:name,description",
+    "free proxy scraper in:name,description",
+    "free proxy bot in:name,description",
 ]
 
 # --- 否定关键词列表 ---
@@ -150,13 +151,8 @@ SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
 
-# 搜索范围限定（选择 name, description, readme 中的一个或多个）
-# 类型：str，可选值："name,description" 或 "name" 或 "description" 或 "readme" 或 "name,description,readme" 等
-# 设为空字符串 "" 表示不添加 in: 限定符，即搜索所有文本字段（默认行为）。
-# 示例1："name,description" → 只搜索仓库名和描述（推荐，精准度高）
-# 示例2："readme" → 只搜索 readme 文件
-# 示例3："" → 不限制搜索范围，搜索所有字段（可能会引入大量噪声）
-SEARCH_IN = "name,description"
+# 搜索范围限定（已被直接写进BASE_QUERIES，此处保留为空）
+SEARCH_IN = ""
 
 # 组装固定后缀（不含 pushed 时间）
 SEARCH_SUFFIX = ""
