@@ -89,8 +89,6 @@ BLACKLIST_FILE = "ljck.txt"
 
 # 是否检查文件的 Last-Modified 时间（24小时内）
 # 类型：bool；默认值：True。
-# 设为 True 时：只下载 24 小时内修改过的文件，节省 API 和带宽。
-# 设为 False 时：对仓库内所有符合扩展名的文件进行下载（只要 SHA 未被处理过）。
 CHECK_FILE_MODIFICATION_TIME = True
 
 # ==================== HEAD 请求优化参数 ====================
@@ -111,52 +109,50 @@ USE_RECURSIVE_TREE = True
 
 # ==================== 搜索关键词与限定符 ====================
 
-# --- 基础关键词列表（中英文全覆盖） ---
-# 注意：为了精确控制搜索范围，已将 "in:name,description" 直接拼接到关键词中。
-# 因此下面的 SEARCH_IN 变量设置为空字符串，避免重复拼接。
+# --- 基础关键词列表（纯文本，不含 in: 限定符） ---
 BASE_QUERIES = [
     # 中文高频
-    "免费节点 in:name,description",
-    "免费clash订阅 in:name,description",
-    "免费v2ray订阅 in:name,description",
-    "免费机场节点 in:name,description",
-    "节点订阅 in:name,description",
-    "免费机场 in:name,description",
-    "科学上网 in:name,description",
-    "代理 in:name,description",
-    "免费ssr节点 in:name,description",
-    "免费vless节点 in:name,description",
-    "免费reality节点 in:name,description",
-    "免费tuic节点 in:name,description",
-    "免费singbox节点 in:name,description",
-    "公益节点 in:name,description",
-    "节点分享 in:name,description",
-    "节点仓库 in:name,description",
-    "每日节点 in:name,description",
-    "免费节点合集 in:name,description",
-    "clash订阅 in:name,description",
-    "v2ray订阅 in:name,description",
-    "trojan订阅 in:name,description",
-    "hysteria2订阅 in:name,description",
+    "免费节点",
+    "免费clash订阅",
+    "免费v2ray订阅",
+    "免费机场节点",
+    "节点订阅",
+    "免费机场",
+    "科学上网",
+    "代理",
+    "免费ssr节点",
+    "免费vless节点",
+    "免费reality节点",
+    "免费tuic节点",
+    "免费singbox节点",
+    "公益节点",
+    "节点分享",
+    "节点仓库",
+    "每日节点",
+    "免费节点合集",
+    "clash订阅",
+    "v2ray订阅",
+    "trojan订阅",
+    "hysteria2订阅",
     # 英文
-    "free nodes in:name,description",
-    "free v2ray nodes in:name,description",
-    "free clash nodes in:name,description",
-    "free trojan nodes in:name,description",
-    "free proxy list in:name,description",
-    "free proxy subscription in:name,description",
-    "subconverter in:name,description",
-    "ACL4SSR in:name,description",
-    "v2rayN in:name,description",
-    "mihomo in:name,description",
-    "Clash.Meta in:name,description",
-    "Shadowrocket in:name,description",
-    "Hiddify in:name,description",
-    "Nekoray in:name,description",
-    "ProxyCollector in:name,description",
-    "TelegramV2rayCollector in:name,description",
-    "free proxy scraper in:name,description",
-    "free proxy bot in:name,description",
+    "free nodes",
+    "free v2ray nodes",
+    "free clash nodes",
+    "free trojan nodes",
+    "free proxy list",
+    "free proxy subscription",
+    "subconverter",
+    "ACL4SSR",
+    "v2rayN",
+    "mihomo",
+    "Clash.Meta",
+    "Shadowrocket",
+    "Hiddify",
+    "Nekoray",
+    "ProxyCollector",
+    "TelegramV2rayCollector",
+    "free proxy scraper",
+    "free proxy bot",
 ]
 
 # --- 否定关键词列表 ---
@@ -175,8 +171,9 @@ SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
 
-# 搜索范围限定（已经被写进 BASE_QUERIES 中，此处设置为空）
-SEARCH_IN = ""
+# 搜索范围限定（例如 "name,description"）
+# 设为空字符串 "" 表示不添加 in: 限定符
+SEARCH_IN = "name,description"
 
 # 组装固定后缀（不含 pushed 时间）
 SEARCH_SUFFIX = ""
