@@ -74,7 +74,6 @@ class Collector:
     def search_query(self, query: str):
         for page in range(1, MAX_PAGES + 1):
             # 关键修复：对查询字符串进行 URL 编码
-            encoded_query = urllib.parse.quote(query, safe='')
             url = (
                 f"https://api.github.com/search/repositories"
                 f"?q={encoded_query}&sort=updated&order=desc"
