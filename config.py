@@ -111,9 +111,31 @@ USE_RECURSIVE_TREE = True
 
 # ==================== 搜索关键词与限定符 ====================
 
-# --- 基础关键词列表 ---
+# --- 基础关键词列表（中英文全覆盖） ---
 BASE_QUERIES = [
-
+    # 中文高频
+    "免费节点",
+    "免费clash订阅",
+    "免费v2ray订阅",
+    "免费机场节点",
+    "节点订阅",
+    "免费机场",
+    "科学上网",
+    "代理",
+    "免费ssr节点",
+    "免费vless节点",
+    "免费reality节点",
+    "免费tuic节点",
+    "免费singbox节点",
+    "公益节点",
+    "节点分享",
+    "节点仓库",
+    "每日节点",
+    "免费节点合集",
+    "clash订阅",
+    "v2ray订阅",
+    "trojan订阅",
+    "hysteria2订阅",
     # 英文
     "free nodes",
     "free v2ray nodes",
@@ -159,7 +181,7 @@ SEARCH_ARCHIVED = False
 # 示例3："" → 不限制搜索范围，搜索所有字段（可能会引入大量噪声）
 SEARCH_IN = "name,description"
 
-# 组装固定后缀
+# 组装固定后缀（不含 pushed 时间）
 SEARCH_SUFFIX = ""
 if SEARCH_FORK:
     SEARCH_SUFFIX += " fork:true"
