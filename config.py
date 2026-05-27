@@ -114,29 +114,9 @@ USE_RECURSIVE_TREE = True
 
 # --- 基础关键词列表（纯文本） ---
 BASE_QUERIES = [
-    # 中文高频
-    "免费节点",
-    "免费clash订阅",
-    "免费v2ray订阅",
-    "免费机场节点",
-    "节点订阅",
-    "免费机场",
-    "科学上网",
-    "代理",
-    "免费ssr节点",
-    "免费vless节点",
-    "免费reality节点",
-    "免费tuic节点",
-    "免费singbox节点",
-    "公益节点",
-    "节点分享",
-    "节点仓库",
-    "每日节点",
-    "免费节点合集",
-    "clash订阅",
-    "v2ray订阅",
-    "trojan订阅",
-    "hysteria2订阅",
+    "vmess","VMess","vless","VLESS","trojan","Trojan","ss","Shadowsocks",
+    "ssr","ShadowsocksR","hysteria","hy","hysteria2","hy2",
+    "tuic","reality","wireguard","sing-box",
     # 英文
     "free nodes",
     "free v2ray nodes",
@@ -168,8 +148,6 @@ SEARCH_NEGATIVE_KEYWORDS = [
 ]
 
 # --- README 广告检测关键词（子串匹配，命中任意一个即视为广告仓库） ---
-# 包含机场品牌词、通用广告话术片段等
-# 注意：这些词会在整个 README 文本中进行子串包含检查，例如 "高速机场推荐1" 会命中 "机场推荐"
 README_SPAM_KEYWORDS = [
     # 品牌词
     "飞鸟加速",
@@ -218,10 +196,15 @@ SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
 
-# 搜索范围限定（例如 "name,description"）
+# 搜索范围限定（例如 "name,description,readme"，空字符串表示不限制）
 SEARCH_IN = ""
 
-# 组装固定后缀（不含 pushed 时间）
+# --- 排除的编程语言列表 ---
+# 基于 GitHub 的语言识别，留空列表 [] 表示不排除任何语言
+# 示例：["HTML", "CSS"] 排除主要语言为 HTML 或 CSS 的仓库
+SEARCH_EXCLUDE_LANGUAGES = ["HTML","CSS"]
+
+# ==================== 组装固定后缀（由 main.py 使用） ====================
 SEARCH_SUFFIX = ""
 if SEARCH_FORK:
     SEARCH_SUFFIX += " fork:true"
@@ -231,8 +214,9 @@ if SEARCH_ARCHIVED:
     SEARCH_SUFFIX += " archived:false"
 for kw in SEARCH_NEGATIVE_KEYWORDS:
     SEARCH_SUFFIX += f" -{kw}"
-# 排除 HTML 仓库（大部分广告仓库的语言被识别为 HTML）
-SEARCH_SUFFIX += " -language:HTML"
+# 追加语言排除限定符（若列表不为空）
+for lang in SEARCH_EXCLUDE_LANGUAGES:
+    SEARCH_SUFFIX += f" -language:{lang}"
 
 # ==================== 输出文件 ====================
 CHUNK_SIZE = 10000
