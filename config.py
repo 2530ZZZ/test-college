@@ -197,7 +197,7 @@ SEARCH_SIZE_RANGE = ""
 SEARCH_ARCHIVED = False
 
 # 搜索范围限定（例如 "name,description,readme"，空字符串表示不限制）
-SEARCH_IN = ""
+SEARCH_IN = "name,description,readme"
 
 # --- 排除的编程语言列表 ---
 # 基于 GitHub 的语言识别，留空列表 [] 表示不排除任何语言
