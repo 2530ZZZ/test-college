@@ -171,9 +171,9 @@ SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
 
-# 搜索范围限定（例如 "name,description"）
+# 搜索范围限定（例如 "name,description,readme"）
 # 设为空字符串 "" 表示不添加 in: 限定符
-SEARCH_IN = "name,description"
+SEARCH_IN = ""
 
 # 组装固定后缀（不含 pushed 时间）
 SEARCH_SUFFIX = ""
