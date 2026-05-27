@@ -241,17 +241,19 @@ class Collector:
             session.close()
 
     def _handle_one_file(self, session, repo, branch, file_path, sha, has_nodes):
-        """处理单个文件：HEAD 获取时间 -> 判断 -> 下载提取。"""
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
-        file_time, success = self._head_one_file(session, raw_url, file_path, sha)
-        if not success or file_time is None:
-            self.processed_file_shas.add(sha)
-            return
-
-        if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
-            self.processed_file_shas.add(sha)
-            return
-
+    
+        if CHECK_FILE_MODIFICATION_TIME:
+            # 原有逻辑：HEAD 获取时间，超过 24 小时则跳过
+            file_time, success = self._head_one_file(session, raw_url, file_path, sha)
+            if not success or file_time is None:
+                self.processed_file_shas.add(sha)
+                return
+            if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
+                self.processed_file_shas.add(sha)
+                return
+        # 否则直接进入下载阶段
+    
         self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
 
     def _head_one_file(self, session, raw_url, file_path, sha):
