@@ -27,6 +27,10 @@ def _now_str() -> str:
 # ==================== 自动获取最新版本 ====================
 
 def _fetch_latest_mihomo_version() -> str:
+    """
+    从 mihomo 官方 version.txt 获取最新稳定版本号。
+    失败时回退到 v1.18.7。
+    """
     url = "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt"
     try:
         resp = requests.get(url, timeout=15)
@@ -87,6 +91,7 @@ ALLOWED_EXTENSIONS = {
 }
 BLACKLIST_FILE = "ljck.txt"
 
+# 是否检查文件的 Last-Modified 时间（24小时内）
 CHECK_FILE_MODIFICATION_TIME = True
 
 # ==================== HEAD 请求优化参数 ====================
@@ -153,7 +158,7 @@ BASE_QUERIES = [
     "free proxy bot",
 ]
 
-# --- 否定关键词列表 ---
+# --- 搜索阶段的否定关键词列表（排除搜索噪音） ---
 SEARCH_NEGATIVE_KEYWORDS = [
     "adblock", "adguard", "filter", "blocklist", "domain",
     "asn", "iptv", "dns", "geosite", "geoip", "firewall",
@@ -162,27 +167,48 @@ SEARCH_NEGATIVE_KEYWORDS = [
     "飞鸟加速", "星辰VPN",
 ]
 
-# --- README 广告特征指纹库 ---
-README_SPAM_PATTERNS = [
-    "无视高峰，全天4K秒开",
-    "IPLC、IEPL中转",
-    "小电影丝般顺滑",
-    "高速冲浪，科学上网不二选择",
-    "机场推荐",
-    "注册地址",
-    "购买链接",
+# --- README 广告检测关键词（子串匹配，命中任意一个即视为广告仓库） ---
+# 包含机场品牌词、通用广告话术片段等
+# 注意：这些词会在整个 README 文本中进行子串包含检查，例如 "高速机场推荐1" 会命中 "机场推荐"
+README_SPAM_KEYWORDS = [
+    # 品牌词
     "飞鸟加速",
     "星辰VPN",
     "西游云",
     "老村长机场",
     "农夫山泉",
     "狗狗加速",
-    "优惠",
-    "打折",
-    "官网",
-    "用户",
+    # 广告特征短语
+    "高速机场推荐",
+    "机场推荐",
     "免费试用",
-    "注册",
+    "注册地址",
+    "购买地址",
+    "购买链接",
+    "官网地址",
+    # 行业黑话
+    "倍率",
+    "折合",
+    "续订",
+    "大流量",
+    "限速",
+    "跑路",
+    "不清零",
+    "邀请码",
+    # 其他高频广告词
+    "超值",
+    "不限时",
+    "优惠",
+    "性价比",
+    "客服",
+    "支付宝",
+    "微信",
+    "付款",
+    # 商业话术片段
+    "无视高峰，全天4K秒开",
+    "IPLC、IEPL中转",
+    "小电影丝般顺滑",
+    "高速冲浪，科学上网不二选择",
 ]
 
 # 是否包含 fork 仓库
@@ -192,7 +218,7 @@ SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
 
-# 搜索范围限定（例如 "name,description,readme"）
+# 搜索范围限定（例如 "name,description"）
 SEARCH_IN = ""
 
 # 组装固定后缀（不含 pushed 时间）
@@ -205,7 +231,7 @@ if SEARCH_ARCHIVED:
     SEARCH_SUFFIX += " archived:false"
 for kw in SEARCH_NEGATIVE_KEYWORDS:
     SEARCH_SUFFIX += f" -{kw}"
-# 排除 HTML 仓库（大多数广告仓库被识别为 HTML）
+# 排除 HTML 仓库（大部分广告仓库的语言被识别为 HTML）
 SEARCH_SUFFIX += " -language:HTML"
 
 # ==================== 输出文件 ====================
