@@ -87,8 +87,6 @@ ALLOWED_EXTENSIONS = {
 }
 BLACKLIST_FILE = "ljck.txt"
 
-# 是否检查文件的 Last-Modified 时间（24小时内）
-# 类型：bool；默认值：True。
 CHECK_FILE_MODIFICATION_TIME = True
 
 # ==================== HEAD 请求优化参数 ====================
@@ -109,9 +107,31 @@ USE_RECURSIVE_TREE = True
 
 # ==================== 搜索关键词与限定符 ====================
 
-# --- 基础关键词列表（纯文本，不含 in: 限定符） ---
+# --- 基础关键词列表（纯文本） ---
 BASE_QUERIES = [
-
+    # 中文高频
+    "免费节点",
+    "免费clash订阅",
+    "免费v2ray订阅",
+    "免费机场节点",
+    "节点订阅",
+    "免费机场",
+    "科学上网",
+    "代理",
+    "免费ssr节点",
+    "免费vless节点",
+    "免费reality节点",
+    "免费tuic节点",
+    "免费singbox节点",
+    "公益节点",
+    "节点分享",
+    "节点仓库",
+    "每日节点",
+    "免费节点合集",
+    "clash订阅",
+    "v2ray订阅",
+    "trojan订阅",
+    "hysteria2订阅",
     # 英文
     "free nodes",
     "free v2ray nodes",
@@ -135,7 +155,34 @@ BASE_QUERIES = [
 
 # --- 否定关键词列表 ---
 SEARCH_NEGATIVE_KEYWORDS = [
+    "adblock", "adguard", "filter", "blocklist", "domain",
+    "asn", "iptv", "dns", "geosite", "geoip", "firewall",
+    "malware", "phishing", "tracker", "spam", "telemetry",
+    "crypto", "mining", "scraper",
     "飞鸟加速", "星辰VPN",
+]
+
+# --- README 广告特征指纹库 ---
+README_SPAM_PATTERNS = [
+    "无视高峰，全天4K秒开",
+    "IPLC、IEPL中转",
+    "小电影丝般顺滑",
+    "高速冲浪，科学上网不二选择",
+    "机场推荐",
+    "注册地址",
+    "购买链接",
+    "飞鸟加速",
+    "星辰VPN",
+    "西游云",
+    "老村长机场",
+    "农夫山泉",
+    "狗狗加速",
+    "优惠",
+    "打折",
+    "官网",
+    "用户",
+    "免费试用",
+    "注册",
 ]
 
 # 是否包含 fork 仓库
@@ -146,8 +193,7 @@ SEARCH_SIZE_RANGE = ""
 SEARCH_ARCHIVED = False
 
 # 搜索范围限定（例如 "name,description,readme"）
-# 设为空字符串 "" 表示不添加 in: 限定符
-SEARCH_IN = "name,description,readme"
+SEARCH_IN = ""
 
 # 组装固定后缀（不含 pushed 时间）
 SEARCH_SUFFIX = ""
@@ -159,6 +205,8 @@ if SEARCH_ARCHIVED:
     SEARCH_SUFFIX += " archived:false"
 for kw in SEARCH_NEGATIVE_KEYWORDS:
     SEARCH_SUFFIX += f" -{kw}"
+# 排除 HTML 仓库（大多数广告仓库被识别为 HTML）
+SEARCH_SUFFIX += " -language:HTML"
 
 # ==================== 输出文件 ====================
 CHUNK_SIZE = 10000
