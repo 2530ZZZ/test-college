@@ -112,8 +112,32 @@ USE_RECURSIVE_TREE = True
 # ==================== 搜索关键词与限定符 ====================
 
 # --- 基础关键词列表（中英文全覆盖） ---
+# 注意：为了精确控制搜索范围，已将 "in:name,description" 直接拼接到关键词中。
+# 因此下面的 SEARCH_IN 变量设置为空字符串，避免重复拼接。
 BASE_QUERIES = [
-
+    # 中文高频
+    "免费节点 in:name,description",
+    "免费clash订阅 in:name,description",
+    "免费v2ray订阅 in:name,description",
+    "免费机场节点 in:name,description",
+    "节点订阅 in:name,description",
+    "免费机场 in:name,description",
+    "科学上网 in:name,description",
+    "代理 in:name,description",
+    "免费ssr节点 in:name,description",
+    "免费vless节点 in:name,description",
+    "免费reality节点 in:name,description",
+    "免费tuic节点 in:name,description",
+    "免费singbox节点 in:name,description",
+    "公益节点 in:name,description",
+    "节点分享 in:name,description",
+    "节点仓库 in:name,description",
+    "每日节点 in:name,description",
+    "免费节点合集 in:name,description",
+    "clash订阅 in:name,description",
+    "v2ray订阅 in:name,description",
+    "trojan订阅 in:name,description",
+    "hysteria2订阅 in:name,description",
     # 英文
     "free nodes in:name,description",
     "free v2ray nodes in:name,description",
@@ -151,7 +175,7 @@ SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
 
-# 搜索范围限定（已被直接写进BASE_QUERIES，此处保留为空）
+# 搜索范围限定（已经被写进 BASE_QUERIES 中，此处设置为空）
 SEARCH_IN = ""
 
 # 组装固定后缀（不含 pushed 时间）
