@@ -8,6 +8,7 @@ import os
 import time
 import shutil
 import requests
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
@@ -71,10 +72,11 @@ class Collector:
 
     def search_query(self, query: str):
         for page in range(1, MAX_PAGES + 1):
-            # 直接使用构建好的 query 字符串，不再进行 URL 编码
+            # 对整个查询字符串进行 URL 编码，确保特殊字符被正确转义
+            encoded_query = urllib.parse.quote(query, safe='')
             url = (
                 f"https://api.github.com/search/repositories"
-                f"?q={query}&sort=updated&order=desc"
+                f"?q={encoded_query}&sort=updated&order=desc"
                 f"&per_page={PER_PAGE}&page={page}"
             )
             resp = safe_get(url, self.headers, timeout=SEARCH_TIMEOUT,
