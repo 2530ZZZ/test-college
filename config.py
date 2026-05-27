@@ -140,11 +140,7 @@ BASE_QUERIES = [
 
 # --- 搜索阶段的否定关键词列表（排除搜索噪音） ---
 SEARCH_NEGATIVE_KEYWORDS = [
-    "adblock", "adguard", "filter", "blocklist", "domain",
-    "asn", "iptv", "dns", "geosite", "geoip", "firewall",
-    "malware", "phishing", "tracker", "spam", "telemetry",
-    "crypto", "mining", "scraper",
-    "飞鸟加速", "星辰VPN",
+    
 ]
 
 # --- README 广告检测关键词（子串匹配，命中任意一个即视为广告仓库） ---
