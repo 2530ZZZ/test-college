@@ -172,8 +172,14 @@ SEARCH_FORK = True
 SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
-# 是否将搜索范围限制在仓库名和描述中（强烈建议开启）
-SEARCH_IN_NAME_DESCRIPTION = True
+
+# 搜索范围限定（选择 name, description, readme 中的一个或多个）
+# 类型：str，可选值："name,description" 或 "name" 或 "description" 或 "readme" 或 "name,description,readme" 等
+# 设为空字符串 "" 表示不添加 in: 限定符，即搜索所有文本字段（默认行为）。
+# 示例1："name,description" → 只搜索仓库名和描述（推荐，精准度高）
+# 示例2："readme" → 只搜索 readme 文件
+# 示例3："" → 不限制搜索范围，搜索所有字段（可能会引入大量噪声）
+SEARCH_IN = "name,description"
 
 # 组装固定后缀
 SEARCH_SUFFIX = ""
