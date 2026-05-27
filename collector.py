@@ -87,6 +87,7 @@ class Collector:
                 f"?q={query}&sort=updated&order=desc"
                 f"&per_page={PER_PAGE}&page={page}"
             )
+            print(f"[{now_str()}] 搜索URL: {url} ", flush=True)
             resp = safe_get(url, self.headers, timeout=SEARCH_TIMEOUT,
                             operation_name=f"搜索第{page}页")
             if not resp:
