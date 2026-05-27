@@ -12,15 +12,14 @@ UTC_NOW = datetime.now(timezone.utc)
 TIME_LIMIT = (UTC_NOW - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')
 TIME_SUFFIX = f"pushed:>{TIME_LIMIT}"
 
-# 构建最终搜索查询列表
+# 构建最终搜索查询列表（不含 URL 编码，编码在 collector.py 中进行）
 QUERIES = []
 for q in BASE_QUERIES:
-    # 如果配置了搜索范围，拼接 "in:name,description" 等
     if SEARCH_IN:
-        final_query = f"{q} in:{SEARCH_IN} {TIME_SUFFIX}{SEARCH_SUFFIX}"
+        query_body = f"{q} in:{SEARCH_IN} {TIME_SUFFIX}{SEARCH_SUFFIX}"
     else:
-        final_query = f"{q} {TIME_SUFFIX}{SEARCH_SUFFIX}"
-    QUERIES.append(final_query)
+        query_body = f"{q} {TIME_SUFFIX}{SEARCH_SUFFIX}"
+    QUERIES.append(query_body)
 
 if __name__ == "__main__":
     start_time = time.time()
