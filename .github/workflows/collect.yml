@@ -30,7 +30,14 @@ jobs:
       - name: 运行动态搜集+测速
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python main.py
+        
+        run: |
+            if [ -z "$GITHUB_TOKEN" ]; then
+               echo "Token is empty!"
+            else
+              echo "Token is set (length: ${#GITHUB_TOKEN})"
+            fi
+            python main.py
 
       - name: 提交所有结果
         run: |
