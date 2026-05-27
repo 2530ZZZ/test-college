@@ -47,8 +47,8 @@ class Collector:
         self.queries = queries or []
         self.all_links: List[str] = []
         self.unique_nodes: Set[str] = set()
-        self.seen_repos: Set[str] = set()              # 本次运行已处理过的仓库
-        self.blacklist_repos: Set[str] = set()          # 永久黑名单仓库（无节点或广告）
+        self.seen_repos: Set[str] = set()
+        self.blacklist_repos: Set[str] = set()
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
         self.processed_file_shas: Set[str] = set()
@@ -59,7 +59,6 @@ class Collector:
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
         for idx, query in enumerate(self.queries, 1):
-            # 检查累计限流等待，若超过阈值则提前终止
             if utils.total_rate_limit_wait >= utils.MAX_TOTAL_RATE_LIMIT_WAIT:
                 print(f"[{now_str()}] ⚠️ 累计限流等待已达 "
                       f"{utils.total_rate_limit_wait:.0f}s，终止搜索", flush=True)
@@ -81,10 +80,7 @@ class Collector:
         print(f"[{now_str()}] 累计限流等待: {utils.total_rate_limit_wait:.0f} 秒", flush=True)
 
     def search_query(self, query: str):
-        """
-        执行单个关键词的多页搜索。
-        搜索结果直接交给 process_repo 处理，不在搜索阶段做额外过滤。
-        """
+        """执行单个关键词的多页搜索。"""
         for page in range(1, MAX_PAGES + 1):
             url = (
                 f"https://api.github.com/search/repositories"
@@ -106,7 +102,6 @@ class Collector:
             for item in items:
                 repo = item["full_name"]
                 github_url = f"https://github.com/{repo}"
-                # 跳过已处理或黑名单中的仓库
                 if repo in self.seen_repos or github_url in self.blacklist_repos:
                     continue
                 self.seen_repos.add(repo)
@@ -121,18 +116,12 @@ class Collector:
 
     def process_repo(self, repo: str):
         """
-        处理单个仓库：
-        1. 获取默认分支
-        2. 获取递归文件树
-        3. 先检查 README 文件是否为广告（命中关键词则加入黑名单并跳过）
-        4. 处理其他文件，提取节点
-        5. 若未提取到节点，加入黑名单
+        处理单个仓库：获取默认分支 → 递归树 → README 广告检测 → 处理文件 → 无节点则黑名单。
         """
         github_url = f"https://github.com/{repo}"
         if github_url in self.blacklist_repos:
             return
 
-        # 获取仓库基本信息（主要用于获取默认分支）
         repo_info = safe_get(f"https://api.github.com/repos/{repo}", self.headers,
                              timeout=REPO_INFO_TIMEOUT)
         if not repo_info:
@@ -143,12 +132,11 @@ class Collector:
         default_branch = repo_data.get("default_branch", "main")
         print(f"[{now_str()}] 仓库 {github_url} (分支: {default_branch})", flush=True)
 
-        has_nodes_flag = [False]  # 使用列表以便在递归中修改
+        has_nodes_flag = [False]
 
         if USE_RECURSIVE_TREE:
             success = self._process_with_recursive_tree(repo, default_branch, has_nodes_flag)
             if not success:
-                # tree API 失败，回退到 Contents API 逐层遍历
                 print(f"[{now_str()}] 树 API 失败，回退到 Contents API 逐层过滤", flush=True)
                 try:
                     if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
@@ -161,7 +149,6 @@ class Collector:
                 except RuntimeError:
                     raise
         else:
-            # 直接使用 Contents API
             try:
                 if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
                     @timeout_decorator(REPO_TIMEOUT_SECONDS)
@@ -173,7 +160,6 @@ class Collector:
             except RuntimeError:
                 raise
 
-        # 若仓库既未提取到节点，又未被标记为广告（has_nodes_flag[0] == False），加入黑名单
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
             print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
             self.blacklist_repos.add(github_url)
@@ -183,11 +169,8 @@ class Collector:
     # ==================== 递归树 API 处理（核心） ====================
     def _process_with_recursive_tree(self, repo: str, branch: str, has_nodes: List[bool]) -> bool:
         """
-        使用 git/trees?recursive=1 一次性获取所有文件。
-        在处理文件前，先检查 README 文件内容是否包含广告关键词。
-        若命中广告，则直接加入黑名单并返回 True（视为处理完成），
-        不再继续处理该仓库的其他文件。
-        返回：True 表示处理成功，False 表示树 API 失败需要回退。
+        使用 git/trees?recursive=1 获取全文件树。
+        先检查 README 是否为广告，再处理其他文件。
         """
         tree_url = f"https://api.github.com/repos/{repo}/git/trees/{branch}?recursive=1"
         resp = safe_get(tree_url, self.headers, timeout=TREE_API_TIMEOUT, operation_name="递归树")
@@ -200,14 +183,13 @@ class Collector:
             return False
         entries = data.get('tree', [])
         if not entries:
-            return True  # 空仓库，无需处理
+            return True
 
         # ---- 第一步：查找并检查 README 文件 ----
         readme_path = None
         for e in entries:
             if e.get('type') == 'blob':
                 path = e.get('path', '').lower()
-                # 常见的 README 文件名
                 if path in ('readme.md', 'readme', 'readme.txt', 'readme.rst', 'readme.markdown'):
                     readme_path = e.get('path')
                     break
@@ -218,19 +200,14 @@ class Collector:
             readme_resp = safe_get(readme_url, self.headers, timeout=FILE_DOWNLOAD_TIMEOUT)
             if readme_resp:
                 content = readme_resp.text
-                # 检查是否包含任意广告关键词（子串匹配）
                 for kw in README_SPAM_KEYWORDS:
                     if kw in content:
                         print(f"[{now_str()}] 🛑 仓库 {repo} README 包含广告关键词 '{kw}'，跳过", flush=True)
                         self.blacklist_repos.add(f"https://github.com/{repo}")
                         with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                             f.write(f"https://github.com/{repo}\n")
-                        # 标记为已处理（避免 process_repo 重复加入黑名单）
-                        has_nodes[0] = True
-                        return True  # 成功拦截，不再继续处理其他文件
-            else:
-                # README 下载失败，不影响后续处理，继续
-                pass
+                        has_nodes[0] = True  # 标记已处理，防止重复加入黑名单
+                        return True
 
         # ---- 第二步：正常处理候选文件 ----
         files_to_check = []
@@ -249,14 +226,12 @@ class Collector:
         if not files_to_check:
             return True
 
-        # 限制单仓库最大文件数（避免超大仓库）
         if MAX_HEAD_PER_REPO is not None and len(files_to_check) > MAX_HEAD_PER_REPO:
             print(f"[{now_str()}] ⚠️ 候选文件过多 ({len(files_to_check)} 个)，"
                   f"仅处理前 {MAX_HEAD_PER_REPO} 个", flush=True)
             files_to_check = files_to_check[:MAX_HEAD_PER_REPO]
 
         total = len(files_to_check)
-        # 根据文件数量选择串行或并发处理
         if total < MIN_FILES_FOR_CONCURRENCY:
             print(f"[{now_str()}] 候选文件 {total} 个（<{MIN_FILES_FOR_CONCURRENCY}），串行处理", flush=True)
             self._process_files_sequential(repo, branch, files_to_check, has_nodes)
@@ -266,10 +241,8 @@ class Collector:
 
         return True
 
-    # ==================== 文件处理辅助方法 ====================
-
-    def _process_files_sequential(self, repo: str, branch: str, files: List[tuple], has_nodes: List[bool]):
-        """串行处理文件列表。"""
+    # ==================== 文件处理辅助方法（串行/并发/下载/提取） ====================
+    def _process_files_sequential(self, repo, branch, files, has_nodes):
         session = requests.Session()
         session.headers.update(self.headers)
         try:
@@ -278,8 +251,7 @@ class Collector:
         finally:
             session.close()
 
-    def _process_files_concurrent(self, repo: str, branch: str, files: List[tuple], has_nodes: List[bool]):
-        """并发处理文件列表。"""
+    def _process_files_concurrent(self, repo, branch, files, has_nodes):
         session = requests.Session()
         session.headers.update(self.headers)
         try:
@@ -313,9 +285,7 @@ class Collector:
             session.close()
 
     def _handle_one_file(self, session, repo, branch, file_path, sha, has_nodes):
-        """处理单个文件：可选的 HEAD 时间检查 → 下载 → 提取节点。"""
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
-
         if CHECK_FILE_MODIFICATION_TIME:
             file_time, success = self._head_one_file(session, raw_url, file_path, sha)
             if not success or file_time is None:
@@ -324,11 +294,9 @@ class Collector:
             if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
                 self.processed_file_shas.add(sha)
                 return
-
         self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
 
     def _head_one_file(self, session, raw_url, file_path, sha):
-        """发送 HEAD 请求获取文件 Last-Modified 时间。返回 (datetime, success)。"""
         try:
             head_resp = session.head(raw_url, timeout=(8, 10))
             if head_resp.status_code == 200:
@@ -344,14 +312,12 @@ class Collector:
             return None, False
 
     def _download_and_extract(self, repo, branch, file_path, raw_url, sha, has_nodes):
-        """下载文件内容并提取节点候选。"""
         file_resp = safe_get(raw_url, self.headers, timeout=FILE_DOWNLOAD_TIMEOUT)
         if not file_resp:
             self.processed_file_shas.add(sha)
             check_rate_limit()
             return
 
-        # 处理可能的编码问题
         content = None
         try:
             content = file_resp.text
@@ -365,12 +331,10 @@ class Collector:
             self.processed_file_shas.add(sha)
             return
 
-        # 文件大小限制
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
             self.processed_file_shas.add(sha)
             return
 
-        # 提取节点候选
         def extract():
             return extract_raw_candidates(content)
         try:
@@ -402,7 +366,7 @@ class Collector:
 
         self.processed_file_shas.add(sha)
 
-    # ==================== 回退方案：原 Contents API 递归 + commits 查询 ====================
+    # ==================== 回退：Contents API 逐层递归 ====================
     def process_file_tree(self, repo: str, path: str, branch: str, has_nodes: List[bool]):
         """使用 Contents API 逐层递归，配合 commits 查询文件时间。用作 tree API 失败时的回退。"""
         contents_url = (f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -500,9 +464,7 @@ class Collector:
                     has_nodes[0] = True
                     print(f"[{now_str()}] 📄 {file_url} ✅ 提取 {new_nodes} 个候选块", flush=True)
 
-    # ==================== 持久化操作 ====================
     def load_blacklist(self):
-        """加载黑名单文件。"""
         if os.path.exists(BLACKLIST_FILE):
             with open(BLACKLIST_FILE, "r", encoding="utf-8") as f:
                 for line in f:
@@ -512,14 +474,10 @@ class Collector:
             print(f"[{now_str()}] 已加载黑名单: {len(self.blacklist_repos)} 个", flush=True)
 
     def save_results(self):
-        """保存收集结果到文件。"""
-        # 保存 no.txt (所有去重后的节点)
         if self.unique_nodes:
             with open("no.txt", "w", encoding="utf-8") as f:
                 f.write("\n".join(self.unique_nodes))
             print(f"[{now_str()}] 保存 no.txt ({len(self.unique_nodes)} 条)", flush=True)
-
-        # 分片到 no/ 文件夹，并生成 no_w_li.txt
         no_dir = "no"
         if os.path.exists(no_dir):
             shutil.rmtree(no_dir)
@@ -542,8 +500,6 @@ class Collector:
         with open("no_w_li.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(no_w_links))
         print(f"[{now_str()}] 保存 no_w_li.txt ({file_count} 分片)", flush=True)
-
-        # 保存 no_li.txt (所有源文件链接)
         self.all_links.append(f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no.txt")
         self.all_links = list(dict.fromkeys(self.all_links))
         with open("no_li.txt", "w", encoding="utf-8") as f:
