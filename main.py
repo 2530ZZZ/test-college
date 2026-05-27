@@ -1,7 +1,4 @@
-"""
-主入口：动态生成搜索关键词，启动收集与测速。
-所有搜索关键词、后缀常量统一从 config.py 导入。
-"""
+"""主入口：动态生成搜索关键词，启动收集与测速。"""
 
 import os
 import time
@@ -10,7 +7,7 @@ from collector import Collector
 from tester import run_full_test
 from config import BASE_QUERIES, SEARCH_SUFFIX, SEARCH_IN
 
-# 生成精确到小时的 pushed 限定词，确保覆盖最近 24 小时活跃仓库
+# 生成精确到小时的 pushed 限定词
 UTC_NOW = datetime.now(timezone.utc)
 TIME_LIMIT = (UTC_NOW - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')
 TIME_SUFFIX = f"pushed:>{TIME_LIMIT}"
@@ -18,7 +15,6 @@ TIME_SUFFIX = f"pushed:>{TIME_LIMIT}"
 # 构建最终搜索查询列表
 QUERIES = []
 for q in BASE_QUERIES:
-    # 如果配置了搜索范围，拼接 "in:name,description" 等
     if SEARCH_IN:
         final_query = f"{q} in:{SEARCH_IN} {TIME_SUFFIX}{SEARCH_SUFFIX}"
     else:
