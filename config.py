@@ -79,7 +79,7 @@ REPO_TIMEOUT_SECONDS = 120
 # ==================== 限流控制 ====================
 MAX_TOTAL_RATE_LIMIT_WAIT = 600
 
-# ==================== 文件收集配置（所有限制均已放宽至最大） ====================
+# ==================== 文件收集配置 ====================
 
 # 最大下载文件大小（字节），None 表示不限制
 MAX_FILE_SIZE = None
@@ -87,13 +87,13 @@ MAX_FILE_SIZE = None
 FILE_PROCESS_TIMEOUT = None
 # 允许处理的文件扩展名（包含空字符串以支持无扩展名文件）
 ALLOWED_EXTENSIONS = {
-    '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64',''
+    '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64', ''
 }
 # 黑名单文件路径
 BLACKLIST_FILE = "ljck.txt"
 
 # 是否检查文件的 Last-Modified 时间（24小时内）
-CHECK_FILE_MODIFICATION_TIME = True   # 保留 HEAD 检查，但添加详细日志
+CHECK_FILE_MODIFICATION_TIME = True   # 保留 HEAD 检查
 
 # ==================== HEAD 请求优化参数 ====================
 
@@ -103,6 +103,12 @@ HEAD_CONCURRENCY = 20
 MAX_HEAD_PER_REPO = None
 # 候选文件数阈值：低于此值时不启用并发，串行处理
 MIN_FILES_FOR_CONCURRENCY = 50
+
+# ==================== Commits API 回退开关 ====================
+# 当 HEAD 请求无法获取 Last-Modified 时，是否回退到 Commits API 查询
+# 默认 False：避免大量消耗 Commits API 配额，快速失败
+# 若设为 True：可提高时间获取成功率，但易触发限流
+USE_COMMITS_API_FALLBACK = False
 
 # ==================== API 请求超时（秒） ====================
 SEARCH_TIMEOUT = (15, 30)
@@ -119,8 +125,6 @@ USE_RECURSIVE_TREE = True
 
 # --- 基础关键词列表（纯文本） ---
 BASE_QUERIES = [
-
-    "free nodes",
     "free v2ray nodes",
     "free clash nodes",
     "free trojan nodes",
@@ -142,7 +146,7 @@ BASE_QUERIES = [
 
 # --- 搜索阶段的否定关键词列表（排除搜索噪音） ---
 SEARCH_NEGATIVE_KEYWORDS = [
-    
+
 ]
 
 # --- README 广告检测关键词（子串匹配） ---
