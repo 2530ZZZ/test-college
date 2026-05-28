@@ -87,7 +87,7 @@ MAX_FILE_SIZE = None
 FILE_PROCESS_TIMEOUT = None
 # 允许处理的文件扩展名（包含空字符串以支持无扩展名文件）
 ALLOWED_EXTENSIONS = {
-    '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64', ''
+    '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64',''
 }
 # 黑名单文件路径
 BLACKLIST_FILE = "ljck.txt"
