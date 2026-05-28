@@ -1,8 +1,7 @@
 name: 动态搜集
-
 on:
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: '0 0 1 * *'   # 每6小时一次 (UTC 04:00, 10:00, 16:00, 22:00)
   workflow_dispatch:
 
 jobs:
@@ -12,9 +11,8 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       NODE_NO_WARNINGS: "1"
     permissions:
-      contents: write  # 允许推送代码
-      actions: read    # 允许读取工作流
-      packages: read   # 添加此行！允许搜索公开仓库
+      contents: write
+      actions: read
 
     steps:
       - name: 拉取仓库代码
@@ -43,5 +41,6 @@ jobs:
           git add -A no/
           git add no.txt no_li.txt no_w_li.txt ljck.txt
           git add alive.txt mihomo.yaml
-          git commit -m "自动更新 + 测速 - $BEIJING_TIME CST" || echo "No changes"
+          git add log/
+          git commit -m "自动更新 + 测速 - $BEIJING_TIME CST" || echo "No changes to commit"
           git push
