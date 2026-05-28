@@ -1,9 +1,6 @@
 """
-GitHub 节点收集器 —— 支持优先使用 git/trees API 获取递归文件树，
-并用 HEAD 请求获取文件修改时间，彻底避免 /commits API 调用。
-根据候选文件数量自动切换串行/并发处理，避免小文件集的开销。
-新增 README 广告内容检测，命中则直接跳过仓库，大幅减少 API 消耗。
-HEAD 请求增加详细日志，便于定位时间过滤问题。
+GitHub 节点收集器 —— 优先使用 git/trees API 获取递归文件树，
+HEAD 请求获取修改时间，失败时回退到 Commits API。
 """
 
 import os
@@ -13,7 +10,7 @@ import requests
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Tuple
 
 import utils
 from utils import safe_get, now_str, timeout_decorator, beijing_tz, check_rate_limit
@@ -47,6 +44,7 @@ class Collector:
         self.processed_file_shas: Set[str] = set()
         self.load_blacklist()
 
+    # ---------- 公共流程 ----------
     def run(self):
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
@@ -229,22 +227,26 @@ class Collector:
                 futures = {}
                 for file_path, sha in files:
                     raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
-                    future = executor.submit(self._head_one_file, session, raw_url, file_path, sha)
+                    # 预先将 repo, branch, file_path 等信息保存，以便回调使用
+                    future = executor.submit(
+                        self._get_file_time, session, repo, branch, file_path, raw_url
+                    )
                     futures[future] = (file_path, sha)
                 for future in as_completed(futures):
                     file_path, sha = futures[future]
                     try:
-                        file_time, success, reason = future.result()  # 返回值增加了 reason 字符串
+                        file_time, success, reason = future.result()
                     except Exception:
                         file_time, success, reason = None, False, "异常"
                     if not success or file_time is None:
-                        print(f"[{now_str()}] ⚠️ HEAD 失败 {raw_url} 原因: {reason}", flush=True)
+                        print(f"[{now_str()}] ⚠️ 获取时间失败 {file_path} 原因: {reason}，跳过", flush=True)
                         self.processed_file_shas.add(sha)
                         continue
                     if CHECK_FILE_MODIFICATION_TIME and (datetime.now(timezone.utc) - file_time >= timedelta(hours=24)):
-                        print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {raw_url}", flush=True)
+                        print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {file_path}", flush=True)
                         self.processed_file_shas.add(sha)
                         continue
+                    # 下载并提取
                     raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
                     self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
         finally:
@@ -253,9 +255,9 @@ class Collector:
     def _handle_one_file(self, session, repo, branch, file_path, sha, has_nodes):
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
         if CHECK_FILE_MODIFICATION_TIME:
-            file_time, success, reason = self._head_one_file(session, raw_url, file_path, sha)
+            file_time, success, reason = self._get_file_time(session, repo, branch, file_path, raw_url)
             if not success or file_time is None:
-                print(f"[{now_str()}] ⚠️ HEAD 失败 {raw_url} 原因: {reason}", flush=True)
+                print(f"[{now_str()}] ⚠️ 获取时间失败 {raw_url} 原因: {reason}", flush=True)
                 self.processed_file_shas.add(sha)
                 return
             if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
@@ -264,11 +266,13 @@ class Collector:
                 return
         self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
 
-    def _head_one_file(self, session, raw_url, file_path, sha):
+    def _get_file_time(self, session, repo, branch, file_path, raw_url) -> Tuple[Optional[datetime], bool, str]:
         """
-        返回 (file_time, success, reason)。
-        reason 为失败原因的简短描述。
+        获取文件最后修改时间。优先使用 HEAD 请求的 Last-Modified，
+        若无此头，则回退到 Commits API 查询。
+        返回 (file_time, success, reason)
         """
+        # 1. 尝试 HEAD
         try:
             head_resp = session.head(raw_url, timeout=(8, 10))
             if head_resp.status_code == 200:
@@ -279,14 +283,29 @@ class Collector:
                         return file_time, True, ""
                     except Exception as e:
                         return None, False, f"解析 Last-Modified 失败: {e}"
+                # 无 Last-Modified，回退到 Commits API
                 else:
-                    return None, False, "无 Last-Modified 头"
+                    return self._get_file_time_via_commits(repo, file_path)
             else:
                 return None, False, f"HTTP {head_resp.status_code}"
-        except requests.exceptions.Timeout:
-            return None, False, "超时"
         except Exception as e:
             return None, False, str(e)
+
+    def _get_file_time_via_commits(self, repo: str, file_path: str) -> Tuple[Optional[datetime], bool, str]:
+        """通过 Commits API 获取文件最后修改时间。"""
+        commit_url = f"https://api.github.com/repos/{repo}/commits?path={file_path}&per_page=1"
+        resp = safe_get(commit_url, self.headers, timeout=COMMITS_API_TIMEOUT, operation_name=f"commits 查询 {file_path}")
+        if not resp:
+            return None, False, "Commits API 请求失败"
+        try:
+            commits = resp.json()
+            if not commits:
+                return None, False, "无提交记录"
+            time_str = commits[0]["commit"]["committer"]["date"]
+            file_time = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+            return file_time, True, ""
+        except Exception as e:
+            return None, False, f"解析 commits 失败: {e}"
 
     # ==================== 下载与提取 ====================
     def _download_and_extract(self, repo, branch, file_path, raw_url, sha, has_nodes):
