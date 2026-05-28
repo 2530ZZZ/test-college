@@ -1,6 +1,7 @@
 """
 GitHub 节点收集器 —— 优先使用 git/trees API 获取递归文件树，
-HEAD 请求获取修改时间，失败时回退到 Commits API。
+修复无 Last-Modified 头问题：HEAD 请求去除认证头，保证正常获取时间；
+若仍无头，才回退到 Commits API。
 """
 
 import os
@@ -44,7 +45,6 @@ class Collector:
         self.processed_file_shas: Set[str] = set()
         self.load_blacklist()
 
-    # ---------- 公共流程 ----------
     def run(self):
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
@@ -211,51 +211,40 @@ class Collector:
 
     # ==================== 文件处理 ====================
     def _process_files_sequential(self, repo, branch, files, has_nodes):
-        session = requests.Session()
-        session.headers.update(self.headers)
-        try:
-            for file_path, sha in files:
-                self._handle_one_file(session, repo, branch, file_path, sha, has_nodes)
-        finally:
-            session.close()
+        for file_path, sha in files:
+            self._handle_one_file(repo, branch, file_path, sha, has_nodes)
 
     def _process_files_concurrent(self, repo, branch, files, has_nodes):
-        session = requests.Session()
-        session.headers.update(self.headers)
-        try:
-            with ThreadPoolExecutor(max_workers=HEAD_CONCURRENCY) as executor:
-                futures = {}
-                for file_path, sha in files:
-                    raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
-                    # 预先将 repo, branch, file_path 等信息保存，以便回调使用
-                    future = executor.submit(
-                        self._get_file_time, session, repo, branch, file_path, raw_url
-                    )
-                    futures[future] = (file_path, sha)
-                for future in as_completed(futures):
-                    file_path, sha = futures[future]
-                    try:
-                        file_time, success, reason = future.result()
-                    except Exception:
-                        file_time, success, reason = None, False, "异常"
-                    if not success or file_time is None:
-                        print(f"[{now_str()}] ⚠️ 获取时间失败 {file_path} 原因: {reason}，跳过", flush=True)
-                        self.processed_file_shas.add(sha)
-                        continue
-                    if CHECK_FILE_MODIFICATION_TIME and (datetime.now(timezone.utc) - file_time >= timedelta(hours=24)):
-                        print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {file_path}", flush=True)
-                        self.processed_file_shas.add(sha)
-                        continue
-                    # 下载并提取
-                    raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
-                    self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
-        finally:
-            session.close()
+        with ThreadPoolExecutor(max_workers=HEAD_CONCURRENCY) as executor:
+            futures = {}
+            for file_path, sha in files:
+                raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
+                future = executor.submit(
+                    self._get_file_time, repo, file_path, raw_url
+                )
+                futures[future] = (file_path, sha)
+            for future in as_completed(futures):
+                file_path, sha = futures[future]
+                try:
+                    file_time, success, reason = future.result()
+                except Exception:
+                    file_time, success, reason = None, False, "异常"
+                if not success or file_time is None:
+                    print(f"[{now_str()}] ⚠️ 获取时间失败 {file_path} 原因: {reason}，跳过", flush=True)
+                    self.processed_file_shas.add(sha)
+                    continue
+                if CHECK_FILE_MODIFICATION_TIME and (datetime.now(timezone.utc) - file_time >= timedelta(hours=24)):
+                    print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {file_path}", flush=True)
+                    self.processed_file_shas.add(sha)
+                    continue
+                # 下载并提取
+                raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
+                self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
 
-    def _handle_one_file(self, session, repo, branch, file_path, sha, has_nodes):
+    def _handle_one_file(self, repo, branch, file_path, sha, has_nodes):
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
         if CHECK_FILE_MODIFICATION_TIME:
-            file_time, success, reason = self._get_file_time(session, repo, branch, file_path, raw_url)
+            file_time, success, reason = self._get_file_time(repo, file_path, raw_url)
             if not success or file_time is None:
                 print(f"[{now_str()}] ⚠️ 获取时间失败 {raw_url} 原因: {reason}", flush=True)
                 self.processed_file_shas.add(sha)
@@ -266,15 +255,15 @@ class Collector:
                 return
         self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
 
-    def _get_file_time(self, session, repo, branch, file_path, raw_url) -> Tuple[Optional[datetime], bool, str]:
+    def _get_file_time(self, repo: str, file_path: str, raw_url: str) -> Tuple[Optional[datetime], bool, str]:
         """
-        获取文件最后修改时间。优先使用 HEAD 请求的 Last-Modified，
-        若无此头，则回退到 Commits API 查询。
-        返回 (file_time, success, reason)
+        获取文件最后修改时间。使用不带 Authorization 的 HEAD 请求，
+        确保获得 Last-Modified 头。若无，则回退到 Commits API。
         """
-        # 1. 尝试 HEAD
+        # 创建不含认证头的 headers，避免干扰 raw 服务器的 Last-Modified 返回
+        head_headers = {k: v for k, v in self.headers.items() if k.lower() != 'authorization'}
         try:
-            head_resp = session.head(raw_url, timeout=(8, 10))
+            head_resp = requests.head(raw_url, headers=head_headers, timeout=(8, 10))
             if head_resp.status_code == 200:
                 last_mod = head_resp.headers.get('Last-Modified')
                 if last_mod:
@@ -283,8 +272,8 @@ class Collector:
                         return file_time, True, ""
                     except Exception as e:
                         return None, False, f"解析 Last-Modified 失败: {e}"
-                # 无 Last-Modified，回退到 Commits API
                 else:
+                    # 无 Last-Modified 头，回退到 Commits API
                     return self._get_file_time_via_commits(repo, file_path)
             else:
                 return None, False, f"HTTP {head_resp.status_code}"
