@@ -341,9 +341,12 @@ class Collector:
         if new_nodes:
             self.all_links.append(raw_url)
             has_nodes[0] = True
-            print(f"[{now_str()}] 📄 {raw_url} ✅ 提取 {new_nodes} 个候选块", flush=True)
+            print(f"[{now_str()}] 📄 {raw_url} ✅ 提取 {len(candidates)} 个节点，新增 {new_nodes} 个", flush=True)
         else:
-            print(f"[{now_str()}] 📄 {raw_url} ❌ 无新节点", flush=True)
+            if len(candidates) == 0:
+                 print(f"[{now_str()}] 📄 {raw_url} ❌ 无节点（文件无有效内容）", flush=True)
+            else:
+                print(f"[{now_str()}] 📄 {raw_url} ⚪ 解析出 {len(candidates)} 个节点，但全部已存在，无新节点", flush=True)
         self.processed_file_shas.add(sha)
 
     # ----------------- 回退：Contents API -----------------
