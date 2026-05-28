@@ -27,10 +27,6 @@ def _now_str() -> str:
 # ==================== 自动获取最新版本 ====================
 
 def _fetch_latest_mihomo_version() -> str:
-    """
-    从 mihomo 官方 version.txt 获取最新稳定版本号。
-    失败时回退到 v1.18.7。
-    """
     url = "https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt"
     try:
         resp = requests.get(url, timeout=15)
@@ -83,20 +79,29 @@ REPO_TIMEOUT_SECONDS = 120
 # ==================== 限流控制 ====================
 MAX_TOTAL_RATE_LIMIT_WAIT = 600
 
-# ==================== 文件收集配置 ====================
+# ==================== 文件收集配置（所有限制均已放宽至最大） ====================
+
+# 最大下载文件大小（字节），None 表示不限制
 MAX_FILE_SIZE = None
-FILE_PROCESS_TIMEOUT = 30
+# 单个文件处理超时（秒），用于正则提取，None 表示不限制
+FILE_PROCESS_TIMEOUT = None
+# 允许处理的文件扩展名（包含空字符串以支持无扩展名文件）
 ALLOWED_EXTENSIONS = {
     '.yaml', '.yml', '.json', '.txt', '.md', '.conf', '.list', '.base64', ''
 }
+# 黑名单文件路径
 BLACKLIST_FILE = "ljck.txt"
 
 # 是否检查文件的 Last-Modified 时间（24小时内）
-CHECK_FILE_MODIFICATION_TIME = True
+CHECK_FILE_MODIFICATION_TIME = True   # 保留 HEAD 检查，但添加详细日志
 
 # ==================== HEAD 请求优化参数 ====================
+
+# HEAD 请求并发线程数
 HEAD_CONCURRENCY = 20
+# 单仓库最大 HEAD 请求数，None 表示不限制
 MAX_HEAD_PER_REPO = None
+# 候选文件数阈值：低于此值时不启用并发，串行处理
 MIN_FILES_FOR_CONCURRENCY = 50
 
 # ==================== API 请求超时（秒） ====================
@@ -114,10 +119,7 @@ USE_RECURSIVE_TREE = True
 
 # --- 基础关键词列表（纯文本） ---
 BASE_QUERIES = [
-    "vmess","VMess","vless","VLESS","trojan","Trojan","ss","Shadowsocks",
-    "ssr","ShadowsocksR","hysteria","hy","hysteria2","hy2",
-    "tuic","reality","wireguard","sing-box",
-    # 英文
+
     "free nodes",
     "free v2ray nodes",
     "free clash nodes",
@@ -143,46 +145,13 @@ SEARCH_NEGATIVE_KEYWORDS = [
     
 ]
 
-# --- README 广告检测关键词（子串匹配，命中任意一个即视为广告仓库） ---
+# --- README 广告检测关键词（子串匹配） ---
 README_SPAM_KEYWORDS = [
-    # 品牌词
-    "飞鸟加速",
-    "星辰VPN",
-    "西游云",
-    "老村长机场",
-    "农夫山泉",
-    "狗狗加速",
-    # 广告特征短语
-    "高速机场推荐",
-    "机场推荐",
-    "免费试用",
-    "注册地址",
-    "购买地址",
-    "购买链接",
-    "官网地址",
-    # 行业黑话
-    "倍率",
-    "折合",
-    "续订",
-    "大流量",
-    "限速",
-    "跑路",
-    "不清零",
-    "邀请码",
-    # 其他高频广告词
-    "超值",
-    "不限时",
-    "优惠",
-    "性价比",
-    "客服",
-    "支付宝",
-    "微信",
-    "付款",
-    # 商业话术片段
-    "无视高峰，全天4K秒开",
-    "IPLC、IEPL中转",
-    "小电影丝般顺滑",
-    "高速冲浪，科学上网不二选择",
+    "飞鸟加速", "星辰VPN", "西游云", "老村长机场", "农夫山泉", "狗狗加速",
+    "高速机场推荐", "机场推荐", "免费试用", "注册地址", "购买地址", "购买链接", "官网地址",
+    "倍率", "折合", "续订", "大流量", "限速", "跑路", "不清零", "邀请码",
+    "超值", "不限时", "优惠", "性价比", "客服", "支付宝", "微信", "付款",
+    "无视高峰，全天4K秒开", "IPLC、IEPL中转", "小电影丝般顺滑", "高速冲浪，科学上网不二选择",
 ]
 
 # 是否包含 fork 仓库
@@ -191,16 +160,13 @@ SEARCH_FORK = True
 SEARCH_SIZE_RANGE = ""
 # 是否排除已归档仓库
 SEARCH_ARCHIVED = False
+# 搜索范围限定（空字符串表示不限制）
+SEARCH_IN = ""
 
-# 搜索范围限定（例如 "name,description,readme"，空字符串表示不限制）
-SEARCH_IN = "name,description,readme"
+# --- 排除的编程语言列表，留空列表 [] 表示不排除任何语言 ---
+SEARCH_EXCLUDE_LANGUAGES = ["HTML"]
 
-# --- 排除的编程语言列表 ---
-# 基于 GitHub 的语言识别，留空列表 [] 表示不排除任何语言
-# 示例：["HTML", "CSS"] 排除主要语言为 HTML 或 CSS 的仓库
-SEARCH_EXCLUDE_LANGUAGES = ["HTML","CSS"]
-
-# ==================== 组装固定后缀（由 main.py 使用） ====================
+# ==================== 组装固定后缀 ====================
 SEARCH_SUFFIX = ""
 if SEARCH_FORK:
     SEARCH_SUFFIX += " fork:true"
@@ -210,7 +176,6 @@ if SEARCH_ARCHIVED:
     SEARCH_SUFFIX += " archived:false"
 for kw in SEARCH_NEGATIVE_KEYWORDS:
     SEARCH_SUFFIX += f" -{kw}"
-# 追加语言排除限定符（若列表不为空）
 for lang in SEARCH_EXCLUDE_LANGUAGES:
     SEARCH_SUFFIX += f" -language:{lang}"
 
