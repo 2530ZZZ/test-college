@@ -2,7 +2,7 @@
 GitHub 节点收集器 —— 优先使用 git/trees API 获取递归文件树，
 HEAD 请求去除 Authorization 头以保证获取 Last-Modified，
 失败时根据配置决定是否回退到 Commits API。
-日志增强：区分“无节点”和“无新节点”。
+日志增强：区分“无节点”和“无新节点”，详细记录 HEAD 失败原因。
 """
 
 import os
@@ -231,14 +231,13 @@ class Collector:
                 except Exception:
                     file_time, success, reason = None, False, "异常"
                 if not success or file_time is None:
-                    print(f"[{now_str()}] ⚠️ 获取时间失败 {file_path} 原因: {reason}，跳过", flush=True)
+                    print(f"[{now_str()}] ⚠️ 获取时间失败 {file_path} 原因: {reason}", flush=True)
                     self.processed_file_shas.add(sha)
                     continue
                 if CHECK_FILE_MODIFICATION_TIME and (datetime.now(timezone.utc) - file_time >= timedelta(hours=24)):
                     print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {file_path}", flush=True)
                     self.processed_file_shas.add(sha)
                     continue
-                # 下载并提取
                 raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
                 self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
 
@@ -261,12 +260,13 @@ class Collector:
         获取文件最后修改时间。使用不带 Authorization 的 HEAD 请求，
         确保获得 Last-Modified 头。若无，且 USE_COMMITS_API_FALLBACK 为 True，
         则回退到 Commits API；否则返回失败。
+        增加详细诊断日志。
         """
-        # 创建不含认证头的 headers，避免干扰 raw 服务器的 Last-Modified 返回
         head_headers = {k: v for k, v in self.headers.items() if k.lower() != 'authorization'}
         try:
             head_resp = requests.head(raw_url, headers=head_headers, timeout=(8, 10))
-            if head_resp.status_code == 200:
+            status = head_resp.status_code
+            if status == 200:
                 last_mod = head_resp.headers.get('Last-Modified')
                 if last_mod:
                     try:
@@ -275,15 +275,29 @@ class Collector:
                     except Exception as e:
                         return None, False, f"解析 Last-Modified 失败: {e}"
                 else:
-                    # 无 Last-Modified 头
+                    # 记录更多头信息用于诊断
+                    headers_of_interest = ['date', 'expires', 'cache-control', 'content-length', 'etag']
+                    header_info = {h: head_resp.headers.get(h) for h in headers_of_interest if head_resp.headers.get(h)}
+                    reason = f"无 Last-Modified 头。其他头: {header_info}"
                     if USE_COMMITS_API_FALLBACK:
+                        print(f"[{now_str()}] ℹ️ HEAD 200 但缺少 Last-Modified，尝试 Commits API: {raw_url}")
                         return self._get_file_time_via_commits(repo, file_path)
                     else:
-                        return None, False, "无 Last-Modified 头（Commits 回退已禁用）"
+                        return None, False, reason
+            elif status == 404:
+                return None, False, "HTTP 404 (文件不存在)"
+            elif status == 403:
+                return None, False, "HTTP 403 (禁止访问，可能是认证问题或限流)"
+            elif status == 302:
+                return None, False, "HTTP 302 (重定向，文件可能被移动)"
             else:
-                return None, False, f"HTTP {head_resp.status_code}"
+                return None, False, f"HTTP {status}"
+        except requests.exceptions.Timeout:
+            return None, False, "HEAD 请求超时"
+        except requests.exceptions.ConnectionError as e:
+            return None, False, f"连接错误: {e}"
         except Exception as e:
-            return None, False, str(e)
+            return None, False, f"未知异常: {type(e).__name__}: {e}"
 
     def _get_file_time_via_commits(self, repo: str, file_path: str) -> Tuple[Optional[datetime], bool, str]:
         """通过 Commits API 获取文件最后修改时间。"""
