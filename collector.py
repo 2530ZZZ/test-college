@@ -2,6 +2,7 @@
 GitHub 节点收集器 —— 使用 git/trees API 获取递归文件树，
 通过 Commits API 串行获取文件修改时间，无 HEAD 请求。
 包含 SHA 持久化缓存、raw 链接递归发现（串行）等功能。
+日志增强：显示仓库链接、候选文件数、提取节点数、黑名单操作。
 """
 
 import os
@@ -227,6 +228,7 @@ class Collector:
             files_to_check.append((path, sha))
 
         if not files_to_check:
+            print(f"[{now_str()}] 仓库 https://github.com/{repo} 无候选文件", flush=True)
             return True
 
         if MAX_COMMITS_PER_REPO is not None and len(files_to_check) > MAX_COMMITS_PER_REPO:
@@ -234,7 +236,7 @@ class Collector:
             files_to_check = files_to_check[:MAX_COMMITS_PER_REPO]
 
         # 串行查询 Commits API
-        print(f"[{now_str()}] 候选文件 {len(files_to_check)} 个，串行查询 Commits API", flush=True)
+        print(f"[{now_str()}] 仓库 https://github.com/{repo} 候选文件 {len(files_to_check)} 个，串行查询 Commits API", flush=True)
         for file_path, sha in files_to_check:
             self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
 
