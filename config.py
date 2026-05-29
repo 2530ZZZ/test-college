@@ -117,10 +117,7 @@ USE_RECURSIVE_TREE = True
 BASE_QUERIES = [
 
     "free v2ray nodes",
-    "free clash nodes",
-    "free trojan nodes",
-    "free proxy list",
-    "free proxy subscription",
+
 
 ]
 
