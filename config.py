@@ -121,18 +121,7 @@ BASE_QUERIES = [
     "free trojan nodes",
     "free proxy list",
     "free proxy subscription",
-    "subconverter",
-    "ACL4SSR",
-    "v2rayN",
-    "mihomo",
-    "Clash.Meta",
-    "Shadowrocket",
-    "Hiddify",
-    "Nekoray",
-    "ProxyCollector",
-    "TelegramV2rayCollector",
-    "free proxy scraper",
-    "free proxy bot",
+
 ]
 
 # --- 搜索阶段的否定关键词列表（排除搜索噪音） ---
