@@ -1,18 +1,18 @@
 """
-GitHub 节点收集器 —— 优先使用 git/trees API 获取递归文件树，
-HEAD 请求去除 Authorization 头以保证获取 Last-Modified，
-失败时根据配置决定是否回退到 Commits API。
-日志增强：区分“无节点”和“无新节点”，详细记录 HEAD 失败原因。
+GitHub 节点收集器 —— 使用 git/trees API 获取递归文件树，
+直接通过 Commits API 获取文件修改时间，无 HEAD 请求。
+包含 SHA 持久化缓存、raw 链接递归发现等功能。
 """
 
 import os
 import time
 import shutil
+import re
+import pickle
 import requests
 from datetime import datetime, timezone, timedelta
-from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
-from typing import List, Set, Optional, Tuple
+from typing import List, Set, Optional, Tuple, Dict
 
 import utils
 from utils import safe_get, now_str, timeout_decorator, beijing_tz, check_rate_limit
@@ -25,7 +25,9 @@ from config import (
     SEARCH_TIMEOUT, REPO_INFO_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, HEAD_CONCURRENCY, MAX_HEAD_PER_REPO, MIN_FILES_FOR_CONCURRENCY,
-    CHECK_FILE_MODIFICATION_TIME, README_SPAM_KEYWORDS, USE_COMMITS_API_FALLBACK,
+    CHECK_FILE_MODIFICATION_TIME, README_SPAM_KEYWORDS,
+    ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
+    SHA_CACHE_FILE,
 )
 
 
@@ -44,8 +46,45 @@ class Collector:
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
         self.processed_file_shas: Set[str] = set()
+        # SHA 持久化缓存
+        self.sha_cache: Dict[str, datetime] = {}
+        # raw 递归计数
+        self.recursive_count = 0
         self.load_blacklist()
+        self.load_sha_cache()
 
+    # ==================== 缓存加载/保存 ====================
+    def load_sha_cache(self):
+        if os.path.exists(SHA_CACHE_FILE):
+            try:
+                with open(SHA_CACHE_FILE, 'rb') as f:
+                    self.sha_cache = pickle.load(f)
+                print(f"[{now_str()}] 加载 SHA 缓存 {len(self.sha_cache)} 条", flush=True)
+            except Exception as e:
+                print(f"[{now_str()}] 加载 SHA 缓存失败: {e}", flush=True)
+                self.sha_cache = {}
+
+    def save_sha_cache(self):
+        now = datetime.now(timezone.utc)
+        # 删除超过 24 小时的条目
+        self.sha_cache = {sha: ts for sha, ts in self.sha_cache.items() if now - ts < timedelta(hours=24)}
+        try:
+            with open(SHA_CACHE_FILE, 'wb') as f:
+                pickle.dump(self.sha_cache, f)
+        except Exception as e:
+            print(f"[{now_str()}] 保存 SHA 缓存失败: {e}", flush=True)
+
+    def _is_file_updated(self, sha: str) -> bool:
+        """通过 SHA 缓存判断文件是否在 24 小时内已处理。未处理则更新缓存并返回 True。"""
+        if sha in self.sha_cache:
+            last_seen = self.sha_cache[sha]
+            if datetime.now(timezone.utc) - last_seen < timedelta(hours=24):
+                return False  # 已处理且未过期
+        # 未处理或过期，记录当前时间
+        self.sha_cache[sha] = datetime.now(timezone.utc)
+        return True
+
+    # ==================== 主流程 ====================
     def run(self):
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
@@ -97,9 +136,9 @@ class Collector:
                 time.sleep(REPO_SLEEP_SECONDS)
             time.sleep(PAGE_SLEEP_SECONDS)
 
-    def process_repo(self, repo: str):
+    def process_repo(self, repo: str, depth: int = 0):
         github_url = f"https://github.com/{repo}"
-        if github_url in self.blacklist_repos:
+        if github_url in self.blacklist_repos or repo in self.seen_repos:
             return
         repo_info = safe_get(f"https://api.github.com/repos/{repo}", self.headers, timeout=REPO_INFO_TIMEOUT)
         if not repo_info:
@@ -111,7 +150,7 @@ class Collector:
         print(f"[{now_str()}] 仓库 {github_url} (分支: {default_branch})", flush=True)
         has_nodes_flag = [False]
         if USE_RECURSIVE_TREE:
-            success = self._process_with_recursive_tree(repo, default_branch, has_nodes_flag)
+            success = self._process_with_recursive_tree(repo, default_branch, has_nodes_flag, depth)
             if not success:
                 print(f"[{now_str()}] 树 API 失败，回退到 Contents API 逐层过滤", flush=True)
                 try:
@@ -142,7 +181,7 @@ class Collector:
                 f.write(github_url + "\n")
 
     # ----------------- 递归树 API 处理 -----------------
-    def _process_with_recursive_tree(self, repo: str, branch: str, has_nodes: List[bool]) -> bool:
+    def _process_with_recursive_tree(self, repo: str, branch: str, has_nodes: List[bool], depth: int = 0) -> bool:
         tree_url = f"https://api.github.com/repos/{repo}/git/trees/{branch}?recursive=1"
         resp = safe_get(tree_url, self.headers, timeout=TREE_API_TIMEOUT, operation_name="递归树")
         if not resp:
@@ -189,7 +228,11 @@ class Collector:
             if ext not in ALLOWED_EXTENSIONS:
                 continue
             sha = e.get('sha', '')
+            # 单次运行内去重
             if sha in self.processed_file_shas:
+                continue
+            # 持久化 SHA 缓存去重（如果 CHECK_FILE_MODIFICATION_TIME 开启，并且 sha 在缓存中且未过期，则跳过）
+            if CHECK_FILE_MODIFICATION_TIME and not self._is_file_updated(sha):
                 continue
             files_to_check.append((path, sha))
 
@@ -203,48 +246,47 @@ class Collector:
         total = len(files_to_check)
         if total < MIN_FILES_FOR_CONCURRENCY:
             print(f"[{now_str()}] 候选文件 {total} 个（<{MIN_FILES_FOR_CONCURRENCY}），串行处理", flush=True)
-            self._process_files_sequential(repo, branch, files_to_check, has_nodes)
+            self._process_files_sequential(repo, branch, files_to_check, has_nodes, depth)
         else:
             print(f"[{now_str()}] 候选文件 {total} 个，并发 {HEAD_CONCURRENCY} 线程处理", flush=True)
-            self._process_files_concurrent(repo, branch, files_to_check, has_nodes)
+            self._process_files_concurrent(repo, branch, files_to_check, has_nodes, depth)
 
         return True
 
     # ==================== 文件处理 ====================
-    def _process_files_sequential(self, repo, branch, files, has_nodes):
+    def _process_files_sequential(self, repo, branch, files, has_nodes, depth):
         for file_path, sha in files:
-            self._handle_one_file(repo, branch, file_path, sha, has_nodes)
+            self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
 
-    def _process_files_concurrent(self, repo, branch, files, has_nodes):
+    def _process_files_concurrent(self, repo, branch, files, has_nodes, depth):
         with ThreadPoolExecutor(max_workers=HEAD_CONCURRENCY) as executor:
             futures = {}
             for file_path, sha in files:
                 raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
                 future = executor.submit(
-                    self._get_file_time, repo, file_path, raw_url
+                    self._get_file_time_via_commits, repo, file_path
                 )
-                futures[future] = (file_path, sha)
+                futures[future] = (file_path, sha, raw_url)
             for future in as_completed(futures):
-                file_path, sha = futures[future]
+                file_path, sha, raw_url = futures[future]
                 try:
                     file_time, success, reason = future.result()
                 except Exception:
                     file_time, success, reason = None, False, "异常"
                 if not success or file_time is None:
-                    print(f"[{now_str()}] ⚠️ 获取时间失败 {file_path} 原因: {reason}", flush=True)
+                    print(f"[{now_str()}] ⚠️ 获取时间失败 {file_path} 原因: {reason}，跳过", flush=True)
                     self.processed_file_shas.add(sha)
                     continue
                 if CHECK_FILE_MODIFICATION_TIME and (datetime.now(timezone.utc) - file_time >= timedelta(hours=24)):
                     print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {file_path}", flush=True)
                     self.processed_file_shas.add(sha)
                     continue
-                raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
-                self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
+                self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes, depth)
 
-    def _handle_one_file(self, repo, branch, file_path, sha, has_nodes):
+    def _handle_one_file(self, repo, branch, file_path, sha, has_nodes, depth):
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
         if CHECK_FILE_MODIFICATION_TIME:
-            file_time, success, reason = self._get_file_time(repo, file_path, raw_url)
+            file_time, success, reason = self._get_file_time_via_commits(repo, file_path)
             if not success or file_time is None:
                 print(f"[{now_str()}] ⚠️ 获取时间失败 {raw_url} 原因: {reason}", flush=True)
                 self.processed_file_shas.add(sha)
@@ -253,51 +295,7 @@ class Collector:
                 print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {raw_url}", flush=True)
                 self.processed_file_shas.add(sha)
                 return
-        self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes)
-
-    def _get_file_time(self, repo: str, file_path: str, raw_url: str) -> Tuple[Optional[datetime], bool, str]:
-        """
-        获取文件最后修改时间。使用不带 Authorization 的 HEAD 请求，
-        确保获得 Last-Modified 头。若无，且 USE_COMMITS_API_FALLBACK 为 True，
-        则回退到 Commits API；否则返回失败。
-        增加详细诊断日志。
-        """
-        head_headers = {k: v for k, v in self.headers.items() if k.lower() != 'authorization'}
-        try:
-            head_resp = requests.head(raw_url, headers=head_headers, timeout=(8, 10))
-            status = head_resp.status_code
-            if status == 200:
-                last_mod = head_resp.headers.get('Last-Modified')
-                if last_mod:
-                    try:
-                        file_time = parsedate_to_datetime(last_mod).replace(tzinfo=timezone.utc)
-                        return file_time, True, ""
-                    except Exception as e:
-                        return None, False, f"解析 Last-Modified 失败: {e}"
-                else:
-                    # 记录更多头信息用于诊断
-                    headers_of_interest = ['date', 'expires', 'cache-control', 'content-length', 'etag']
-                    header_info = {h: head_resp.headers.get(h) for h in headers_of_interest if head_resp.headers.get(h)}
-                    reason = f"无 Last-Modified 头。其他头: {header_info}"
-                    if USE_COMMITS_API_FALLBACK:
-                        print(f"[{now_str()}] ℹ️ HEAD 200 但缺少 Last-Modified，尝试 Commits API: {raw_url}")
-                        return self._get_file_time_via_commits(repo, file_path)
-                    else:
-                        return None, False, reason
-            elif status == 404:
-                return None, False, "HTTP 404 (文件不存在)"
-            elif status == 403:
-                return None, False, "HTTP 403 (禁止访问，可能是认证问题或限流)"
-            elif status == 302:
-                return None, False, "HTTP 302 (重定向，文件可能被移动)"
-            else:
-                return None, False, f"HTTP {status}"
-        except requests.exceptions.Timeout:
-            return None, False, "HEAD 请求超时"
-        except requests.exceptions.ConnectionError as e:
-            return None, False, f"连接错误: {e}"
-        except Exception as e:
-            return None, False, f"未知异常: {type(e).__name__}: {e}"
+        self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes, depth)
 
     def _get_file_time_via_commits(self, repo: str, file_path: str) -> Tuple[Optional[datetime], bool, str]:
         """通过 Commits API 获取文件最后修改时间。"""
@@ -315,8 +313,8 @@ class Collector:
         except Exception as e:
             return None, False, f"解析 commits 失败: {e}"
 
-    # ==================== 下载与提取 ====================
-    def _download_and_extract(self, repo, branch, file_path, raw_url, sha, has_nodes):
+    # ==================== 下载与提取（包含 raw 递归发现） ====================
+    def _download_and_extract(self, repo, branch, file_path, raw_url, sha, has_nodes, depth):
         file_resp = safe_get(raw_url, self.headers, timeout=FILE_DOWNLOAD_TIMEOUT)
         if not file_resp:
             self.processed_file_shas.add(sha)
@@ -336,6 +334,7 @@ class Collector:
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
             self.processed_file_shas.add(sha)
             return
+
         def extract():
             return extract_raw_candidates(content)
         try:
@@ -352,11 +351,13 @@ class Collector:
         except Exception:
             self.processed_file_shas.add(sha)
             return
+
         new_nodes = 0
         for cand in candidates:
             if cand not in self.unique_nodes:
                 self.unique_nodes.add(cand)
                 new_nodes += 1
+
         if new_nodes:
             self.all_links.append(raw_url)
             has_nodes[0] = True
@@ -368,6 +369,28 @@ class Collector:
                 print(f"[{now_str()}] 📄 {raw_url} ⚪ 解析出 {len(candidates)} 个节点，但全部已存在，无新节点", flush=True)
 
         self.processed_file_shas.add(sha)
+
+        # ---- raw 链接递归发现 ----
+        if ENABLE_RAW_RECURSIVE and depth < MAX_RECURSIVE_DEPTH and self.recursive_count < MAX_RECURSIVE_REPOS:
+            raw_pattern = re.compile(r'https://raw\.githubusercontent\.com/([^/]+/[^/]+)/([^/]+)/([^\s"\'`#]+)')
+            found = set()
+            for match in raw_pattern.finditer(content):
+                full_name = match.group(1)
+                ref = match.group(2)
+                path = match.group(3)
+                ext = os.path.splitext(path)[1].lower()
+                if ext not in ALLOWED_EXTENSIONS:
+                    continue
+                if full_name in self.seen_repos or f"https://github.com/{full_name}" in self.blacklist_repos:
+                    continue
+                if full_name in found:
+                    continue
+                found.add(full_name)
+                if self.recursive_count >= MAX_RECURSIVE_REPOS:
+                    break
+                print(f"[{now_str()}] 🔗 递归发现仓库 {full_name} (来源 {raw_url})", flush=True)
+                self.recursive_count += 1
+                self.process_repo(full_name, depth + 1)
 
     # ----------------- 回退：Contents API -----------------
     def process_file_tree(self, repo: str, path: str, branch: str, has_nodes: List[bool]):
@@ -492,3 +515,5 @@ class Collector:
         self.all_links = list(dict.fromkeys(self.all_links))
         with open("no_li.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(self.all_links))
+        # 保存 SHA 缓存
+        self.save_sha_cache()
