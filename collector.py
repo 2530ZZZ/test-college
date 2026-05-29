@@ -276,7 +276,7 @@ class Collector:
                 self.processed_file_shas.add(sha)
                 return
             if datetime.now(timezone.utc) - file_time >= timedelta(hours=24):
-                print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {raw_url}", flush=True)
+                # print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {raw_url}", flush=True)
                 self.processed_file_shas.add(sha)
                 return
         self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes, depth)
