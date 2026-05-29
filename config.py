@@ -97,7 +97,7 @@ BLACKLIST_FILE = "ljck.txt"
 # 设为 False 时：对仓库内所有符合扩展名的文件进行下载（只要 SHA 未被处理过）。
 CHECK_FILE_MODIFICATION_TIME = True
 
-# 单仓库最大请求数（用于 Commits API），None 表示不限制
+# 单仓库最大 Commits API 请求数，None 表示不限制
 MAX_COMMITS_PER_REPO = None
 
 # ==================== API 请求超时（秒） ====================
@@ -116,25 +116,23 @@ USE_RECURSIVE_TREE = True
 # --- 基础关键词列表（纯文本） ---
 BASE_QUERIES = [
 
-    "free nodes",
-    "free proxy nodes",
     "free v2ray nodes",
     "free clash nodes",
     "free trojan nodes",
-    "free hysteria nodes",
-    "free vless nodes",
-    "free hysteria2 nodes",
-    "free tuic nodes",
-    "free reality nodes",
-    "free singbox nodes",
-    "free shadowsocks nodes",
-    "free wireguard nodes",
     "free proxy list",
     "free proxy subscription",
-    "free proxy config",
-    "free proxy yaml",
-    "free proxy json",
-    "free proxy base64",
+    "subconverter",
+    "ACL4SSR",
+    "v2rayN",
+    "mihomo",
+    "Clash.Meta",
+    "Shadowrocket",
+    "Hiddify",
+    "Nekoray",
+    "ProxyCollector",
+    "TelegramV2rayCollector",
+    "free proxy scraper",
+    "free proxy bot",
 ]
 
 # --- 搜索阶段的否定关键词列表（排除搜索噪音） ---
