@@ -2,7 +2,8 @@
 GitHub 节点收集器 —— 使用 git/trees API 获取递归文件树，
 通过 Commits API 串行获取文件修改时间，无 HEAD 请求。
 包含 SHA 持久化缓存、raw 链接递归发现（串行）等功能。
-日志增强：显示仓库链接、候选文件数、提取节点数、黑名单操作。
+日志增强：显示仓库链接、候选文件数、提取节点数、黑名单操作，
+并输出仓库跳过的原因。
 """
 
 import os
@@ -125,9 +126,15 @@ class Collector:
             print(f"[{now_str()}] 第{page}页 total_count={total_count}, items={len(items)}", flush=True)
             if not items:
                 break
-            for item in items:
-                repo = item["full_name"]
+            for idx, item in enumerate(items, 1):
+                try:
+                    repo = item["full_name"]
+                except KeyError:
+                    print(f"[{now_str()}] ⚠️ 搜索结果缺少 full_name: {item}", flush=True)
+                    continue
                 github_url = f"https://github.com/{repo}"
+                # 调试日志：打印每个待处理仓库
+                print(f"[{now_str()}] 检查仓库 #{idx}: {github_url}", flush=True)
                 if repo in self.seen_repos:
                     print(f"[{now_str()}] ⏭️ 跳过已处理仓库 {github_url}", flush=True)
                     continue
@@ -136,17 +143,22 @@ class Collector:
                     continue
                 self.seen_repos.add(repo)
                 self.checked_count += 1
+                print(f"[{now_str()}] 开始处理仓库 {github_url}", flush=True)
                 try:
                     self.process_repo(repo)
                 except RuntimeError:
                     print(f"[{now_str()}] ⚠️ 限流超限，停止处理仓库", flush=True)
                     return
+                except Exception as e:
+                    print(f"[{now_str()}] ⚠️ 处理仓库异常 {github_url}: {e}", flush=True)
                 time.sleep(REPO_SLEEP_SECONDS)
             time.sleep(PAGE_SLEEP_SECONDS)
 
     def process_repo(self, repo: str, depth: int = 0):
         github_url = f"https://github.com/{repo}"
+        print(f"[{now_str()}] 进入 process_repo: {github_url}", flush=True)
         if github_url in self.blacklist_repos or repo in self.seen_repos:
+            print(f"[{now_str()}] 仓库已在黑名单或已处理: {github_url}", flush=True)
             return
         repo_info = safe_get(f"https://api.github.com/repos/{repo}", self.headers, timeout=REPO_INFO_TIMEOUT)
         if not repo_info:
