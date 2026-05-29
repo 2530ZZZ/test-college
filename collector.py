@@ -2,7 +2,6 @@
 GitHub 节点收集器 —— 使用 git/trees API 获取递归文件树，
 通过 Commits API 串行获取文件修改时间，无 HEAD 请求。
 包含 SHA 持久化缓存、raw 链接递归发现（串行）等功能。
-文件下载保持并发。
 """
 
 import os
@@ -25,7 +24,7 @@ from config import (
     ALLOWED_EXTENSIONS, BLACKLIST_FILE,
     SEARCH_TIMEOUT, REPO_INFO_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
-    USE_RECURSIVE_TREE, HEAD_CONCURRENCY, MAX_HEAD_PER_REPO, MIN_FILES_FOR_CONCURRENCY,
+    USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     CHECK_FILE_MODIFICATION_TIME, README_SPAM_KEYWORDS,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     SHA_CACHE_FILE,
@@ -230,11 +229,11 @@ class Collector:
         if not files_to_check:
             return True
 
-        if MAX_HEAD_PER_REPO is not None and len(files_to_check) > MAX_HEAD_PER_REPO:
-            print(f"[{now_str()}] ⚠️ 候选文件过多 ({len(files_to_check)} 个)，仅处理前 {MAX_HEAD_PER_REPO} 个", flush=True)
-            files_to_check = files_to_check[:MAX_HEAD_PER_REPO]
+        if MAX_COMMITS_PER_REPO is not None and len(files_to_check) > MAX_COMMITS_PER_REPO:
+            print(f"[{now_str()}] ⚠️ 候选文件过多 ({len(files_to_check)} 个)，仅处理前 {MAX_COMMITS_PER_REPO} 个", flush=True)
+            files_to_check = files_to_check[:MAX_COMMITS_PER_REPO]
 
-        # 文件时间查询改为完全串行
+        # 串行查询 Commits API
         print(f"[{now_str()}] 候选文件 {len(files_to_check)} 个，串行查询 Commits API", flush=True)
         for file_path, sha in files_to_check:
             self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
@@ -253,8 +252,6 @@ class Collector:
                 print(f"[{now_str()}] ⚠️ 文件过期 ({file_time}) {raw_url}", flush=True)
                 self.processed_file_shas.add(sha)
                 return
-        # 文件下载可以保持并发（但这里因为已经是串行循环，下载也是串行）
-        # 如果你想保持下载并发，需要调整逻辑，但既然时间查询已经是串行，下载也串行影响不大。
         self._download_and_extract(repo, branch, file_path, raw_url, sha, has_nodes, depth)
 
     def _get_file_time_via_commits(self, repo: str, file_path: str) -> Tuple[Optional[datetime], bool, str]:
@@ -348,7 +345,6 @@ class Collector:
                     break
                 print(f"[{now_str()}] 🔗 递归发现仓库 {full_name} (来源 {raw_url})", flush=True)
                 self.recursive_count += 1
-                # 串行调用 process_repo
                 self.process_repo(full_name, depth + 1)
 
     # ----------------- 回退：Contents API -----------------
