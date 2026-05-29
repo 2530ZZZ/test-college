@@ -92,23 +92,13 @@ ALLOWED_EXTENSIONS = {
 # 黑名单文件路径
 BLACKLIST_FILE = "ljck.txt"
 
-# 是否检查文件的 Last-Modified 时间（24小时内）
-CHECK_FILE_MODIFICATION_TIME = True   # 保留 HEAD 检查
+# 是否检查文件的最后修改时间（通过 Commits API 获取）
+# 设为 True 时：只下载 24 小时内修改过的文件，节省 API 和带宽。
+# 设为 False 时：对仓库内所有符合扩展名的文件进行下载（只要 SHA 未被处理过）。
+CHECK_FILE_MODIFICATION_TIME = True
 
-# ==================== HEAD 请求优化参数 ====================
-
-# HEAD 请求并发线程数
-HEAD_CONCURRENCY = 20
-# 单仓库最大 HEAD 请求数，None 表示不限制
-MAX_HEAD_PER_REPO = None
-# 候选文件数阈值：低于此值时不启用并发，串行处理
-MIN_FILES_FOR_CONCURRENCY = 50
-
-# ==================== Commits API 回退开关 ====================
-# 当 HEAD 请求无法获取 Last-Modified 时，是否回退到 Commits API 查询
-# 默认 False：避免大量消耗 Commits API 配额，快速失败
-# 若设为 True：可提高时间获取成功率，但易触发限流
-USE_COMMITS_API_FALLBACK = False
+# 单仓库最大请求数（用于 Commits API），None 表示不限制
+MAX_COMMITS_PER_REPO = None
 
 # ==================== API 请求超时（秒） ====================
 SEARCH_TIMEOUT = (15, 30)
@@ -125,23 +115,26 @@ USE_RECURSIVE_TREE = True
 
 # --- 基础关键词列表（纯文本） ---
 BASE_QUERIES = [
+
+    "free nodes",
+    "free proxy nodes",
     "free v2ray nodes",
     "free clash nodes",
     "free trojan nodes",
+    "free hysteria nodes",
+    "free vless nodes",
+    "free hysteria2 nodes",
+    "free tuic nodes",
+    "free reality nodes",
+    "free singbox nodes",
+    "free shadowsocks nodes",
+    "free wireguard nodes",
     "free proxy list",
     "free proxy subscription",
-    "subconverter",
-    "ACL4SSR",
-    "v2rayN",
-    "mihomo",
-    "Clash.Meta",
-    "Shadowrocket",
-    "Hiddify",
-    "Nekoray",
-    "ProxyCollector",
-    "TelegramV2rayCollector",
-    "free proxy scraper",
-    "free proxy bot",
+    "free proxy config",
+    "free proxy yaml",
+    "free proxy json",
+    "free proxy base64",
 ]
 
 # --- 搜索阶段的否定关键词列表（排除搜索噪音） ---
@@ -182,6 +175,14 @@ for kw in SEARCH_NEGATIVE_KEYWORDS:
     SEARCH_SUFFIX += f" -{kw}"
 for lang in SEARCH_EXCLUDE_LANGUAGES:
     SEARCH_SUFFIX += f" -language:{lang}"
+
+# ==================== Raw 链接递归配置 ====================
+ENABLE_RAW_RECURSIVE = True          # 是否启用从 raw 链接反向发现仓库
+MAX_RECURSIVE_REPOS = 5              # 最多递归发现的仓库数量
+MAX_RECURSIVE_DEPTH = 2              # 最大递归深度
+
+# ==================== 持久化 SHA 缓存 ====================
+SHA_CACHE_FILE = "sha_cache.pkl"
 
 # ==================== 输出文件 ====================
 CHUNK_SIZE = 10000
