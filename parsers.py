@@ -1,33 +1,36 @@
 """
-节点候选提取模块 —— 只负责从任意文本中提取“看起来像节点”的候选块。
-修复：将 URI 全局扫描提前，并保护 Base64 解码异常，避免因单个错误导致提取失败。
+结构化格式提取模块。
+
+从 Clash YAML、Surge 配置、Sing-box JSON 等结构化格式中提取代理节点信息。
+与 uri_parser.py 分工：
+  - uri_parser.py: 负责 URI 格式（vmess://, trojan://, ss:// 等）的发现和解析
+  - parsers.py:    负责结构化配置格式（YAML/JSON 中的 proxies 数组）的提取
+
+设计原则：
+  1. 每个提取策略一个独立函数，可单独测试
+  2. 直接产出 StandardProxy 列表（已解析、已验证）
+  3. 不处理 URI（交给 uri_parser.py）
 """
 
 import re
 import json
-from typing import List
+import os
+from typing import List, Set
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+
+from models import StandardProxy, dict_to_standard_proxy
+from uri_parser import discover_candidates, validate_candidate
 from utils import safe_base64_decode
 
-# ==================== 预编译正则（已放宽长度限制） ====================
 
+# ==================== 预编译正则 ====================
+
+# URI 格式的 scheme 扫描（用于从结构化文本中查找嵌入的 URI）
 URI_SCHEMES = r'(?:vmess|vless|trojan|ss|ssr|hysteria|hysteria2|hy2|tuic|reality|wireguard|sing-box)'
 URI_RE = re.compile(rf'(?i){URI_SCHEMES}://\S{{1,4000}}')
 
-SS_URI_RE = re.compile(
-    r'ss://[A-Za-z0-9+/=]{1,500}(?:\?[^\s<>"\'`]{1,2000})?(?:#[^\s<>"\'`]{1,2000})?'
-)
-SSR_URI_RE = re.compile(r'ssr://[A-Za-z0-9+/=]{1,4000}')
-HY2_URI_RE = re.compile(r'(?i)hysteria2://\S{1,2000}')
-HY2_SHORT_RE = re.compile(r'(?i)hy2://\S{1,2000}')
-TUIC_URI_RE = re.compile(r'(?i)tuic://\S{1,2000}')
-
-BASE64_RE = re.compile(r'[A-Za-z0-9+/=]{100,200000}')
-
-CODE_BLOCK_RE = re.compile(
-    r'(?:```(?:[\w]*)\n?)([\s\S]{1,1000000}?)(?:\n?```)'
-    r'|`([^`\n]{1,10000})`'
-)
-
+# YAML 中 Clash 代理的定义模式
+# 例如: - {name: xx, type: vmess, server: xx, port: 443, ...}
 CLASH_SINGLE_RE = re.compile(
     r'-\s*\{[^}]{1,15000}?'
     r'(?:name|server|port|type|uuid|password|ps|flow|sni|fp|reality-opts)'
@@ -35,17 +38,14 @@ CLASH_SINGLE_RE = re.compile(
     re.DOTALL
 )
 
+# YAML 多行代理定义: - name: xxx\n  type: vmess\n  server: xxx\n  ...
 CLASH_MULTI_RE = re.compile(
     r'-\s*name:[^\n]*\n'
     r'(?:\s+[a-zA-Z_-]+:[^\n]*\n){2,100}',
     re.DOTALL
 )
 
-CLASH_INLINE_RE = re.compile(
-    r'- name:\s*\S[^\n]{0,10000}',
-    re.DOTALL
-)
-
+# Surge / Quantumult 代理格式: ProxyName = protocol, server, port, ...
 SURGE_PROXY_RE = re.compile(
     r'(?i)(?:^|\n)\s*'
     r'([^\s=,]+)\s*=\s*'
@@ -54,203 +54,392 @@ SURGE_PROXY_RE = re.compile(
     re.MULTILINE
 )
 
+# JSON 中的 proxies/outbounds 数组
 JSON_PROXY_ARRAY_RE = re.compile(
     r'"(?:proxies|outbounds)"\s*:\s*\[([\s\S]{1,2000000}?)\]',
     re.IGNORECASE
 )
 
-CONCAT_URI_SPLIT_RE = re.compile(rf'(?={URI_SCHEMES}://)')
+# 代码块（Markdown 等）
+CODE_BLOCK_RE = re.compile(
+    r'(?:```(?:[\w]*)\n?)([\s\S]{1,1000000}?)(?:\n?```)'
+    r'|`([^`\n]{1,10000})`'
+)
 
+# JSON 对象退避扫描（用于未匹配到常规格式的场景）
 JSON_FALLBACK_RE = re.compile(
-    r'\{[^{}]*?"server"\s*:\s*"[^"]*"[^{}]*?"port"\s*:\s*\d+[^{}]*?\}',
+    r'\{[^{}]*?"server"\s*:\s*"[^"]*"[^{}]*?(?:port|server_port)"\s*:\s*\d+[^{}]*?\}',
     re.IGNORECASE | re.DOTALL
 )
 
-
-def _is_proxy_uri(line: str) -> bool:
-    lower = line.lower()
-    return any(lower.startswith(f'{p}://') for p in [
-        'vmess', 'vless', 'trojan', 'ss', 'ssr',
-        'hysteria', 'hysteria2', 'hy2', 'tuic', 'reality',
-        'wireguard', 'sing-box'
-    ])
+# Base64 长块（用于递归解码）
+BASE64_RE = re.compile(r'[A-Za-z0-9+/=]{100,200000}')
 
 
-def _split_concatenated_uris(text: str) -> List[str]:
-    parts = CONCAT_URI_SPLIT_RE.split(text)
-    uris = []
-    for part in parts:
-        part = part.strip()
-        if part and _is_proxy_uri(part):
-            uris.append(part)
-    return uris
+# ==================== 策略函数 ====================
+
+def extract_embedded_uris(text: str) -> List[StandardProxy]:
+    """从文本中提取嵌入式 URI 节点。
+
+    使用 uri_parser.discover_candidates 进行递归发现和协议验证。
+
+    Args:
+        text: 任意文本内容
+
+    Returns:
+        已验证的 StandardProxy 列表
+    """
+    candidates = discover_candidates(text)
+    proxies = []
+    seen = set()
+    for cand in candidates:
+        proxy = validate_candidate(cand)
+        if proxy and proxy.is_valid():
+            key = proxy.dedup_key("server_port_protocol")
+            if key not in seen:
+                seen.add(key)
+                proxies.append(proxy)
+    return proxies
 
 
-def extract_raw_candidates(text: str) -> List[str]:
-    if not text or len(text) > 10_000_000:
-        return []
+def extract_clash_yaml(text: str) -> List[StandardProxy]:
+    """从 Clash YAML 格式文本中提取代理节点。
 
-    candidates = []
+    处理三种 Clash 代理定义格式：
+      - 单行 JSON 对象: - {name: xx, type: vmess, ...}
+      - 多行 YAML:     - name: xx\n  type: vmess\n  ...
+      - JSO(内联):    - name: xx  ...
+
+    Args:
+        text: YAML 格式文本
+
+    Returns:
+        StandardProxy 列表
+    """
+    proxies = []
     seen = set()
 
-    # ---- 第四阶段：提前全局正则扫描（确保即使后续出错也能捕获标准链接） ----
-    for uri_match in URI_RE.findall(text):
-        if uri_match not in seen:
-            seen.add(uri_match)
-            candidates.append(uri_match)
-    for ss_match in SS_URI_RE.findall(text):
-        if ss_match not in seen:
-            seen.add(ss_match)
-            candidates.append(ss_match)
-    for ssr_match in SSR_URI_RE.findall(text):
-        if ssr_match not in seen:
-            seen.add(ssr_match)
-            candidates.append(ssr_match)
-    for hy2_match in HY2_URI_RE.findall(text):
-        if hy2_match not in seen:
-            seen.add(hy2_match)
-            candidates.append(hy2_match)
-    for hy2s in HY2_SHORT_RE.findall(text):
-        if hy2s not in seen:
-            seen.add(hy2s)
-            candidates.append(hy2s)
-    for tuic_match in TUIC_URI_RE.findall(text):
-        if tuic_match not in seen:
-            seen.add(tuic_match)
-            candidates.append(tuic_match)
+    # 尝试整块 YAML 解析
+    try:
+        import yaml
+        doc = yaml.safe_load(text)
+        if isinstance(doc, dict):
+            _walk_dict_for_proxies(doc, proxies, seen)
+            if proxies:
+                return proxies
+    except ImportError:
+        pass
+    except Exception:
+        pass  # YAML 解析失败，回退到正则
 
-    # ---- 第一阶段：递归处理 Markdown 代码块和 Base64（增加异常保护） ----
-    for match in CODE_BLOCK_RE.finditer(text):
-        block = match.group(1) or match.group(2)
-        if block and block.strip():
+    # 回退：正则提取
+    # 单行 JSON 对象
+    for m in CLASH_SINGLE_RE.finditer(text):
+        clean = re.sub(r'\s+', ' ', m.group(0).strip())
+        if len(clean) > 30:
             try:
-                candidates.extend(extract_raw_candidates(block))
+                # 确保是合法 JSON 对象
+                obj = json.loads(clean)
+                proxy = dict_to_standard_proxy(obj)
+                if proxy and proxy.is_valid():
+                    key = proxy.dedup_key("server_port_protocol")
+                    if key not in seen:
+                        seen.add(key)
+                        proxies.append(proxy)
             except Exception:
                 pass
 
-    for b64 in BASE64_RE.findall(text):
+    # 多行 YAML 代理块
+    for m in CLASH_MULTI_RE.finditer(text):
+        block = m.group(0)
         try:
-            decoded = safe_base64_decode(b64)
-            if decoded:
-                candidates.extend(extract_raw_candidates(decoded))
-        except Exception:
-            pass  # 忽略解码错误，继续处理
-
-    # ---- 第二阶段：逐行扫描 ----
-    for line in text.split('\n'):
-        line = line.strip()
-        if not line or len(line) < 10:
-            continue
-        if line.startswith('#') or line.startswith('//'):
-            continue
-
-        # 尝试对单行进行 Base64 解码（用于混合编码的行）
-        try:
-            decoded_line = safe_base64_decode(line)
-            if decoded_line and '://' in decoded_line:
-                candidates.extend(extract_raw_candidates(decoded_line))
-                continue
+            import yaml
+            # 需要包裹一下: - name: -> proxies: [- name:]
+            wrapped = "proxies:\n" + block
+            doc = yaml.safe_load(wrapped)
+            if doc and "proxies" in doc:
+                for item in doc["proxies"]:
+                    if isinstance(item, dict):
+                        proxy = dict_to_standard_proxy(item)
+                        if proxy and proxy.is_valid():
+                            key = proxy.dedup_key("server_port_protocol")
+                            if key not in seen:
+                                seen.add(key)
+                                proxies.append(proxy)
         except Exception:
             pass
 
-        if '://' in line:
-            uris = _split_concatenated_uris(line)
-            if uris:
-                for uri in uris:
-                    if uri not in seen:
-                        seen.add(uri)
-                        candidates.append(uri)
-                continue
-            if len(line) > 100 and any(sep in line for sep in ['|', ';', ',']):
-                parts = re.split(r'[|,;\s]+', line)
-                for part in parts:
-                    part = part.strip()
-                    if _is_proxy_uri(part):
-                        if part not in seen:
-                            seen.add(part)
-                            candidates.append(part)
-                continue
+    return proxies
 
-        if len(line) > 100 and not _is_proxy_uri(line):
+
+def extract_singbox_json(text: str) -> List[StandardProxy]:
+    """从 Sing-box JSON 配置中提取 outbounds 代理节点。
+
+    尝试整块 JSON 解析，失败后回退到正则提取 proxies/outbounds 数组。
+
+    Args:
+        text: JSON 格式文本
+
+    Returns:
+        StandardProxy 列表
+    """
+    proxies = []
+    seen = set()
+
+    # 尝试整块 JSON 解析
+    try:
+        doc = json.loads(text)
+        if isinstance(doc, dict):
+            _walk_dict_for_proxies(doc, proxies, seen)
+            return proxies
+    except Exception:
+        pass
+
+    # 回退：正则提取
+    for arr_match in JSON_PROXY_ARRAY_RE.finditer(text):
+        arr = arr_match.group(1)
+        # 在每个 JSON 对象上尝试解析
+        for obj_match in re.finditer(r'\{[\s\S]{1,5000}?\}', arr):
+            obj_str = obj_match.group(0)
             try:
-                decoded = safe_base64_decode(line)
-                if decoded and '://' in decoded:
-                    candidates.extend(extract_raw_candidates(decoded))
-                    continue
+                obj = json.loads(obj_str)
+                proxy = dict_to_standard_proxy(obj)
+                if proxy and proxy.is_valid():
+                    key = proxy.dedup_key("server_port_protocol")
+                    if key not in seen:
+                        seen.add(key)
+                        proxies.append(proxy)
             except Exception:
                 pass
 
-    # ---- 第三阶段：结构化格式提取 ----
-    yaml_text = re.sub(r'&\w+\s+', '', text)
-    yaml_text = re.sub(r'\*\w+', '', yaml_text)
+    # 兜底：退避正则
+    for m in JSON_FALLBACK_RE.finditer(text):
+        try:
+            obj = json.loads(m.group(0))
+            proxy = dict_to_standard_proxy(obj)
+            if proxy and proxy.is_valid():
+                key = proxy.dedup_key("server_port_protocol")
+                if key not in seen:
+                    seen.add(key)
+                    proxies.append(proxy)
+        except Exception:
+            pass
 
-    for m in CLASH_SINGLE_RE.findall(yaml_text):
-        clean = re.sub(r'\s+', ' ', m.strip())
-        if len(clean) > 30 and clean not in seen:
-            seen.add(clean)
-            candidates.append(clean)
+    return proxies
 
-    for m in CLASH_MULTI_RE.findall(yaml_text):
-        clean = re.sub(r'\s+', ' ', m.strip())
-        if len(clean) > 30 and ('server:' in clean.lower() or 'type:' in clean.lower()):
-            if clean not in seen:
-                seen.add(clean)
-                candidates.append(clean)
 
-    for m in CLASH_INLINE_RE.findall(yaml_text):
-        clean = re.sub(r'\s+', ' ', m.strip())
-        if len(clean) > 30 and ('name:' in clean.lower() and ('server:' in clean.lower() or 'type:' in clean.lower())):
-            if clean not in seen:
-                seen.add(clean)
-                candidates.append(clean)
+def extract_surge_format(text: str) -> List[StandardProxy]:
+    """从 Surge / Quantumult 配置格式中提取代理节点。
+
+    格式: ProxyName = protocol, server, port, [options...]
+
+    Args:
+        text: Surge 格式文本
+
+    Returns:
+        StandardProxy 列表
+    """
+    proxies = []
+    seen = set()
 
     for m in SURGE_PROXY_RE.finditer(text):
         full_line = m.group(0).strip()
-        if full_line not in seen and len(full_line) > 20:
-            seen.add(full_line)
-            candidates.append(full_line)
-
-    for arr in JSON_PROXY_ARRAY_RE.findall(text):
-        for obj in re.findall(r'\{[\s\S]{1,5000}?\}', arr):
-            try:
-                proxy_dict = json.loads(obj)
-                candidates.append(json.dumps(proxy_dict, ensure_ascii=False))
-            except Exception:
-                clean_obj = re.sub(r'\s+', ' ', obj.strip())
-                if any(k in clean_obj.lower() for k in ['server', 'port', 'type', 'uuid']):
-                    if clean_obj not in seen:
-                        seen.add(clean_obj)
-                        candidates.append(clean_obj)
-
-    try:
-        config = json.loads(text)
-        if isinstance(config, dict):
-            for key in ('proxies', 'outbounds'):
-                if key in config and isinstance(config[key], list):
-                    for item in config[key]:
-                        if isinstance(item, dict):
-                            candidates.append(json.dumps(item, ensure_ascii=False))
-                        elif isinstance(item, str):
-                            candidates.append(item)
-    except Exception:
-        for match in JSON_FALLBACK_RE.finditer(text):
-            obj_str = match.group().strip()
-            if obj_str not in seen:
-                seen.add(obj_str)
-                candidates.append(obj_str)
-
-    # ---- 最终过滤 ----
-    final = []
-    for c in candidates:
-        c = c.strip()
-        if not c or len(c) < 15:
+        if len(full_line) < 20:
             continue
-        if c.startswith('http://') or c.startswith('https://'):
-            if 'raw.githubusercontent.com' not in c:
-                continue
-        if c in seen:
-            continue
-        seen.add(c)
-        final.append(c)
 
-    return final
+        name = m.group(1).strip()
+        protocol = m.group(2).strip().lower()
+        args_part = full_line.split("=", 1)[1].strip()
+        if "," in args_part:
+            # 移除协议名称后的逗号
+            args = args_part.split(",", 1)[1].strip().split(",")
+            args = [a.strip() for a in args]
+        else:
+            args = []
+
+        # Surge 参数顺序: protocol, server, port, [username/uuid], [password], [extra...]
+        server = args[0] if len(args) > 0 else ""
+        port_str = args[1] if len(args) > 1 else ""
+        port = int(port_str) if port_str.isdigit() else 0
+
+        if not server or port <= 0:
+            continue
+
+        uuid = ""
+        for arg in args[2:]:
+            if arg and not arg.startswith("tls=") and not arg.startswith("sni="):
+                uuid = arg
+                break
+
+        # 检测 TLS
+        tls = any(a.lower().startswith("tls=true") or a.lower() == "tls"
+                  for a in args if "=" in a)
+
+        # SNI
+        sni = ""
+        for arg in args:
+            if arg.lower().startswith("sni="):
+                sni = arg.split("=", 1)[1]
+                break
+
+        proxy = StandardProxy(
+            protocol=protocol,
+            server=server,
+            port=port,
+            uuid=uuid,
+            remark=name,
+        )
+        if tls:
+            proxy.tls = True
+            proxy.sni = sni or server
+
+        if proxy.is_valid():
+            key = proxy.dedup_key("server_port_protocol")
+            if key not in seen:
+                seen.add(key)
+                proxies.append(proxy)
+
+    return proxies
+
+
+def extract_from_code_blocks(text: str, max_depth: int = 3) -> List[StandardProxy]:
+    """从 Markdown 代码块中递归提取节点。
+
+    代码块中的内容可能是 Base64 编码的、YAML 的或纯文本 URI。
+
+    Args:
+        text: 包含 Markdown 代码块的文本
+        max_depth: 最大递归深度（默认 3）
+
+    Returns:
+        StandardProxy 列表
+    """
+    if max_depth <= 0:
+        return []
+
+    proxies = []
+    for m in CODE_BLOCK_RE.finditer(text):
+        block = m.group(1) or m.group(2)
+        if block and block.strip():
+            proxies.extend(extract_all_strategies(block, max_depth - 1))
+    return proxies
+
+
+def extract_from_base64_text(text: str, max_depth: int = 3) -> List[StandardProxy]:
+    """从 Base64 编码的文本中递归提取节点。
+
+    找到文本中所有长 Base64 块，解码后递归提取。
+
+    Args:
+        text: 可能包含 Base64 块的文本
+        max_depth: 最大递归深度（默认 3）
+
+    Returns:
+        StandardProxy 列表
+    """
+    if max_depth <= 0:
+        return []
+
+    proxies = []
+    for m in BASE64_RE.finditer(text):
+        decoded = safe_base64_decode(m.group(0))
+        if decoded:
+            proxies.extend(extract_all_strategies(decoded, max_depth - 1))
+    return proxies
+
+
+# ==================== 辅助函数 ====================
+
+def _walk_dict_for_proxies(doc: dict, proxies: List[StandardProxy],
+                           seen: Set[tuple], max_depth: int = 5):
+    """递归遍历字典树，查找 proxies/outbounds 数组并提取节点。
+
+    Args:
+        doc: 配置字典
+        proxies: 结果列表（原地修改）
+        seen: 去重集合（原地修改）
+        max_depth: 最大递归深度（默认 5）
+    """
+    if max_depth <= 0:
+        return
+
+    # 查找代理数组
+    for key in ('proxies', 'outbounds', 'proxy-groups'):
+        if key in doc and isinstance(doc[key], list):
+            for item in doc[key]:
+                if isinstance(item, dict):
+                    proxy = dict_to_standard_proxy(item)
+                    if proxy and proxy.is_valid():
+                        dedup_key = proxy.dedup_key("server_port_protocol")
+                        if dedup_key not in seen:
+                            seen.add(dedup_key)
+                            proxies.append(proxy)
+
+    # 递归进子字典
+    for key, value in doc.items():
+        if isinstance(value, dict):
+            _walk_dict_for_proxies(value, proxies, seen, max_depth - 1)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    _walk_dict_for_proxies(item, proxies, seen, max_depth - 1)
+
+
+# ==================== 主入口 ====================
+
+def extract_all_strategies(text: str, max_depth: int = 3) -> List[StandardProxy]:
+    """使用所有策略从文本中提取代理节点。
+
+    按顺序尝试：嵌入式 URI → Clash YAML → Sing-box JSON → Surge → 代码块 → Base64 递归。
+    每种策略独立运行，最后由调用者做全局去重。
+
+    Args:
+        text: 任意文本内容
+        max_depth: 递归深度（默认 3）
+
+    Returns:
+        StandardProxy 列表（当前文本内已去重）
+    """
+    if not text or len(text) > 10_000_000:
+        return []
+
+    all_proxies = []
+    seen = set()
+
+    def _add(proxies: List[StandardProxy]):
+        for p in proxies:
+            key = p.dedup_key("server_port_protocol")
+            if key not in seen:
+                seen.add(key)
+                all_proxies.append(p)
+
+    # 策略 1: 嵌入式 URI（最可靠）
+    _add(extract_embedded_uris(text))
+
+    # 策略 2: Clash YAML
+    _add(extract_clash_yaml(text))
+
+    # 策略 3: Sing-box JSON
+    _add(extract_singbox_json(text))
+
+    # 策略 4: Surge / Quantumult
+    _add(extract_surge_format(text))
+
+    # 策略 5: 代码块递归
+    _add(extract_from_code_blocks(text, max_depth))
+
+    # 策略 6: Base64 递归
+    _add(extract_from_base64_text(text, max_depth))
+
+    return all_proxies
+
+
+# ==================== 兼容旧接口 ====================
+
+def extract_raw_candidates(text: str) -> List[str]:
+    """提取 所有候选 URI 字符串（原始格式，未经协议解析）。
+
+    保留此接口用于向后兼容。新代码应使用 extract_all_strategies()。
+    """
+    candidates = discover_candidates(text)
+    return list(dict.fromkeys(candidates))  # 保持顺序去重

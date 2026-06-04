@@ -1,7 +1,7 @@
-name: 动态搜集
+name: 动态搜集 + 测速
 on:
   schedule:
-    - cron: '0 0 1 * *'   # 每6小时一次 (UTC 04:00, 10:00, 16:00, 22:00)
+    - cron: '0 */6 * * *'   # 每 6 小时一次
   workflow_dispatch:
 
 jobs:
@@ -23,12 +23,27 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 安装依赖
+      - name: 安装 Python 依赖
         run: pip install requests pyyaml
 
-      - name: 运行动态搜集+测速
+      - name: 下载 subs-check
+        run: |
+          set +e
+          curl -sL "https://github.com/beck-8/subs-check/releases/latest/download/subs-check-linux-amd64" \
+            -o subs-check
+          if [ -f subs-check ] && [ -s subs-check ]; then
+            chmod +x subs-check
+            echo "subs-check 就绪"
+          else
+            echo "subs-check 下载失败，测速将跳过"
+          fi
+        continue-on-error: true
+
+      - name: 运行搜集 + 测速
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: python main.py
 
       - name: 提交所有结果
@@ -39,8 +54,9 @@ jobs:
           export GIT_AUTHOR_DATE="$BEIJING_TIME +0800"
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
           git add -A no/
-          git add no.txt no_li.txt no_w_li.txt ljck.txt
+          git add no.txt no_li.txt no_w_li.txt ljck.txt sha_cache.pkl
           git add alive.txt mihomo.yaml
+          git add no_batch_*.txt
           git add log/
           git commit -m "自动更新 + 测速 - $BEIJING_TIME CST" || echo "No changes to commit"
           git push

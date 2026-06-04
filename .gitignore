@@ -1,0 +1,61 @@
+# ==================== Python ====================
+# 编译字节码
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+
+# 虚拟环境
+venv/
+.venv/
+env/
+.env
+
+# 打包分发
+dist/
+build/
+*.egg-info/
+*.egg
+
+# ==================== IDE / 编辑器 ====================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==================== 操作系统 ====================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ==================== 项目运行时输出 ====================
+# 日志
+log/
+
+# 缓存文件
+*.pkl
+
+# 存活节点输出
+alive.txt
+
+# mihomo 配置输出
+mihomo.yaml
+
+# 黑名单（运行时生成）
+ljck.txt
+
+# 中间结果文件
+no.txt
+no_li.txt
+no_w_li.txt
+
+# 测速二进制
+subs-check
+mihomo
+
+# ==================== 环境变量 / 密钥 ====================
+.env
+.env.local
+*.token
