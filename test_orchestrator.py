@@ -148,6 +148,7 @@ class TestOrchestrator:
               f"(并发={self.max_concurrent}, 批次大小={self.batch_size})", flush=True)
 
         sentinel_received = False
+        batches_received = 0
 
         while self._running:
             # 1. 回收完成的进程
@@ -159,27 +160,43 @@ class TestOrchestrator:
                     item = self._queue.get(timeout=2)
                 except Empty:
                     if sentinel_received and not self._active:
-                        return  # 全部处理完毕
+                        if batches_received == 0:
+                            print(f"[{now_str()}] ⚠️ 编排器未收到任何批次文件，"
+                                  f"跳过测速", flush=True)
+                        else:
+                            print(f"[{now_str()}] ✅ 所有 {batches_received} 个批次 "
+                                  f"测速完成", flush=True)
+                        return
                     break
 
                 if item is None:  # sentinel
                     sentinel_received = True
                     if not self._active:
-                        return  # 全部处理完毕
+                        if batches_received == 0:
+                            print(f"[{now_str()}] ⚠️ 编排器未收到任何批次文件，"
+                                  f"跳过测速", flush=True)
+                        return
                     break
 
                 batch_id, input_file = item
+                batches_received += 1
                 self._spawn(batch_id, input_file)
 
             # 3. 如果收到 sentinel 且无活跃进程 → 退出
             if sentinel_received and not self._active:
+                if batches_received == 0:
+                    print(f"[{now_str()}] ⚠️ 编排器未收到任何批次文件，"
+                          f"跳过测速", flush=True)
                 return
 
             # 4. 短暂休眠避免忙等
             time.sleep(1)
 
         # 清理：等待所有剩余进程
-        self._wait_all()
+        if batches_received > 0:
+            self._wait_all()
+        else:
+            print(f"[{now_str()}] ⚠️ 编排器未收到任何批次文件，跳过测速", flush=True)
 
     def _spawn(self, batch_id: int, input_file: str):
         """启动一个 subs-check 子进程。

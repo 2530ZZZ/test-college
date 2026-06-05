@@ -74,11 +74,13 @@ jobs:
           BEIJING_TIME=$(date -u -d '+8 hours' +'%Y-%m-%d %H:%M:%S')
           export GIT_AUTHOR_DATE="$BEIJING_TIME +0800"
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
-          git add -A no/ 2>/dev/null || true
-          git add no.txt no_li.txt no_w_li.txt ljck.txt sha_cache.pkl 2>/dev/null || true
-          git add alive.txt mihomo.yaml 2>/dev/null || true
-          git add batches/ 2>/dev/null || true
-          git add log/ 2>/dev/null || true
-          git add subs-check 2>/dev/null || true
+          # 逐个添加，避免某个文件不存在导致全部失败
+          git add no/ 2>/dev/null; git add -A no/ 2>/dev/null || true
+          for f in no.txt no_li.txt no_w_li.txt ljck.txt sha_cache.pkl alive.txt mihomo.yaml; do
+            [ -f "$f" ] && git add "$f" || true
+          done
+          [ -d batches/ ] && git add batches/ || true
+          [ -d log/ ] && git add log/ || true
+          [ -f subs-check ] && git add subs-check || true
           git commit -m "自动更新 + 测速 - $BEIJING_TIME CST" || echo "No changes to commit"
           git push

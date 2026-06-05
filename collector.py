@@ -181,7 +181,7 @@ class Collector:
         # 通知测速编排器
         if self.on_batch_flush:
             try:
-                self.on_batch_flush(seq, filename, node_count)
+                self.on_batch_flush(seq, filepath, node_count)
             except Exception as e:
                 print(f"[{now_str()}] ⚠️ 批次回调异常: {e}", flush=True)
 
