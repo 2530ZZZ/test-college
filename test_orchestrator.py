@@ -16,6 +16,7 @@ subs-check 并发编排器。
 """
 
 import os
+import shutil
 import time
 import json
 import subprocess
@@ -66,6 +67,15 @@ class TestOrchestrator:
         self.batch_timeout = batch_timeout or SUBS_CHECK_BATCH_TIMEOUT
         self.base_port = base_port or SUBS_CHECK_BASE_PORT
         self.subs_check_bin = subs_check_bin or SUBS_CHECK_BIN
+
+        # 解析二进制文件全路径（subprocess.Popen 不搜当前目录）
+        resolved = shutil.which(self.subs_check_bin)
+        if not resolved:
+            local = os.path.join(os.getcwd(), self.subs_check_bin)
+            if os.path.isfile(local):
+                resolved = local
+        if resolved:
+            self.subs_check_bin = resolved
 
         # 队列与状态
         self._queue = Queue()

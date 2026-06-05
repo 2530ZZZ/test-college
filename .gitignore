@@ -31,27 +31,10 @@ Thumbs.db
 Desktop.ini
 
 # ==================== 项目运行时输出 ====================
-# 日志
+# 日志（不需要提交，由 GitHub Actions 自动生成）
 log/
 
-# 缓存文件
-*.pkl
-
-# 存活节点输出
-alive.txt
-
-# mihomo 配置输出
-mihomo.yaml
-
-# 黑名单（运行时生成）
-ljck.txt
-
-# 中间结果文件
-no.txt
-no_li.txt
-no_w_li.txt
-
-# 测速二进制
+# 测速二进制（从 release 自动下载，不需要提交）
 subs-check
 mihomo
 
