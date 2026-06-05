@@ -312,5 +312,3 @@ SEARCH_SUFFIX = " ".join(_SEARCH_SUFFIX_PARTS)
 
 # 清理内部变量，避免被外部 import 污染命名空间
 del _SEARCH_SUFFIX_PARTS
-del kw
-del lang
