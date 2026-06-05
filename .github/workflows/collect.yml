@@ -29,13 +29,33 @@ jobs:
       - name: 下载 subs-check
         run: |
           set +e
-          curl -sL "https://github.com/beck-8/subs-check/releases/latest/download/subs-check-linux-amd64" \
-            -o subs-check
-          if [ -f subs-check ] && [ -s subs-check ]; then
-            chmod +x subs-check
-            echo "subs-check 就绪"
+          FALLBACK_TAG="v1.6.0"
+
+          download_and_extract() {
+            local tag="$1"
+            local url="https://github.com/beck-8/subs-check/releases/download/${tag}/subs-check_Linux_x86_64.tar.gz"
+            echo "  下载 ${url} ..."
+            curl -sL "$url" -o subs-check.tar.gz
+            if [ -f subs-check.tar.gz ] && [ -s subs-check.tar.gz ]; then
+              tar xzf subs-check.tar.gz
+              chmod +x subs-check
+              return 0
+            fi
+            return 1
+          }
+
+          # 获取最新 tag
+          TAG=$(curl -s "https://api.github.com/repos/beck-8/subs-check/releases/latest" \
+            | grep '"tag_name":' | cut -d'"' -f4)
+          echo "最新版本: ${TAG:-获取失败}"
+
+          # 尝试最新版
+          if [ -n "$TAG" ] && download_and_extract "$TAG"; then
+            echo "subs-check ${TAG} 就绪"
+          elif download_and_extract "$FALLBACK_TAG"; then
+            echo "最新版下载失败，回退到 ${FALLBACK_TAG}"
           else
-            echo "subs-check 下载失败，测速将跳过"
+            echo "subs-check 所有版本下载失败，测速将跳过"
           fi
         continue-on-error: true
 

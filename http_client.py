@@ -54,8 +54,71 @@ class HttpClient:
         self.limiter = rate_limiter or RateLimiter()
         self.user_agent = user_agent
 
+        # API 调用统计
+        self.stats = {"total": 0, "by_endpoint": {}, "by_status": {}}
+
         # 构建带重试策略的 Session
         self.session = self._create_session(pool_connections, pool_maxsize)
+
+    def _classify_url(self, url: str) -> str:
+        """将 URL 分类为端点类型，用于统计。
+
+        Returns:
+            端点类型名称，如 "search", "repo", "tree", "commits", "raw", "compare", "other"
+        """
+        if "/search/repositories" in url:
+            return "search"
+        elif "/git/trees/" in url:
+            return "tree"
+        elif "/repos/" in url and "/compare/" in url:
+            return "compare"
+        elif "/repos/" in url and "/commits" in url:
+            return "commits"
+        elif "/repos/" in url and "/contents" in url:
+            return "contents"
+        elif "/repos/" in url and "/git/refs/" in url:
+            return "refs"
+        elif "/repos/" in url:
+            return "repo"
+        elif "raw.githubusercontent.com" in url:
+            return "raw"
+        else:
+            return "other"
+
+    def _record_call(self, url: str, status: int = 0):
+        """记录一次 API 调用。
+
+        Args:
+            url: 请求的 URL
+            status: HTTP 状态码（0 表示请求未发出）
+        """
+        self.stats["total"] += 1
+        endpoint = self._classify_url(url)
+        self.stats["by_endpoint"][endpoint] = self.stats["by_endpoint"].get(endpoint, 0) + 1
+        status_group = f"{status // 100}xx" if status else "no_req"
+        self.stats["by_status"][status_group] = self.stats["by_status"].get(status_group, 0) + 1
+
+    def get_stats_report(self) -> str:
+        """生成 API 调用统计报告。"""
+        lines = [
+            "API 调用统计",
+            "=" * 40,
+            f"  总请求数:    {self.stats['total']}",
+            "",
+            "  按端点类型:",
+        ]
+        for ep, count in sorted(self.stats["by_endpoint"].items()):
+            lines.append(f"    {ep:15s} {count}")
+        lines.append("")
+        lines.append("  按状态码:")
+        for st, count in sorted(self.stats["by_status"].items()):
+            lines.append(f"    {st:15s} {count}")
+        lines.append("=" * 40)
+        return "\n".join(lines)
+
+    def reset_stats(self):
+        """重置统计。"""
+        self.stats = {"total": 0, "by_endpoint": {}, "by_status": {}}
 
     def _create_session(self, pool_connections: int, pool_maxsize: int) -> requests.Session:
         """创建带重试策略和连接池的 requests Session。
@@ -127,10 +190,14 @@ class HttpClient:
         for attempt in range(1, max_retries + 1):
             # ---- 入口拦截：限流超限则直接放弃 ----
             if self.limiter.should_stop():
+                self._record_call(url, 0)
                 return None
 
             try:
                 resp = self.session.get(url, headers=self.headers, timeout=timeout)
+
+                # 不管什么状态码都记录一次调用
+                self._record_call(url, resp.status_code)
 
                 # 成功
                 if resp.status_code == 200:

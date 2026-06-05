@@ -106,9 +106,9 @@ def extract_clash_yaml(text: str) -> List[StandardProxy]:
     """从 Clash YAML 格式文本中提取代理节点。
 
     处理三种 Clash 代理定义格式：
-      - 单行 JSON 对象: - {name: xx, type: vmess, ...}
-      - 多行 YAML:     - name: xx\n  type: vmess\n  ...
-      - JSO(内联):    - name: xx  ...
+      - 标准多行 YAML:  - name: xx\n  type: vmess\n  ...
+      - 单行 JSON:      - {name: xx, type: vmess, ...}
+      - 压缩 YAML:      {port: ..., proxies: [{name: xx, ...}, ...]}
 
     Args:
         text: YAML 格式文本
@@ -119,7 +119,7 @@ def extract_clash_yaml(text: str) -> List[StandardProxy]:
     proxies = []
     seen = set()
 
-    # 尝试整块 YAML 解析
+    # ── 策略 1: 整块 YAML 解析 ──
     try:
         import yaml
         doc = yaml.safe_load(text)
@@ -132,13 +132,75 @@ def extract_clash_yaml(text: str) -> List[StandardProxy]:
     except Exception:
         pass  # YAML 解析失败，回退到正则
 
-    # 回退：正则提取
-    # 单行 JSON 对象
+    # ── 逻辑 2: 压缩 YAML flow 格式（minified，无换行） ──
+    # 格式: {..., proxies: [{name: ..., server: ..., port: ..., type: ..., ...}, ...], ...}
+    # 找到 proxies: [ 到 ] 之间的内容，逐个提取 proxy 对象
+    try:
+        # 找到 proxies 数组的起始和结束位置
+        pm = re.search(r'proxies\s*:\s*\[', text, re.IGNORECASE)
+        if pm:
+            start = pm.end()
+            depth = 1
+            i = start
+            while i < len(text) and depth > 0:
+                if text[i] == '[': depth += 1
+                elif text[i] == ']': depth -= 1
+                i += 1
+            if depth == 0:
+                arr_content = text[start:i-1]
+                # 逐个提取 proxy 对象 {name: ..., type: ..., ...}
+                for obj_match in re.finditer(r'\{[^{}]*?\}', arr_content):
+                    obj_str = obj_match.group(0)
+                    # 检查是否是 proxy 对象（包含 type 或 server 关键字段）
+                    if re.search(r'(?:^|,)\s*(?:type|server|port|name)\s*:', obj_str, re.IGNORECASE):
+                        # 尝试转为标准格式（加引号做 JSON 解析）
+                        try:
+                            # 先把 YAML flow 值转为 JSON：给 key 加引号
+                            json_str = re.sub(
+                                r'(?<=[\s,:]|^)(\b[a-zA-Z_][a-zA-Z0-9_-]*)\s*:',
+                                r'"\1":', obj_str
+                            )
+                            # 给未加引号的字符串值加引号（但跳过 true/false/null/数字）
+                            json_str = re.sub(
+                                r':\s*([a-zA-Z_][a-zA-Z0-9_\-/.@+%]*?)(?=[,}])',
+                                r': "\1"', json_str
+                            )
+                            obj = json.loads(json_str)
+                            proxy = dict_to_standard_proxy(obj)
+                            if proxy and proxy.is_valid():
+                                key = proxy.dedup_key("server_port_protocol")
+                                if key not in seen:
+                                    seen.add(key)
+                                    proxies.append(proxy)
+                        except Exception:
+                            # JSON 解析失败，用 dict_to_standard_proxy 直接处理
+                            # 先转为 Python dict
+                            try:
+                                pairs = re.findall(
+                                    r'(\w[\w-]*)\s*:\s*"([^"]*)"|(\w[\w-]*)\s*:\s*(\S+)',
+                                    obj_str
+                                )
+                                d = {}
+                                for p in pairs:
+                                    key = p[0] or p[2]
+                                    val = p[1] or p[3]
+                                    d[key.strip()] = val.strip().strip('"').strip("'")
+                                proxy = dict_to_standard_proxy(d)
+                                if proxy and proxy.is_valid():
+                                    key = proxy.dedup_key("server_port_protocol")
+                                    if key not in seen:
+                                        seen.add(key)
+                                        proxies.append(proxy)
+                            except Exception:
+                                pass
+    except Exception:
+        pass
+
+    # ── 策略 3: 单行 JSON 对象正则 ──
     for m in CLASH_SINGLE_RE.finditer(text):
         clean = re.sub(r'\s+', ' ', m.group(0).strip())
         if len(clean) > 30:
             try:
-                # 确保是合法 JSON 对象
                 obj = json.loads(clean)
                 proxy = dict_to_standard_proxy(obj)
                 if proxy and proxy.is_valid():
@@ -149,12 +211,11 @@ def extract_clash_yaml(text: str) -> List[StandardProxy]:
             except Exception:
                 pass
 
-    # 多行 YAML 代理块
+    # ── 策略 4: 多行 YAML 代理块 ──
     for m in CLASH_MULTI_RE.finditer(text):
         block = m.group(0)
         try:
             import yaml
-            # 需要包裹一下: - name: -> proxies: [- name:]
             wrapped = "proxies:\n" + block
             doc = yaml.safe_load(wrapped)
             if doc and "proxies" in doc:

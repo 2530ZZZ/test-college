@@ -242,6 +242,7 @@ class Collector:
               f"节点: {len(self.unique_nodes)}, "
               f"批次: {len(self.batch_file_paths)}", flush=True)
         print(f"[{now_str()}] 累计限流等待: {self.limiter.total_wait:.0f} 秒", flush=True)
+        print(f"[{now_str()}] API 调用统计:\n{self.http.get_stats_report()}", flush=True)
 
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
@@ -418,23 +419,36 @@ class Collector:
 
         # ---- 收集候选文件 ----
         files_to_check = []
+        skipped_by_processed = 0
+        skipped_by_cache = 0
+        skipped_by_ext = 0
         for e in entries:
             if e.get('type') != 'blob':
                 continue
             path = e.get('path', '')
             ext = os.path.splitext(path)[1].lower()
             if ext not in ALLOWED_EXTENSIONS:
+                skipped_by_ext += 1
                 continue
             sha = e.get('sha', '')
             if sha in self.processed_file_shas:
+                skipped_by_processed += 1
                 continue
             # SHA 缓存检查
             if not self._is_file_updated(sha):
+                skipped_by_cache += 1
                 continue
             files_to_check.append((path, sha))
 
         if not files_to_check:
-            print(f"[{now_str()}] 仓库 https://github.com/{repo} 无候选文件", flush=True)
+            print(f"[{now_str()}] 仓库 https://github.com/{repo} 无候选文件 "
+                  f"(总计 {len([e for e in entries if e.get('type')=='blob'])} blob"
+                  f", 扩展名过滤 {skipped_by_ext}"
+                  f", processed_shas 跳过 {skipped_by_processed}"
+                  f", SHA 缓存跳过 {skipped_by_cache})", flush=True)
+            # 如果有被 SHA 缓存或 processed_shas 跳过的文件，说明已处理过
+            if skipped_by_cache > 0 or skipped_by_processed > 0:
+                has_nodes[0] = True  # 避免已处理过的仓库被加入黑名单
             return True
 
         # ---- 文件时间检查（阈值策略） ----
@@ -614,9 +628,11 @@ class Collector:
 
         # ---- 过滤 + 去重 + 入 buffer ----
         new_count = 0
+        has_valid_nodes = False  # 是否提取到任何有效节点（用于黑名单判断）
         for proxy in proxies:
             if not proxy.is_valid():
                 continue
+            has_valid_nodes = True  # 只要有解析成功且合法的节点就算
 
             # 全局去重
             if DEDUP_ENABLED:
@@ -630,17 +646,22 @@ class Collector:
             self.batch_buffer.append(node_uri)
             new_count += 1
 
-        if new_count:
+        if has_valid_nodes:
             self.all_links.append(raw_url)
-            has_nodes[0] = True
+            has_nodes[0] = True  # 无论是否重复，有节点就不进黑名单
+
+        if new_count:
             print(f"[{now_str()}] 📄 {raw_url} "
                   f"✅ 提取 {len(proxies)} 个候选，新增 {new_count} 个", flush=True)
         else:
             if len(proxies) == 0:
                 print(f"[{now_str()}] 📄 {raw_url} ❌ 无节点", flush=True)
-            else:
+            elif has_valid_nodes:
                 print(f"[{now_str()}] 📄 {raw_url} "
                       f"⚪ 解析出 {len(proxies)} 个节点但全部重复", flush=True)
+            else:
+                print(f"[{now_str()}] 📄 {raw_url} "
+                      f"⚪ 解析出 {len(proxies)} 个节点但全部验证失败", flush=True)
 
         self.processed_file_shas.add(sha)
 
