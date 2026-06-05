@@ -175,7 +175,7 @@ class Collector:
 
         self.batch_file_paths.append(filepath)
         print(f"[{now_str()}] 📦 批次 {seq:04d} 已持久化: "
-              f"{filename} ({node_count} 个节点, "
+              f"{filepath} ({node_count} 个节点, "
               f"累计 {len(self.unique_nodes)} 个)", flush=True)
 
         # 通知测速编排器
@@ -213,32 +213,57 @@ class Collector:
         """主入口：搜索 → 遍历仓库 → 提取节点 → 持久化。"""
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
+        loop_exception = None
 
-        for idx, query in enumerate(self.queries, 1):
-            # 检查限流状态
-            if self.limiter.should_stop():
-                print(f"[{now_str()}] ⚠️ 限流超限，终止搜索 "
-                      f"(累计 {self.limiter.total_wait:.0f}s)", flush=True)
-                break
+        try:
+            for idx, query in enumerate(self.queries, 1):
+                # 检查限流状态
+                if self.limiter.should_stop():
+                    print(f"[{now_str()}] ⚠️ 限流超限，终止搜索 "
+                          f"(累计 {self.limiter.total_wait:.0f}s)", flush=True)
+                    break
 
-            q_start = time.time()
-            print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
+                q_start = time.time()
+                print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
 
-            try:
-                self.search_query(query)
-            except RuntimeError:
-                print(f"[{now_str()}] ⚠️ 限流超限，立即终止所有搜索", flush=True)
-                break
+                try:
+                    self.search_query(query)
+                except RuntimeError:
+                    print(f"[{now_str()}] ⚠️ 限流超限，立即终止所有搜索", flush=True)
+                    break
 
-            print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
+                print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
 
-        # 搜完后把 buffer 里剩余的刷盘
-        self._flush_batch()
-        self.save_results()
-        self.save_sha_cache()
+        except Exception as e:
+            print(f"[{now_str()}] ❌ 搜索过程异常: {e}", flush=True)
+            loop_exception = e
 
-        elapsed = time.time() - start_time
-        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed:.0f}s", flush=True)
+        finally:
+            # 无论搜索过程是否发生错误，都尝试保存已搜集的节点
+            self._finalize(elapsed_seconds=time.time() - start_time)
+
+        # 如果有异常但已保存了节点，不重新抛出（让主线程继续处理测速）
+        if loop_exception:
+            print(f"[{now_str()}] ⚠️ 搜集阶段已完成（含错误），"
+                  f"已保存 {len(self.unique_nodes)} 个节点", flush=True)
+
+    def _finalize(self, elapsed_seconds: float = 0):
+        """最终保存和统计。即使之前发生错误也能安全调用。"""
+        try:
+            self._flush_batch()
+        except Exception as e:
+            print(f"[{now_str()}] ⚠️ buffer 刷盘异常: {e}", flush=True)
+        try:
+            self.save_results()
+        except Exception as e:
+            print(f"[{now_str()}] ⚠️ save_results 异常: {e}", flush=True)
+        try:
+            self.save_sha_cache()
+        except Exception as e:
+            print(f"[{now_str()}] ⚠️ SHA 缓存保存异常: {e}", flush=True)
+
+        # 统计信息（包含 API 调用量，含 raw 下载统计）
+        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed_seconds:.0f}s", flush=True)
         print(f"[{now_str()}] 检查仓库: {self.checked_count}, "
               f"源链接: {len(self.all_links)}, "
               f"节点: {len(self.unique_nodes)}, "
