@@ -32,7 +32,7 @@ from config import (
     MAX_RAW_DOWNLOADS_PER_REPO,
     SHA_CACHE_FILE, SHA_CACHE_TTL_DAYS,
     README_SPAM_KEYWORDS, ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
-    CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, SUBS_CHECK_BATCH_SIZE,
+    CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, SUBS_CHECK_BATCH_SIZE, BATCH_DIR,
 )
 from http_client import HttpClient, RateLimiter
 from parsers import extract_all_strategies
@@ -167,11 +167,13 @@ class Collector:
             node_count = len(nodes_to_write)
             self.batch_buffer.clear()
 
-        filename = f"no_batch_{seq:04d}.txt"
-        with open(filename, "w", encoding="utf-8") as f:
+        batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
+        os.makedirs(batch_dir, exist_ok=True)
+        filepath = os.path.join(batch_dir, f"no_batch_{seq:04d}.txt")
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(nodes_to_write))
 
-        self.batch_file_paths.append(filename)
+        self.batch_file_paths.append(filepath)
         print(f"[{now_str()}] 📦 批次 {seq:04d} 已持久化: "
               f"{filename} ({node_count} 个节点, "
               f"累计 {len(self.unique_nodes)} 个)", flush=True)

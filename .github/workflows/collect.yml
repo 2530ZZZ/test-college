@@ -67,6 +67,7 @@ jobs:
         run: python main.py
 
       - name: 提交所有结果
+        if: always()
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -76,7 +77,8 @@ jobs:
           git add -A no/
           git add no.txt no_li.txt no_w_li.txt ljck.txt sha_cache.pkl
           git add alive.txt mihomo.yaml
-          git add no_batch_*.txt
+          git add batches/
           git add log/
+          git add subs-check subs-check.tar.gz 2>/dev/null || true
           git commit -m "自动更新 + 测速 - $BEIJING_TIME CST" || echo "No changes to commit"
           git push
