@@ -26,10 +26,8 @@ from typing import List, Dict, Optional, Callable
 
 from config import (
     SUBS_CHECK_BIN, SUBS_CHECK_BATCH_SIZE, SUBS_CHECK_MAX_CONCURRENT,
-    SUBS_CHECK_BATCH_TIMEOUT, SUBS_CHECK_BASE_PORT,
+    SUBS_CHECK_BATCH_TIMEOUT, SUBS_CHECK_BASE_PORT, SUBS_CHECK_CONCURRENT,
     SUBS_CHECK_LATENCY_URL, SUBS_CHECK_SPEED_TEST_URL,
-    LATENCY_TIMEOUT, SPEED_TIMEOUT, MIN_SPEED_MB, MAX_LATENCY,
-    TCP_SCAN_ENABLED, TCP_SCAN_TIMEOUT, TCP_SCAN_WORKERS,
 )
 from utils import now_str
 
@@ -315,6 +313,8 @@ class TestOrchestrator:
             配置文件路径
         """
         config_path = f"subs_check_batch_{batch_id}.yaml"
+        # concurrent 控制并发 goroutine 数，默认很低（实测约1-2）
+        # 不设的话 subs-check 默认值会很慢。
         config = {
             "mixed-port": port,
             "external-controller": f"127.0.0.1:{port + 1}",
@@ -322,6 +322,8 @@ class TestOrchestrator:
             "mode": "rule",
             "log-level": "error",
             "proxies-file": input_file,
+            "concurrent": SUBS_CHECK_CONCURRENT,
+            "test-url": SUBS_CHECK_LATENCY_URL,
         }
 
         try:

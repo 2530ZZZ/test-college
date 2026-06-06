@@ -209,20 +209,6 @@ MIHOMO_BIN = "mihomo"
 MIHOMO_MIXED_PORT = 7890
 MIHOMO_API_PORT = 9090
 
-# ==================== TCP 端口预筛选 ====================
-
-# 是否启用 TCP 端口预筛选（在测速前快速过滤明显不可达的节点）
-# 默认 True。
-TCP_SCAN_ENABLED = True
-
-# TCP 连接超时（秒）
-# 默认 1.5，取值范围 0.5-5.0。越小越快但可能漏掉高延迟节点。
-TCP_SCAN_TIMEOUT = 1.5
-
-# TCP 扫描并发线程数
-# 默认 200，取值范围 50-500。
-TCP_SCAN_WORKERS = 200
-
 # ==================== subs-check 测速配置 ====================
 
 # subs-check 二进制文件路径
@@ -245,6 +231,11 @@ SUBS_CHECK_BATCH_TIMEOUT = 3600
 # 默认 7890，每个并发实例递增 10 避免端口冲突。
 SUBS_CHECK_BASE_PORT = 7890
 
+# subs-check 并发测速线程数（goroutines）
+# 默认 10，取值范围 1-50。GitHub Actions (2核/7GB) 建议 5-10。
+# 本地高配机器可设 20+。这个参数对测速耗时影响最大。
+SUBS_CHECK_CONCURRENT = 10
+
 # 测速目标 URL — 延迟测试
 # 使用 Google 的 generate_204 端点，全球 CDN，响应快且稳定。
 SUBS_CHECK_LATENCY_URL = "https://www.gstatic.com/generate_204"
@@ -257,7 +248,7 @@ SUBS_CHECK_SPEED_TEST_URL = "https://speed.cloudflare.com/__down?bytes=10485760"
 
 # 延迟测试超时（毫秒）
 # 默认 5000，取值范围 1000-30000。
-LATENCY_TIMEOUT = 5000
+LATENCY_TIMEOUT = 2000
 
 # 最大允许延迟（毫秒），超过此值的节点将被过滤
 # 默认 3000，取值范围 500-10000。
