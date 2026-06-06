@@ -163,9 +163,10 @@ def main():
 
     # ---- 阶段 3: 等待测速完成 ----
     if subs_check_available and collector.batch_file_paths:
-        print(f"[{now_str()}] 🧪 等待测速完成...", flush=True)
+        print("::group::🧪 测速进度", flush=True)
         orch.signal_done()
         results, errors = orch.wait()
+        print("::endgroup::", flush=True)
         stats = orch.get_stats()
         print(f"[{now_str()}] 测速统计: 完成 {stats['completed']}, "
               f"失败 {stats['failed']}, 存活 {stats['total_alive']}", flush=True)

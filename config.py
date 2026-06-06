@@ -217,7 +217,7 @@ SUBS_CHECK_BIN = "subs-check"
 
 # 每批节点数（边搜集边测速模式下，每凑够此数量就持久化并投喂给 subs-check）
 # 默认 10000，取值范围 1000-50000。值越小单批越快但启动开销占比高。
-SUBS_CHECK_BATCH_SIZE = 10000
+SUBS_CHECK_BATCH_SIZE = 2000
 
 # 最大并发 subs-check 实例数
 # 默认 3，取值范围 1-5。GitHub Actions (2核/7GB) 不建议超过 3。
@@ -248,7 +248,7 @@ SUBS_CHECK_SPEED_TEST_URL = "https://speed.cloudflare.com/__down?bytes=10485760"
 
 # 延迟测试超时（毫秒）
 # 默认 5000，取值范围 1000-30000。
-LATENCY_TIMEOUT = 2000
+LATENCY_TIMEOUT = 5000
 
 # 最大允许延迟（毫秒），超过此值的节点将被过滤
 # 默认 3000，取值范围 500-10000。

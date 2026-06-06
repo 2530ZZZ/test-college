@@ -157,6 +157,8 @@ class TestOrchestrator:
 
         sentinel_received = False
         batches_received = 0
+        progress_ticks = 0          # 休眠计数器，每 30 秒打印一次进度
+        batch_start_time = {}       # batch_id → 启动时间戳
 
         while self._running:
             # 1. 回收完成的进程
@@ -188,6 +190,7 @@ class TestOrchestrator:
 
                 batch_id, input_file = item
                 batches_received += 1
+                batch_start_time[batch_id] = time.time()
                 self._spawn(batch_id, input_file)
 
             # 3. 如果收到 sentinel 且无活跃进程 → 退出
@@ -197,7 +200,21 @@ class TestOrchestrator:
                           f"跳过测速", flush=True)
                 return
 
-            # 4. 短暂休眠避免忙等
+            # 4. 每 30 秒打印一次进度
+            progress_ticks += 1
+            if progress_ticks >= 30 and self._active:
+                progress_ticks = 0
+                lines = [f"[{now_str()}] 📊 测速进行中..."]
+                for bid, proc in list(self._active.items()):
+                    elapsed = int(time.time() - batch_start_time.get(bid, time.time()))
+                    status = "运行中" if proc.poll() is None else "结束"
+                    lines.append(f"  批次 {bid}: {elapsed}s [{status}]")
+                lines.append(f"  已完成 {len(self._results)} 批, "
+                             f"失败 {len(self._errors)} 批, "
+                             f"存活 {sum(len(v) for v in self._results.values())} 个节点")
+                print("\n".join(lines), flush=True)
+
+            # 5. 短暂休眠避免忙等
             time.sleep(1)
 
         # 清理：等待所有剩余进程
@@ -222,7 +239,7 @@ class TestOrchestrator:
             proc = subprocess.Popen(
                 [self.subs_check_bin, "-f", config_path],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 text=True,
             )
             self._active[batch_id] = proc
