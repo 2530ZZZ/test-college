@@ -28,6 +28,7 @@ from config import (
     SUBS_CHECK_BIN, SUBS_CHECK_BATCH_SIZE, SUBS_CHECK_MAX_CONCURRENT,
     SUBS_CHECK_BATCH_TIMEOUT, SUBS_CHECK_BASE_PORT, SUBS_CHECK_CONCURRENT,
     SUBS_CHECK_LATENCY_URL, SUBS_CHECK_SPEED_TEST_URL,
+    LATENCY_TIMEOUT, SPEED_TIMEOUT,
 )
 from utils import now_str
 
@@ -157,14 +158,34 @@ class TestOrchestrator:
 
         sentinel_received = False
         batches_received = 0
-        progress_ticks = 0          # 休眠计数器，每 30 秒打印一次进度
-        batch_start_time = {}       # batch_id → 启动时间戳
+        batch_start_time = {}  # batch_id → start_timestamp
 
         while self._running:
-            # 1. 回收完成的进程
+            # 1. 检查是否有超时的批次（超过 SUBS_CHECK_BATCH_TIMEOUT 秒无结果）
+            now = time.time()
+            for bid, start_ts in list(batch_start_time.items()):
+                if bid in self._active:
+                    elapsed = now - start_ts
+                    if elapsed > self.batch_timeout:
+                        proc = self._active.get(bid)
+                        if proc:
+                            try:
+                                proc.kill()
+                                proc.wait(timeout=3)
+                            except Exception:
+                                pass
+                            print(f"[{now_str()}] ⏰ 批次 {bid} 超时 "
+                                  f"({int(elapsed)}s > {self.batch_timeout}s)，强制终止",
+                                  flush=True)
+                            self._errors[bid] = f"运行超时 ({int(elapsed)}s)"
+                            del self._active[bid]
+                        batch_start_time.pop(bid, None)
+                        # 减少并发槽位计数，允许启动新批次
+
+            # 2. 回收已完成的进程
             self._reap_finished()
 
-            # 2. 尝试启动新批次
+            # 3. 尝试启动新批次
             while len(self._active) < self.max_concurrent:
                 try:
                     item = self._queue.get(timeout=2)
@@ -174,17 +195,21 @@ class TestOrchestrator:
                             print(f"[{now_str()}] ⚠️ 编排器未收到任何批次文件，"
                                   f"跳过测速", flush=True)
                         else:
-                            print(f"[{now_str()}] ✅ 所有 {batches_received} 个批次 "
-                                  f"测速完成", flush=True)
+                            completed = len(self._results)
+                            failed = len(self._errors)
+                            print(f"[{now_str()}] ✅ 测速完成: "
+                                  f"{completed} 批成功, {failed} 批失败",
+                                  flush=True)
                         return
                     break
 
                 if item is None:  # sentinel
                     sentinel_received = True
                     if not self._active:
-                        if batches_received == 0:
-                            print(f"[{now_str()}] ⚠️ 编排器未收到任何批次文件，"
-                                  f"跳过测速", flush=True)
+                        completed = len(self._results)
+                        failed = len(self._errors)
+                        print(f"[{now_str()}] ✅ 测速完成: "
+                              f"{completed} 批成功, {failed} 批失败", flush=True)
                         return
                     break
 
@@ -200,22 +225,11 @@ class TestOrchestrator:
                           f"跳过测速", flush=True)
                 return
 
-            # 4. 每 30 秒打印一次进度
-            progress_ticks += 1
-            if progress_ticks >= 30 and self._active:
-                progress_ticks = 0
-                lines = [f"[{now_str()}] 📊 测速进行中..."]
-                for bid, proc in list(self._active.items()):
-                    elapsed = int(time.time() - batch_start_time.get(bid, time.time()))
-                    status = "运行中" if proc.poll() is None else "结束"
-                    lines.append(f"  批次 {bid}: {elapsed}s [{status}]")
-                lines.append(f"  已完成 {len(self._results)} 批, "
-                             f"失败 {len(self._errors)} 批, "
-                             f"存活 {sum(len(v) for v in self._results.values())} 个节点")
-                print("\n".join(lines), flush=True)
-
-            # 5. 短暂休眠避免忙等
-            time.sleep(1)
+            # 4. 短暂休眠（只需在无活跃进程时等队列）
+            if not self._active:
+                time.sleep(1)
+            else:
+                time.sleep(0.5)
 
         # 清理：等待所有剩余进程
         if batches_received > 0:
@@ -340,7 +354,10 @@ class TestOrchestrator:
             "log-level": "error",
             "proxies-file": input_file,
             "concurrent": SUBS_CHECK_CONCURRENT,
-            "test-url": SUBS_CHECK_LATENCY_URL,
+            "url": SUBS_CHECK_LATENCY_URL,
+            "timeout": LATENCY_TIMEOUT,
+            "speed-test-url": SUBS_CHECK_SPEED_TEST_URL,
+            "speed-test-timeout": SPEED_TIMEOUT,
         }
 
         try:

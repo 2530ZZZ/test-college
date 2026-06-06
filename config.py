@@ -209,6 +209,12 @@ MIHOMO_BIN = "mihomo"
 MIHOMO_MIXED_PORT = 7890
 MIHOMO_API_PORT = 9090
 
+# ==================== 测速开关 ====================
+
+# 是否启用测速。若关闭，则只搜集节点并保存，不执行 subs-check 测速。
+# 默认 True。如果测速环境不可用（如 GitHub Actions 网络受限），设为 False。
+SPEED_TEST_ENABLED = True
+
 # ==================== subs-check 测速配置 ====================
 
 # subs-check 二进制文件路径

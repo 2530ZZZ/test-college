@@ -32,7 +32,7 @@ from config import (
     GITHUB_TOKEN, BASE_QUERIES, SEARCH_SUFFIX, SEARCH_IN,
     LOG_DIR, MAX_LOG_FILES,
     SUBS_CHECK_BATCH_SIZE, SUBS_CHECK_MAX_CONCURRENT,
-    SUBS_CHECK_BIN,
+    SUBS_CHECK_BIN, SPEED_TEST_ENABLED,
 )
 
 
@@ -124,24 +124,27 @@ def main():
     print(f"[{now_str()}] 关键词: {len(queries)} 个, "
           f"时间基准: {(datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')} UTC", flush=True)
 
-    # ---- 阶段 1: 启动测速编排器 ----
-    orch = TestOrchestrator()
-    orch.start()
+    # ---- 阶段 1: 决定是否启用测速 ----
+    speed_test_enabled = SPEED_TEST_ENABLED and _check_subs_check()
+    if not SPEED_TEST_ENABLED:
+        print(f"[{now_str()}] ⚠️ 测速已禁用 (SPEED_TEST_ENABLED=False)，只搜集不测速", flush=True)
+    elif not _check_subs_check():
+        print(f"[{now_str()}] ⚠️ subs-check 不可用，只搜集不测速", flush=True)
 
-    # ---- 阶段 2: 运行搜集（边搜集边通过回调投喂） ----
-    # 回调函数：将持久化的批次文件投喂给测速编排器
+    # 启动测速编排器（如果启用）
+    orch = None
     def on_batch_flush(batch_id, file_path, node_count):
-        orch.enqueue(file_path)
+        if orch:
+            orch.enqueue(file_path)
 
-    # 检查 subs-check 是否可用
-    subs_check_available = _check_subs_check()
-    if not subs_check_available:
-        print(f"[{now_str()}] ⚠️ subs-check 不可用，将跳过测速阶段", flush=True)
+    if speed_test_enabled:
+        orch = TestOrchestrator()
+        orch.start()
 
     collector = Collector(
         token=GITHUB_TOKEN,
         queries=queries,
-        on_batch_flush=on_batch_flush if subs_check_available else None,
+        on_batch_flush=on_batch_flush if speed_test_enabled else None,
     )
 
     # 搜集运行（主线程）
@@ -162,7 +165,7 @@ def main():
           f"批次: {len(collector.batch_file_paths)}", flush=True)
 
     # ---- 阶段 3: 等待测速完成 ----
-    if subs_check_available and collector.batch_file_paths:
+    if speed_test_enabled and orch and collector.batch_file_paths:
         print("::group::🧪 测速进度", flush=True)
         orch.signal_done()
         results, errors = orch.wait()
