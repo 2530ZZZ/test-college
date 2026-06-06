@@ -1,7 +1,7 @@
 name: 动态搜集 + 测速
 on:
   schedule:
-    # - cron: '0 */6 * * *'   # 每 6 小时一次
+    # - cron: '0 */6 * * *'   # 每  6 小时一次
   workflow_dispatch:
 
 jobs:
