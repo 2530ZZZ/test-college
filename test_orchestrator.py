@@ -132,14 +132,20 @@ class TestOrchestrator:
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
-    def wait(self) -> tuple:
+    def wait(self, timeout: int = None) -> tuple:
         """等待编排线程完成，返回结果。
+
+        Args:
+            timeout: 最大等待秒数（默认 self.batch_timeout + 60）
 
         Returns:
             (results: dict[batch_id → list[uris]], errors: dict[batch_id → str])
         """
         if self._thread and self._thread.is_alive():
-            self._thread.join()
+            t = timeout or (self.batch_timeout + 60)
+            self._thread.join(timeout=t)
+            if self._thread.is_alive():
+                print(f"[{now_str()}] ⚠️ 测速线程超时 ({t}s)，强制结束", flush=True)
         return dict(self._results), dict(self._errors)
 
     # ---- 内部循环 ----
@@ -153,34 +159,39 @@ class TestOrchestrator:
           3. 启动 subs-check 子进程
           4. 循环直到收到 sentinel 且无活跃进程
         """
-        print(f"[{now_str()}] 🧪 测速编排器启动 "
-              f"(并发={self.max_concurrent}, 批次大小={self.batch_size})", flush=True)
+        thread_id = threading.get_ident()
+        qsize = self._queue.qsize()
+        print(f"[{now_str()}] 🧪 测速编排器已启动 "
+              f"(线程={thread_id}, 队列初始大小={qsize}, "
+              f"最大并发={self.max_concurrent}, 批次大小={self.batch_size})", flush=True)
 
         sentinel_received = False
         batches_received = 0
         batch_start_time = {}  # batch_id → start_timestamp
+        heartbeat_ticks = 0    # 每 60 秒打印一次活跃状态
+        loop_count = 0
 
         while self._running:
+            loop_count += 1
             # 1. 检查是否有超时的批次（超过 SUBS_CHECK_BATCH_TIMEOUT 秒无结果）
             now = time.time()
             for bid, start_ts in list(batch_start_time.items()):
-                if bid in self._active:
-                    elapsed = now - start_ts
-                    if elapsed > self.batch_timeout:
-                        proc = self._active.get(bid)
-                        if proc:
-                            try:
-                                proc.kill()
-                                proc.wait(timeout=3)
-                            except Exception:
-                                pass
-                            print(f"[{now_str()}] ⏰ 批次 {bid} 超时 "
-                                  f"({int(elapsed)}s > {self.batch_timeout}s)，强制终止",
-                                  flush=True)
-                            self._errors[bid] = f"运行超时 ({int(elapsed)}s)"
-                            del self._active[bid]
-                        batch_start_time.pop(bid, None)
-                        # 减少并发槽位计数，允许启动新批次
+                elapsed = now - start_ts
+                if elapsed < self.batch_timeout:
+                    continue  # 还没超时，跳过
+                # 超时了：不管进程是在启动中还是运行中，都强制终止
+                proc = self._active.pop(bid, None)
+                if proc:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=3)
+                    except Exception:
+                        pass
+                batch_start_time.pop(bid, None)
+                print(f"[{now_str()}] ⏰ 批次 {bid} 超时 "
+                      f"({int(elapsed)}s > {self.batch_timeout}s)，强制终止",
+                      flush=True)
+                self._errors[bid] = f"运行超时 ({int(elapsed)}s)"
 
             # 2. 回收已完成的进程
             self._reap_finished()
@@ -205,6 +216,9 @@ class TestOrchestrator:
 
                 if item is None:  # sentinel
                     sentinel_received = True
+                    alive_count = len(self._active)
+                    print(f"[{now_str()}] 🔔 收到结束信号 "
+                          f"(批次={batches_received}, 活跃进程={alive_count})", flush=True)
                     if not self._active:
                         completed = len(self._results)
                         failed = len(self._errors)
@@ -214,9 +228,12 @@ class TestOrchestrator:
                     break
 
                 batch_id, input_file = item
+                print(f"[{now_str()}] 📤 取出队列: 批次 {batch_id} "
+                      f"(文件={input_file}, 队列剩余={self._queue.qsize()})", flush=True)
                 batches_received += 1
                 batch_start_time[batch_id] = time.time()
                 self._spawn(batch_id, input_file)
+                print(f"[{now_str()}] ✅ _spawn 返回, 活跃进程={len(self._active)}", flush=True)
 
             # 3. 如果收到 sentinel 且无活跃进程 → 退出
             if sentinel_received and not self._active:
@@ -230,6 +247,15 @@ class TestOrchestrator:
                 time.sleep(1)
             else:
                 time.sleep(0.5)
+                # 每 60 秒打一次心跳，确认测速仍然在跑
+                heartbeat_ticks += 1
+                if heartbeat_ticks >= 120:  # 0.5s * 120 = 60s
+                    heartbeat_ticks = 0
+                    elapsed = int(time.time() - list(batch_start_time.values())[0]
+                                  if batch_start_time else 0)
+                    print(f"[{now_str()}] ⏳ 测速中 (运行 {elapsed}s, "
+                          f"{len(self._results)} 批完成, "
+                          f"{len(self._active)} 批运行中)", flush=True)
 
         # 清理：等待所有剩余进程
         if batches_received > 0:
