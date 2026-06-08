@@ -170,7 +170,7 @@ class Collector:
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
         os.makedirs(batch_dir, exist_ok=True)
         filepath = os.path.join(batch_dir, f"no_batch_{seq:04d}.txt")
-        with open(filepath, "w", encoding="utf-8") as f:
+        with open(filepath, "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(nodes_to_write))
 
         self.batch_file_paths.append(filepath)
@@ -832,7 +832,7 @@ class Collector:
         no_w_li.txt（分片链接）、ljck.txt（黑名单）、SHA 缓存。
         """
         if self.unique_nodes:
-            with open("no.txt", "w", encoding="utf-8") as f:
+            with open("no.txt", "w", encoding="utf-8", errors="replace") as f:
                 f.write("\n".join(self.unique_nodes))
             print(f"[{now_str()}] 保存 no.txt ({len(self.unique_nodes)} 条)", flush=True)
 
@@ -853,13 +853,13 @@ class Collector:
             file_count += 1
             filename = f"{file_count}.txt"
             filepath = os.path.join(no_dir, filename)
-            with open(filepath, "w", encoding="utf-8") as f:
+            with open(filepath, "w", encoding="utf-8", errors="replace") as f:
                 f.write("\n".join(chunk))
             no_w_links.append(
                 f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{filename}"
             )
 
-        with open("no_w_li.txt", "w", encoding="utf-8") as f:
+        with open("no_w_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(no_w_links))
         print(f"[{now_str()}] 保存 no_w_li.txt ({file_count} 分片)", flush=True)
 
@@ -868,5 +868,5 @@ class Collector:
             f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no.txt"
         )
         self.all_links = list(dict.fromkeys(self.all_links))
-        with open("no_li.txt", "w", encoding="utf-8") as f:
+        with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(self.all_links))

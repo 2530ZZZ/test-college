@@ -33,7 +33,7 @@ def save_alive_nodes(node_uris: List[str], output_path: str = None):
         output_path: 输出文件路径，默认 config.ALIVE_NODE_FILE
     """
     path = output_path or ALIVE_NODE_FILE
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8", errors="replace") as f:
         if node_uris:
             f.write("\n".join(node_uris))
     print(f"[{now_str()}] 保存 {path} ({len(node_uris)} 个节点)", flush=True)
