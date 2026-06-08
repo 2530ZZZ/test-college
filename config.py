@@ -29,11 +29,11 @@ MAX_TOTAL_RATE_LIMIT_WAIT = 600
 
 # 每个关键词搜索的最大页数
 # 默认 3，取值范围 1-10。每页 30 条，3 页 = 最多 90 个仓库。
-MAX_PAGES = 3
+MAX_PAGES = 5
 
 # 每页搜索结果数
 # 默认 30，取值范围 1-100（GitHub API 上限）。
-PER_PAGE = 30
+PER_PAGE = 50
 
 # 仓库间休眠（秒），避免连续请求触发限流
 # 默认 0.5，取值范围 0.1-2.0。
@@ -120,7 +120,102 @@ USE_RECURSIVE_TREE = True
 # 基础搜索关键词列表（纯文本，不含时间/语言限定符）
 # 每个关键词会附加 pushed:>24h 时间限定，确保只搜索最近活跃的仓库。
 BASE_QUERIES = [
-    "free v2ray nodes",
+        # ==================== 1. 基础高频 ====================
+        "free nodes",
+        "free proxy nodes",
+        "free v2ray nodes",
+        "free clash nodes",
+        "free trojan nodes",
+        "free hysteria nodes",
+        "free vless nodes",
+        "free hysteria2 nodes",
+        "free tuic nodes",
+        "free reality nodes",
+        "free singbox nodes",
+        "free shadowsocks nodes",
+        "free wireguard nodes",
+        "free proxy list",
+        "free proxy subscription",
+        "free proxy config",
+        "free proxy yaml",
+        "free proxy json",
+        "free proxy base64",
+        # ==================== 2. 主流项目 ====================
+        "ACL4SSR",
+        "subconverter",
+        "v2rayN",
+        "v2rayNG",
+        "Clash.Meta",
+        "mihomo",
+        "Hiddify",
+        "Shadowrocket",
+        "Quantumult X",
+        "Stash",
+        "clash verge",
+        "clash verge rev",
+        "v2rayA",
+        "Nekoray",
+        "Nekobox",
+        "FlClash",
+        # ==================== 3. 订阅相关 ====================
+        "free subscription github",
+        "daily subscription",
+        "base64 subscription",
+        "free sub",
+        "v2ray sub",
+        "clash sub",
+        "trojan sub",
+        "ss sub",
+        "ssr sub",
+        "sing-box sub",
+        "hysteria sub",
+        "tuic sub",
+        "sub list",
+        "sub store",
+        "sub collection",
+        # ==================== 4. 中文高频 ====================
+        "免费节点",
+        "免费clash订阅",
+        "免费v2ray订阅",
+        "免费机场节点",
+        "节点订阅",
+        "免费机场",
+        "科学上网",
+        "梯子",
+        "代理",
+        "免费ssr节点",
+        "免费vless节点",
+        "免费reality节点",
+        "免费tuic节点",
+        "免费singbox节点",
+        "免费翻墙",
+        "公益节点",
+        "节点分享",
+        "节点仓库",
+        "每日节点",
+        "免费节点合集",
+        # ==================== 5. 混合 OR 组合 ====================
+        "免费 (clash OR v2ray OR trojan) (订阅 OR 节点 OR 机场)",
+        "clash (订阅 OR 配置 OR 节点) github",
+        "v2ray (订阅 OR 配置 OR 节点) github",
+        "trojan (订阅 OR 配置 OR 节点) github",
+        "hysteria (订阅 OR 配置 OR 节点) github",
+        "hysteria2 (订阅 OR 配置 OR 节点) github",
+        "tuic (订阅 OR 配置 OR 节点) github",
+        "singbox (订阅 OR 配置 OR 节点) github",
+        # ==================== 6. 收集器/项目名 ====================
+        "TelegramV2rayCollector",
+        "ProxyCollector",
+        "V2RAY-CLASH-BASE64-Subscription",
+        "free airport nodes",
+        "free shadowrocket nodes",
+        "free hiddify nodes",
+        "free v2rayng nodes",
+        "free clash meta nodes",
+        "free mihomo nodes",
+        "free proxy scraper",
+        "free proxy spider",
+        "free proxy bot",
 ]
 
 # 是否包含 fork 仓库
@@ -213,7 +308,7 @@ MIHOMO_API_PORT = 9090
 
 # 是否启用测速。若关闭，则只搜集节点并保存，不执行 subs-check 测速。
 # 默认 True。如果测速环境不可用（如 GitHub Actions 网络受限），设为 False。
-SPEED_TEST_ENABLED = True
+SPEED_TEST_ENABLED = False
 
 # ==================== subs-check 测速配置 ====================
 

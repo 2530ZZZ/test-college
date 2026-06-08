@@ -1,7 +1,7 @@
 name: 动态搜集 + 测速
 on:
   schedule:
-    - cron: '0 */6 * * *'   # 每  6 小时一次
+    - cron: '37 14 * * *'   # UTC 14:37 → 北京时间 22:37
   workflow_dispatch:
 
 jobs:
