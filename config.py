@@ -223,7 +223,7 @@ SUBS_CHECK_BIN = "subs-check"
 
 # 每批节点数（边搜集边测速模式下，每凑够此数量就持久化并投喂给 subs-check）
 # 默认 10000，取值范围 1000-50000。值越小单批越快但启动开销占比高。
-SUBS_CHECK_BATCH_SIZE = 2000
+SUBS_CHECK_BATCH_SIZE = 1000
 
 # 最大并发 subs-check 实例数
 # 默认 3，取值范围 1-5。GitHub Actions (2核/7GB) 不建议超过 3。
@@ -231,7 +231,7 @@ SUBS_CHECK_MAX_CONCURRENT = 3
 
 # 单批次测速超时（秒）
 # 默认 1200（20 分钟），取值范围 300-18000。超时后 kill 进程并标记该批次失败。
-SUBS_CHECK_BATCH_TIMEOUT = 1200
+SUBS_CHECK_BATCH_TIMEOUT = 18000
 
 # subs-check 实例起始端口
 # 默认 7890，每个并发实例递增 10 避免端口冲突。
