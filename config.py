@@ -79,9 +79,13 @@ BLACKLIST_FILE = "ljck.txt"
 # 存储已处理文件 SHA → 时间戳的 pickle 字典。跨运行持久化。
 SHA_CACHE_FILE = "sha_cache.pkl"
 
-# SHA 缓存保留天数
-# 默认 7。超过此天数的缓存条目将被清理，释放磁盘空间。
-SHA_CACHE_TTL_DAYS = 7
+# SHA 缓存最大条目数
+# SHA 是内容哈希，内容不变则 SHA 不变，缓存应长期保留。
+# 有上限时文件大小固定，不会随时间无限增长。
+# 默认 1000000（一百万条），约 4MB 文件、200MB 内存。GA 7GB 内存下完全可接受。
+# 加载耗时约 0.2 秒，查重为微秒级。
+# 取值范围 50000-5000000。超过 500 万条时注意内存占用 (~1GB)。
+SHA_CACHE_MAX_ENTRIES = 1000000
 
 # 单仓库最大候选文件处理数，None 表示不限制
 # 默认 None。限制值可设为 50，避免超大仓库消耗过多资源。
@@ -304,6 +308,22 @@ MIHOMO_BIN = "mihomo"
 MIHOMO_MIXED_PORT = 7890
 MIHOMO_API_PORT = 9090
 
+# ==================== TCP 预筛选 ====================
+
+# 是否在保存 alive.txt 前进行 TCP 端口预筛选
+# 快速过滤明显不可达的节点（端口未开放、服务器宕机等）。
+# 注意：TCP 通 ≠ 节点可用，TCP 不通 = 节点一定不可用。
+# 数据中心 IP（如 GitHub Actions）下大部分免费节点会屏蔽 TCP 连接。
+TCP_PRESCREEN_ENABLED = False
+
+# TCP 连接超时（秒）
+# 默认 2.0，取值范围 0.5-5.0。越小越快但可能漏掉高延迟节点。
+TCP_PRESCREEN_TIMEOUT = 2.0
+
+# TCP 扫描并发线程数
+# 默认 500，取值范围 50-2000。
+TCP_PRESCREEN_WORKERS = 500
+
 # ==================== 测速开关 ====================
 
 # 是否启用测速。若关闭，则只搜集节点并保存，不执行 subs-check 测速。
@@ -318,7 +338,7 @@ SUBS_CHECK_BIN = "subs-check"
 
 # 每批节点数（边搜集边测速模式下，每凑够此数量就持久化并投喂给 subs-check）
 # 默认 10000，取值范围 1000-50000。值越小单批越快但启动开销占比高。
-SUBS_CHECK_BATCH_SIZE = 1000
+SUBS_CHECK_BATCH_SIZE = 10000
 
 # 最大并发 subs-check 实例数
 # 默认 3，取值范围 1-5。GitHub Actions (2核/7GB) 不建议超过 3。

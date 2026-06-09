@@ -111,3 +111,106 @@ def timeout_decorator(seconds: int):
 
         return wrapper
     return decorator
+
+
+# ==================== TCP 预筛选 ====================
+
+import socket
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Tuple, Optional
+
+
+def parse_host_port(node_str: str) -> Tuple[Optional[str], Optional[int]]:
+    """从节点 URI 中提取 host 和 port。
+
+    Args:
+        node_str: 原始节点 URI，如 vmess://xxx、ss://xxx、trojan://pass@host:port
+
+    Returns:
+        (host, port) 如果无法解析返回 (None, None)
+    """
+    import urllib.parse
+    try:
+        if "://" not in node_str:
+            return None, None
+        # 对于标准 URI（trojan、vless、hysteria2 等）
+        if "@" in node_str:
+            # trojan://password@host:port
+            # ss://method:password@host:port
+            after_at = node_str.split("@", 1)[1]
+            if "?" in after_at:
+                after_at = after_at.split("?")[0]
+            if "#" in after_at:
+                after_at = after_at.split("#")[0]
+            if ":" in after_at:
+                host, port_str = after_at.rsplit(":", 1)
+                return host, int(port_str)
+        else:
+            # ss://base64 或 vmess://base64（以 base64 起始，不包含 @）
+            # 尝试 URL 解码
+            parsed = urllib.parse.urlparse(node_str)
+            if parsed.hostname and parsed.port:
+                return parsed.hostname, parsed.port
+    except Exception:
+        pass
+    return None, None
+
+
+def tcp_check(host: str, port: int, timeout: float = 2.0) -> bool:
+    """检查指定主机和端口是否可达。
+
+    Args:
+        host: IP 或域名
+        port: 端口号
+        timeout: 连接超时秒数
+
+    Returns:
+        True 如果 TCP 连接成功
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((host, port))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
+
+
+def tcp_prescreen(node_list: List[str], timeout: float = 2.0,
+                  max_workers: int = 500) -> List[str]:
+    """TCP 端口预筛选：从节点列表中过滤出 TCP 可达的节点。
+
+    使用线程池并发连接，适合快速过滤明显不可达的节点。
+
+    Args:
+        node_list: 节点 URI 字符串列表
+        timeout: 单次 TCP 连接超时（秒）
+        max_workers: 并发线程数
+
+    Returns:
+        TCP 可达的节点 URI 列表
+    """
+    if not node_list:
+        return []
+
+    alive = []
+    tasks = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for node in node_list:
+            host, port = parse_host_port(node)
+            if host and port:
+                tasks[executor.submit(tcp_check, host, port, timeout)] = node
+            else:
+                alive.append(node)  # 无法解析的节点默认放行
+
+        for future in as_completed(tasks):
+            node = tasks[future]
+            try:
+                if future.result():
+                    alive.append(node)
+            except Exception:
+                pass
+
+    return alive

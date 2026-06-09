@@ -30,7 +30,7 @@ from config import (
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     MAX_RAW_DOWNLOADS_PER_REPO,
-    SHA_CACHE_FILE, SHA_CACHE_TTL_DAYS,
+    SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
     README_SPAM_KEYWORDS, ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, SUBS_CHECK_BATCH_SIZE, BATCH_DIR,
 )
@@ -120,12 +120,17 @@ class Collector:
                 self.sha_cache = {}
 
     def save_sha_cache(self):
-        """保存 SHA 缓存，并清理过期条目。
+        """保存 SHA 缓存，按数量上限清理。
 
-        使用 TTL（SHA_CACHE_TTL_DAYS）清理，防止文件无限增长。
+        策略：
+          1. 按时间戳排序，保留最近的 SHA_CACHE_MAX_ENTRIES 条
+          2. 同时清理 30 天前的条目（安全兜底）
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(days=SHA_CACHE_TTL_DAYS)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         self.sha_cache = {sha: ts for sha, ts in self.sha_cache.items() if ts > cutoff}
+        if len(self.sha_cache) > SHA_CACHE_MAX_ENTRIES:
+            sorted_items = sorted(self.sha_cache.items(), key=lambda x: x[1], reverse=True)
+            self.sha_cache = dict(sorted_items[:SHA_CACHE_MAX_ENTRIES])
         try:
             with open(SHA_CACHE_FILE, 'wb') as f:
                 pickle.dump(self.sha_cache, f)
@@ -170,8 +175,9 @@ class Collector:
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
         os.makedirs(batch_dir, exist_ok=True)
         filepath = os.path.join(batch_dir, f"no_batch_{seq:04d}.txt")
-        with open(filepath, "w", encoding="utf-8", errors="replace") as f:
-            f.write("\n".join(nodes_to_write))
+        text = "\n".join(nodes_to_write).encode("utf-8", errors="replace").decode("utf-8")
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(text)
 
         self.batch_file_paths.append(filepath)
         print(f"[{now_str()}] 📦 批次 {seq:04d} 已持久化: "
@@ -214,6 +220,12 @@ class Collector:
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
         loop_exception = None
+
+        # 清空上次运行的批次文件，旧的节点已过时
+        batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
+        if os.path.exists(batch_dir):
+            shutil.rmtree(batch_dir)
+        os.makedirs(batch_dir, exist_ok=True)
 
         try:
             for idx, query in enumerate(self.queries, 1):
@@ -833,33 +845,32 @@ class Collector:
         """
         if self.unique_nodes:
             with open("no.txt", "w", encoding="utf-8", errors="replace") as f:
-                f.write("\n".join(self.unique_nodes))
+                text = "\n".join(self.unique_nodes).encode("utf-8", errors="replace").decode("utf-8")
+                f.write(text)
             print(f"[{now_str()}] 保存 no.txt ({len(self.unique_nodes)} 条)", flush=True)
 
-        # 分片文件
+        # 分片文件（节点 URI 同样需要清除非法字符）
         no_dir = "no"
         if os.path.exists(no_dir):
             shutil.rmtree(no_dir)
         os.makedirs(no_dir, exist_ok=True)
-
         nodes_list = list(self.unique_nodes)
         file_count = 0
         no_w_links = []
         repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
         branch_name = os.getenv("GITHUB_REF_NAME", "main")
-
         for i in range(0, len(nodes_list), CHUNK_SIZE):
             chunk = nodes_list[i:i + CHUNK_SIZE]
             file_count += 1
             filename = f"{file_count}.txt"
             filepath = os.path.join(no_dir, filename)
-            with open(filepath, "w", encoding="utf-8", errors="replace") as f:
-                f.write("\n".join(chunk))
+            chunk_text = "\n".join(chunk).encode("utf-8", errors="replace").decode("utf-8")
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(chunk_text)
             no_w_links.append(
-                f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{filename}"
-            )
 
-        with open("no_w_li.txt", "w", encoding="utf-8", errors="replace") as f:
+        # no_w_li.txt 中的链接不含非法字符，直接写入
+        with open("no_w_li.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(no_w_links))
         print(f"[{now_str()}] 保存 no_w_li.txt ({file_count} 分片)", flush=True)
 

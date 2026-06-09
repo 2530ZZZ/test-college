@@ -33,6 +33,7 @@ from config import (
     LOG_DIR, MAX_LOG_FILES,
     SUBS_CHECK_BATCH_SIZE, SUBS_CHECK_MAX_CONCURRENT,
     SUBS_CHECK_BIN, SPEED_TEST_ENABLED,
+    TCP_PRESCREEN_ENABLED, TCP_PRESCREEN_TIMEOUT, TCP_PRESCREEN_WORKERS,
 )
 
 
@@ -183,11 +184,22 @@ def main():
         alive_uris = list(collector.unique_nodes)
         results, errors = {}, {}
 
-    # ---- 阶段 4: 输出 ----
-    # 4.1 alive.txt
+    # ---- 阶段 4: TCP 预筛选 ----
+    if TCP_PRESCREEN_ENABLED and alive_uris:
+        from utils import tcp_prescreen
+        print(f"[{now_str()}] 🔍 TCP 预筛选: {len(alive_uris)} 个节点 "
+              f"(超时={TCP_PRESCREEN_TIMEOUT}s, 并发={TCP_PRESCREEN_WORKERS})", flush=True)
+        t0 = time.time()
+        alive_uris = tcp_prescreen(alive_uris, TCP_PRESCREEN_TIMEOUT, TCP_PRESCREEN_WORKERS)
+        elapsed = time.time() - t0
+        print(f"[{now_str()}] TCP 预筛选完成: {len(alive_uris)} 个存活 "
+              f"(耗时 {elapsed:.1f}s)", flush=True)
+
+    # ---- 阶段 5: 输出 ----
+    # 5.1 alive.txt
     save_alive_nodes(alive_uris)
 
-    # 4.2 mihomo.yaml
+    # 5.2 mihomo.yaml
     generate_mihomo_yaml(alive_uris)
 
     # 4.3 统计
