@@ -36,7 +36,7 @@ from config import (
     SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, SUBS_CHECK_BATCH_SIZE, BATCH_DIR,
-    SOURCE_STALE_DAYS,
+    SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
     WEB_SEARCH_ENABLED, WEB_SEARCH_ENGINES, WEB_MAX_PAGES, WEB_PER_PAGE,
     WEB_PAGE_SLEEP, WEB_DOWNLOAD_TIMEOUT, WEB_BLACKLIST_FILE, WEB_USER_AGENTS,
     TG_ENABLED, TG_API_ID, TG_API_HASH, TG_MESSAGES_PER_CHANNEL,
@@ -302,10 +302,17 @@ class Collector:
 
     # ==================== 主流程 ====================
 
+    def _runtime_exceeded(self) -> bool:
+        """检查是否超出最大运行时间。GA 6 小时超时前 30 分钟触发。"""
+        if self.max_runtime_seconds is None or self.max_runtime_seconds <= 0:
+            return False
+        return time.time() - self.start_time > self.max_runtime_seconds
+
     def run(self):
         """主入口：多来源搜集 → 持久化。各来源独立运行，互不影响。"""
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
-        start_time = time.time()
+        self.start_time = time.time()
+        self.max_runtime_seconds = MAX_RUNTIME_SECONDS or None
 
         # 加载种子文件
         repo_seeds = self._load_seed_file(SEED_REPOS_FILE)
@@ -357,7 +364,7 @@ class Collector:
             print(f"[{now_str()}] 种子仓库: {len(seed_list)} 个", flush=True)
 
         for repo in seed_list:
-            if self.limiter.should_stop():
+            if self.limiter.should_stop() or self._runtime_exceeded():
                 break
             before = len(self.unique_nodes)
             try:
@@ -375,6 +382,9 @@ class Collector:
         for idx, query in enumerate(self.queries, 1):
             if self.limiter.should_stop():
                 print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
+                break
+            if self._runtime_exceeded():
+                print(f"[{now_str()}] ⏰ 接近 GA 超时，停止搜索", flush=True)
                 break
 
             q_start = time.time()
@@ -581,6 +591,9 @@ class Collector:
 
     def _finalize(self, elapsed_seconds: float = 0):
         """最终保存和统计。即使之前发生错误也能安全调用。"""
+        if self.max_runtime_seconds and elapsed_seconds > self.max_runtime_seconds:
+            print(f"[{now_str()}] ⚠️ 运行时间 {elapsed_seconds:.0f}s 超出上限 "
+                  f"{self.max_runtime_seconds}s（已提前停止搜集）", flush=True)
         try:
             self._flush_batch()
         except Exception as e:
@@ -610,8 +623,8 @@ class Collector:
             query: GitHub 搜索查询字符串
         """
         for page in range(1, MAX_PAGES + 1):
-            # 每次翻页前检查限流
-            if self.limiter.should_stop():
+            # 每次翻页前检查限流和运行时间
+            if self.limiter.should_stop() or self._runtime_exceeded():
                 return
 
             url = (f"https://api.github.com/search/repositories"
