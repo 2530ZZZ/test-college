@@ -7,6 +7,7 @@ on:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       NODE_NO_WARNINGS: "1"

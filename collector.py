@@ -361,7 +361,9 @@ class Collector:
                 break
             before = len(self.unique_nodes)
             try:
-                self.process_repo(repo)
+                # 种子仓库无搜索结果，默认尝试 main，失败则查真实分支
+                self.process_repo(repo, branch="main",
+                                  size=-1, disabled=False, pushed_at="")
             except Exception as e:
                 print(f"[{now_str()}] ⚠️ 种子仓库 {repo}: {e}", flush=True)
             new_nodes = len(self.unique_nodes) - before
@@ -713,6 +715,15 @@ class Collector:
             success = self._process_with_recursive_tree(
                 repo, branch, has_nodes_flag, depth)
             if not success:
+                # 树 API 404 可能是因为分支名不对（种子仓库进来默认是 main），
+                # 懒查真实分支名，只消耗 1 次 API 调用，然后重试
+                actual_branch = self._resolve_branch(repo, branch)
+                if actual_branch and actual_branch != branch:
+                    print(f"[{now_str()}]   分支名修正: {branch} → {actual_branch}", flush=True)
+                    success = self._process_with_recursive_tree(
+                        repo, actual_branch, has_nodes_flag, depth)
+
+            if not success:
                 print(f"[{now_str()}] 树 API 失败，回退到 Contents API", flush=True)
                 try:
                     if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
@@ -847,6 +858,34 @@ class Collector:
             self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
 
         return True
+
+    # ==================== 懒分支名解析 ====================
+
+    def _resolve_branch(self, repo: str, current_branch: str) -> Optional[str]:
+        """懒获取仓库真实分支名。
+
+        只在树 API 失败时调用。搜索结果已自带正确的 default_branch，
+        所以只需处理种子仓库和递归发现的仓库（它们都是进来就默认 main）。
+        每仓库最多消耗 1 次 API 调用。
+
+        Args:
+            repo: 仓库全名
+            current_branch: 当前尝试的分支名
+
+        Returns:
+            真实默认分支名，或 None（API 失败时）
+        """
+        # 搜索结果自带的分支名不需要修正（已验证为正确）
+        if current_branch != "main":
+            return None
+
+        repo_data = self.http.get_json(
+            f"https://api.github.com/repos/{repo}",
+            timeout=FILE_DOWNLOAD_TIMEOUT,
+            operation_name=f"repo info ({repo})")
+        if not repo_data:
+            return None
+        return repo_data.get("default_branch", "main")
 
     # ==================== 仓库级文件变更查询 ====================
 
