@@ -119,6 +119,82 @@ TREE_API_TIMEOUT = (12, 20)
 # 默认 True。一次调用获取全仓库文件树，失败时自动回退到 Contents API 逐层遍历。
 USE_RECURSIVE_TREE = True
 
+# ==================== 种子仓库 ====================
+
+# 种子仓库文件路径（JSON 数组，每行一个 "owner/repo"）
+# 作为数据文件独立存储，与代码分离，便于动态更新。
+# 系统每次运行会将此文件中的仓库加入处理队列，并通过 sources.json 追踪产出。
+SEED_REPOS_FILE = "seed_repos.json"
+
+# ==================== 来源种子管理 ====================
+
+# 来源淘汰天数
+# 默认 7。超过此天数未产生新节点的来源视为失效，自动从种子文件移除。
+# 种子文件（seed_repos.json / seed_channels.json）直接存储来源及元数据，
+# 每次运行时由系统自动更新和清理。
+SOURCE_STALE_DAYS = 7
+
+# ==================== 网页搜索配置 ====================
+
+# 是否启用网页搜索（搜索引擎抓取）
+# 默认 False。需要配合 WEB_SEARCH_ENGINES 使用。
+WEB_SEARCH_ENABLED = False
+
+# 搜索引擎列表（可多选）
+# 支持: "google", "bing", "duckduckgo", "yandex"
+# 每个引擎的搜索结果都会被下载和提取。
+WEB_SEARCH_ENGINES = ["duckduckgo", "bing"]
+
+# 每个关键词搜索的最大页数
+# 默认 2，取值范围 1-5。
+WEB_MAX_PAGES = 2
+
+# 每页搜索结果数
+# 默认 30，取值范围 10-100。
+WEB_PER_PAGE = 30
+
+# 搜索结果页间休眠（秒）
+# 默认 3.0，取值范围 1.0-10.0。
+WEB_PAGE_SLEEP = 3.0
+
+# 搜索结果 URL 下载超时（秒）
+# 默认 (8, 15)。
+WEB_DOWNLOAD_TIMEOUT = (8, 15)
+
+# 网页 URL 黑名单文件路径
+# 存储已知无节点或广告网站的域名，每行一个。跨运行持久化。
+WEB_BLACKLIST_FILE = "web_blacklist.txt"
+
+# User-Agent 轮换池（搜索引擎爬取时随机选取，避免被反爬）
+WEB_USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+]
+
+# ==================== Telegram 抓取配置 ====================
+
+# 是否启用 Telegram 频道抓取
+# 默认 False。需要申请 Telegram API ID 和 API Hash。
+TG_ENABLED = False
+
+# Telegram API 凭证（从 my.telegram.org 申请）
+TG_API_ID = ""        # 数字 ID
+TG_API_HASH = ""      # 字符串 Hash
+
+# 每次从每个频道抓取的消息数
+# 默认 200，取值范围 50-500。
+TG_MESSAGES_PER_CHANNEL = 200
+
+# 频道间休眠（秒）
+TG_CHANNEL_SLEEP = 2.0
+
+# TG 频道种子文件路径（JSON 对象，{"channels": ["@channel1", ...]}）
+# 作为数据文件独立存储，与代码分离，便于动态更新。
+# 系统每次运行会将此文件中的频道加入抓取队列，并通过 sources.json 追踪产出。
+TG_CHANNELS_FILE = "seed_channels.json"
+
 # ==================== 搜索关键词 ====================
 
 # 基础搜索关键词列表（纯文本，不含时间/语言限定符）

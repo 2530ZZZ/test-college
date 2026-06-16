@@ -14,10 +14,13 @@ GitHub 节点收集器 — 使用 git/trees API 获取递归文件树，
 
 import os
 import time
+import json
+import random
 import shutil
 import re
 import pickle
 import threading
+from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from typing import List, Set, Optional, Tuple, Dict
@@ -26,18 +29,22 @@ from config import (
     GITHUB_TOKEN, MAX_PAGES, PER_PAGE, REPO_SLEEP_SECONDS, PAGE_SLEEP_SECONDS,
     REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, FILE_PROCESS_TIMEOUT,
     ALLOWED_EXTENSIONS, BLACKLIST_FILE,
-    SEARCH_TIMEOUT, REPO_INFO_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
+    SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
-    MAX_RAW_DOWNLOADS_PER_REPO,
+    MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
     SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
-    README_SPAM_KEYWORDS, ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
+    ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, SUBS_CHECK_BATCH_SIZE, BATCH_DIR,
+    SOURCE_STALE_DAYS,
+    WEB_SEARCH_ENABLED, WEB_SEARCH_ENGINES, WEB_MAX_PAGES, WEB_PER_PAGE,
+    WEB_PAGE_SLEEP, WEB_DOWNLOAD_TIMEOUT, WEB_BLACKLIST_FILE, WEB_USER_AGENTS,
+    TG_ENABLED, TG_API_ID, TG_API_HASH, TG_MESSAGES_PER_CHANNEL,
+    TG_CHANNEL_SLEEP, TG_CHANNELS_FILE,
 )
 from http_client import HttpClient, RateLimiter
 from parsers import extract_all_strategies
 from utils import now_str, timeout_decorator
-from uri_parser import validate_candidate
 
 
 class Collector:
@@ -141,7 +148,7 @@ class Collector:
         """检查文件 SHA 是否从未处理过。
 
         SHA 是 Git 内容哈希 — 相同 SHA 永远意味着相同内容。
-        一旦处理过就永久跳过，不再需要 Commits API 验证时间。
+        命中时将时间戳更新为当前时间（LRU），保证高频 SHA 不会被淘汰。
 
         Args:
             sha: Git blob SHA
@@ -150,6 +157,7 @@ class Collector:
             True 表示需要处理（新内容），False 表示已处理过可跳过
         """
         if sha in self.sha_cache:
+            self.sha_cache[sha] = datetime.now(timezone.utc)  # LRU: 更新时间戳
             return False  # 已处理，跳过
         self.sha_cache[sha] = datetime.now(timezone.utc)
         return True  # 新内容，需要处理
@@ -213,51 +221,361 @@ class Collector:
         if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
             self._flush_batch()
 
+    # ==================== 种子文件管理 ====================
+    # 种子文件（seed_repos.json / seed_channels.json）直接存储来源及其元数据。
+    # 每次运行直接更新这些文件：有产出来源刷新时间戳，无产出来源被淘汰。
+    # 不再需要中间层 sources.json。
+
+    @staticmethod
+    def _load_seed_file(filepath: str) -> dict:
+        """加载种子文件，返回 {source_key: metadata_dict}。
+        兼容旧格式（纯字符串数组）和新格式（带元数据的对象）。
+        """
+        import json
+        if not os.path.exists(filepath):
+            return {}
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return {}
+
+        result = {}
+        # 新格式：{"repos": {"key": {"last_new_node": "...", ...}}}
+        # 或      {"channels": {"key": {"last_new_node": "...", ...}}}
+        for container_key in ("repos", "channels"):
+            if container_key in data and isinstance(data[container_key], dict):
+                for key, meta in data[container_key].items():
+                    if isinstance(meta, dict):
+                        result[key] = meta
+                    else:
+                        result[key] = {}  # 旧格式无元数据
+        # 旧格式：纯数组 ["key1", "key2", ...]
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, str):
+                    result[item] = {}
+        return result
+
+    @staticmethod
+    def _save_seed_file(filepath: str, container_key: str, seeds: dict):
+        """保存种子文件。"""
+        import json
+        try:
+            data = {container_key: seeds,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "pruning_days": SOURCE_STALE_DAYS}
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[{now_str()}] ⚠️ 保存 {filepath} 失败: {e}", flush=True)
+
+    @staticmethod
+    def _update_seed_entry(seeds: dict, key: str, new_node_count: int):
+        """更新种子条目：有新节点则刷新时间戳。"""
+        if key not in seeds:
+            seeds[key] = {}
+        if new_node_count > 0:
+            seeds[key]["last_new_node"] = datetime.now(timezone.utc).isoformat()
+            seeds[key]["total_new_nodes"] = (seeds[key].get("total_new_nodes", 0)
+                                              + new_node_count)
+
+    @staticmethod
+    def _prune_seeds(seeds: dict) -> dict:
+        """淘汰超过 SOURCE_STALE_DAYS 天无产出的种子。"""
+        cutoff = datetime.now(timezone.utc) - timedelta(days=SOURCE_STALE_DAYS)
+        pruned = {}
+        for key, meta in seeds.items():
+            last = meta.get("last_new_node", "")
+            if not last:
+                pruned[key] = meta  # 首次加入，保留
+                continue
+            try:
+                if datetime.fromisoformat(last) > cutoff:
+                    pruned[key] = meta
+            except Exception:
+                pruned[key] = meta  # 解析失败保留
+        removed = len(seeds) - len(pruned)
+        if removed:
+            print(f"[{now_str()}] 淘汰 {removed} 个过期种子", flush=True)
+        return pruned
+
     # ==================== 主流程 ====================
 
     def run(self):
-        """主入口：搜索 → 遍历仓库 → 提取节点 → 持久化。"""
+        """主入口：多来源搜集 → 持久化。各来源独立运行，互不影响。"""
         print(f"[{now_str()}] 🚀 程序启动", flush=True)
         start_time = time.time()
-        loop_exception = None
 
-        # 清空上次运行的批次文件，旧的节点已过时
+        # 加载种子文件
+        repo_seeds = self._load_seed_file(SEED_REPOS_FILE)
+        channel_seeds = self._load_seed_file(TG_CHANNELS_FILE)
+
+        # 清空上次运行的批次文件
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
         if os.path.exists(batch_dir):
             shutil.rmtree(batch_dir)
         os.makedirs(batch_dir, exist_ok=True)
 
+        # ── 来源 1: GitHub 搜索 ──
         try:
-            for idx, query in enumerate(self.queries, 1):
-                # 检查限流状态
-                if self.limiter.should_stop():
-                    print(f"[{now_str()}] ⚠️ 限流超限，终止搜索 "
-                          f"(累计 {self.limiter.total_wait:.0f}s)", flush=True)
-                    break
-
-                q_start = time.time()
-                print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
-
-                try:
-                    self.search_query(query)
-                except RuntimeError:
-                    print(f"[{now_str()}] ⚠️ 限流超限，立即终止所有搜索", flush=True)
-                    break
-
-                print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
-
+            self._collect_github(repo_seeds)
         except Exception as e:
-            print(f"[{now_str()}] ❌ 搜索过程异常: {e}", flush=True)
-            loop_exception = e
+            print(f"[{now_str()}] ❌ GitHub 搜集崩溃: {e}", flush=True)
+            import traceback; traceback.print_exc()
+
+        # ── 来源 2: 网页搜索 ──
+        if WEB_SEARCH_ENABLED:
+            try:
+                self._collect_web()
+            except Exception as e:
+                print(f"[{now_str()}] ❌ 网页搜集崩溃: {e}", flush=True)
+                import traceback; traceback.print_exc()
+
+        # ── 来源 3: Telegram 抓取 ──
+        if TG_ENABLED:
+            try:
+                self._collect_telegram(channel_seeds)
+            except Exception as e:
+                print(f"[{now_str()}] ❌ TG 搜集崩溃: {e}", flush=True)
+                import traceback; traceback.print_exc()
+
+        # ── 淘汰无产出来源并写回种子文件 ──
+        repo_seeds = self._prune_seeds(repo_seeds)
+        channel_seeds = self._prune_seeds(channel_seeds)
+        self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
+        self._save_seed_file(TG_CHANNELS_FILE, "channels", channel_seeds)
+
+        # ── 最终保存 ──
+        self._finalize(elapsed_seconds=time.time() - start_time)
+
+    def _collect_github(self, repo_seeds: dict):
+        """GitHub 搜索收集。先处理种子仓库，再搜索关键词。"""
+        # ── 处理种子仓库 ──
+        seed_list = list(repo_seeds.keys())
+        if seed_list:
+            print(f"[{now_str()}] 种子仓库: {len(seed_list)} 个", flush=True)
+
+        for repo in seed_list:
+            if self.limiter.should_stop():
+                break
+            before = len(self.unique_nodes)
+            try:
+                self.process_repo(repo)
+            except Exception as e:
+                print(f"[{now_str()}] ⚠️ 种子仓库 {repo}: {e}", flush=True)
+            new_nodes = len(self.unique_nodes) - before
+            self._update_seed_entry(repo_seeds, repo, new_nodes)
+            time.sleep(REPO_SLEEP_SECONDS)
+
+        # 再搜索关键词
+        print(f"[{now_str()}] 🔎 开始 GitHub 搜索 ({len(self.queries)} 个关键词)", flush=True)
+        for idx, query in enumerate(self.queries, 1):
+            if self.limiter.should_stop():
+                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
+                break
+
+            q_start = time.time()
+            print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
+
+            try:
+                self.search_query(query)
+            except RuntimeError:
+                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
+                break
+
+            print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
+
+    def _collect_web(self):
+        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
+
+        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致：
+        先获取列表，再检查黑名单跳过无效项，不浪费下载请求。
+        """
+        from parsers import extract_all_strategies
+        print(f"[{now_str()}] 🌐 开始网页搜索 "
+              f"(引擎={WEB_SEARCH_ENGINES}, 关键词={len(self.queries)})", flush=True)
+
+        blacklist = set()
+        if os.path.exists(WEB_BLACKLIST_FILE):
+            with open(WEB_BLACKLIST_FILE, "r", encoding="utf-8") as f:
+                blacklist = {line.strip() for line in f if line.strip()}
+
+        for engine in WEB_SEARCH_ENGINES:
+            for query in self.queries[:10]:  # 减少网络搜索关键词数量
+                if self.limiter.should_stop():
+                    return
+
+                for page in range(1, WEB_MAX_PAGES + 1):
+                    search_url = self._build_search_url(engine, query, page)
+                    if not search_url:
+                        continue
+
+                    # UA 轮换：HttpClient.get() 使用 self.headers 构造请求头，
+                    # headers 属性从 self.user_agent 取值 -> 设置 user_agent 属性即可
+                    self.http.user_agent = random.choice(WEB_USER_AGENTS)
+
+                    print(f"[{now_str()}]   搜索: [{engine}] {query} (第{page}页)", flush=True)
+                    resp = self.http.get(search_url, timeout=WEB_DOWNLOAD_TIMEOUT,
+                                         operation_name=f"web[{engine}]")
+                    if not resp:
+                        if page == 1:
+                            break  # 首页失败说明引擎不可用，跳过
+                        else:
+                            continue  # 后续页失败可能是翻页到末尾，继续其他关键词
+
+                    # 提取搜索结果中的 URL
+                    result_urls = self._parse_search_results(resp.text, engine)
+                    for url in result_urls:
+                        domain = url.split("/")[2] if "://" in url else url
+                        if domain in blacklist:
+                            continue
+
+                        content_resp = self.http.get(url, timeout=WEB_DOWNLOAD_TIMEOUT,
+                                                     operation_name=f"web dl: {url[:60]}")
+                        if not content_resp:
+                            continue
+
+                        before = len(self.unique_nodes)
+                        proxies = extract_all_strategies(content_resp.text)
+                        for p in proxies:
+                            if not p.is_valid():
+                                continue
+                            dedup_key = p.dedup_key(DEDUP_STRATEGY)
+                            if dedup_key not in self.global_dedup_keys:
+                                self.global_dedup_keys.add(dedup_key)
+                                node_uri = p.to_uri()
+                                self.unique_nodes.add(node_uri)
+                                self.batch_buffer.append(node_uri)
+                                if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
+                                    self._flush_batch()
+
+                        new_nodes = len(self.unique_nodes) - before
+                        if new_nodes > 0:
+                            print(f"[{now_str()}]     ✅ {url[:80]}: +{new_nodes} 个节点", flush=True)
+                            blacklist_pending.pop(domain, None)  # 成功则重置计数
+                        else:
+                            print(f"[{now_str()}]     ⚪ {url[:80]}: 无新节点", flush=True)
+                            blacklist.add(domain)
+
+                    time.sleep(WEB_PAGE_SLEEP)
+
+        # 保存黑名单
+        with open(WEB_BLACKLIST_FILE, "w", encoding="utf-8") as f:
+            f.write("\n".join(blacklist))
+
+    def _collect_telegram(self, channel_seeds: dict):
+        """Telegram 频道抓取。
+
+        Telethon 是异步库，这里用 asyncio.run() 在同步上下文中运行异步逻辑。
+        如果 session 文件首次使用，需要交互式输入，故 GA 环境需预先建立 session。
+        """
+        import asyncio
+        print(f"[{now_str()}] 📱 开始 TG 抓取", flush=True)
+        asyncio.run(self._collect_telegram_async(channel_seeds))
+
+    async def _collect_telegram_async(self, channel_seeds: dict):
+        """TG 抓取异步实现。"""
+        try:
+            from telethon import TelegramClient
+            from telethon.errors import FloodWaitError
+        except ImportError:
+            print(f"[{now_str()}] ⚠️ telethon 未安装，跳过 TG 抓取", flush=True)
+            return
+
+        if not TG_API_ID or not TG_API_HASH:
+            print(f"[{now_str()}] ⚠️ TG API 凭证未配置，跳过", flush=True)
+            return
+
+        from parsers import extract_all_strategies
+
+        tg_channels = list(channel_seeds.keys())
+        if not tg_channels:
+            print(f"[{now_str()}] ⚠️ 无 TG 频道种子", flush=True)
+            return
+        print(f"[{now_str()}] TG 频道: {len(tg_channels)} 个", flush=True)
+
+        client = TelegramClient("tg_session", int(TG_API_ID), TG_API_HASH)
+        try:
+            await client.start()
+
+            for channel in tg_channels:
+                before = len(self.unique_nodes)
+                try:
+                    messages = await client.get_messages(channel, limit=TG_MESSAGES_PER_CHANNEL)
+                    for msg in messages:
+                        text = msg.text or ""
+                        proxies = extract_all_strategies(text)
+                        for p in proxies:
+                            if not p.is_valid():
+                                continue
+                            dedup_key = p.dedup_key(DEDUP_STRATEGY)
+                            if dedup_key not in self.global_dedup_keys:
+                                self.global_dedup_keys.add(dedup_key)
+                                node_uri = p.to_uri()
+                                self.unique_nodes.add(node_uri)
+                                self.batch_buffer.append(node_uri)
+                                if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
+                                    self._flush_batch()
+
+                    new_nodes = len(self.unique_nodes) - before
+                    print(f"[{now_str()}]   {channel}: +{new_nodes} 个节点", flush=True)
+                    self._update_seed_entry(channel_seeds, channel, new_nodes)
+                except FloodWaitError as e:
+                    print(f"[{now_str()}]   {channel}: Flood wait {e.seconds}s，跳过", flush=True)
+                except Exception as e:
+                    print(f"[{now_str()}]   {channel}: 抓取失败 ({e})", flush=True)
+
+                time.sleep(TG_CHANNEL_SLEEP)
 
         finally:
-            # 无论搜索过程是否发生错误，都尝试保存已搜集的节点
-            self._finalize(elapsed_seconds=time.time() - start_time)
+            client.disconnect()
 
-        # 如果有异常但已保存了节点，不重新抛出（让主线程继续处理测速）
-        if loop_exception:
-            print(f"[{now_str()}] ⚠️ 搜集阶段已完成（含错误），"
-                  f"已保存 {len(self.unique_nodes)} 个节点", flush=True)
+    # ── 搜索辅助 ──
+
+    @staticmethod
+    def _build_search_url(engine: str, query: str, page: int) -> str:
+        """构建搜索引擎查询 URL。
+
+        各引擎翻页参数：
+          DuckDuckGo: s=N  (N = 结果偏移，每页约 30 条)
+          Bing:       first=N+1 (N = 偏移，1-based)
+          Google:     start=(page-1)*10 (每页固定 10 条，Google 忽略自定义 num)
+          Yandex:     p=N  (N = 页码，0-based)
+        """
+        from urllib.parse import quote
+        q = quote(query)
+        if engine == "duckduckgo":
+            s = (page - 1) * WEB_PER_PAGE
+            return f"https://html.duckduckgo.com/html/?q={q}&s={s}"
+        elif engine == "bing":
+            first = (page - 1) * WEB_PER_PAGE + 1
+            return f"https://www.bing.com/search?q={q}&first={first}&count={WEB_PER_PAGE}"
+        elif engine == "google":
+            start = (page - 1) * 10
+            return f"https://www.google.com/search?q={q}&start={start}&num={WEB_PER_PAGE}"
+        elif engine == "yandex":
+            return f"https://yandex.com/search?text={q}&p={page - 1}"
+        print(f"[{now_str()}] ⚠️ 未知搜索引擎: {engine}", flush=True)
+        return ""
+
+    @staticmethod
+    def _parse_search_results(html: str, engine: str) -> list:
+        """从搜索引擎结果中提取 URL 列表。"""
+        import re
+        urls = set()
+        # 通用方法：提取所有 http/https 链接
+        url_pattern = re.compile(r'https?://[^\s"\'<>]+')
+        for m in url_pattern.finditer(html):
+            url = m.group(0).rstrip('.,;:!?)"\'')
+            # 过滤搜索引擎自身的链接
+            if any(skip in url for skip in
+                   ['google.com', 'bing.com', 'duckduckgo.com',
+                    'yandex.com', 'yandex.ru', '/search', 'microsoft.com']):
+                continue
+            if len(url) > 20 and '://' in url:
+                urls.add(url)
+        return list(urls)[:WEB_PER_PAGE]
 
     def _finalize(self, elapsed_seconds: float = 0):
         """最终保存和统计。即使之前发生错误也能安全调用。"""
@@ -355,7 +673,7 @@ class Collector:
             time.sleep(PAGE_SLEEP_SECONDS)
 
     def process_repo(self, repo: str, branch: str = "main",
-                     size: int = 0, disabled: bool = False,
+                     size: int = -1, disabled: bool = False,
                      pushed_at: str = "", depth: int = 0):
         """处理单个仓库。
 
@@ -868,6 +1186,8 @@ class Collector:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(chunk_text)
             no_w_links.append(
+                f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{filename}"
+            )
 
         # no_w_li.txt 中的链接不含非法字符，直接写入
         with open("no_w_li.txt", "w", encoding="utf-8") as f:
