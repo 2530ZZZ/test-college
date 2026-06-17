@@ -1128,8 +1128,21 @@ class Collector:
             print(f"[{now_str()}] 🔗 递归发现仓库 {full_name} "
                   f"(来源 {source_url})", flush=True)
             self.recursive_count += 1
-            time.sleep(REPO_SLEEP_SECONDS)  # 递归仓库间休眠，避免连续请求触发限流
-            self.process_repo(full_name, depth=depth + 1)
+            time.sleep(REPO_SLEEP_SECONDS)
+            # 递归仓库也先调 repo_info 拿分支名，避免 main→404 模式触发次级限流
+            repo_info = self.http.get_json(
+                f"https://api.github.com/repos/{full_name}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"repo info ({full_name})")
+            if not repo_info or repo_info.get('disabled', False):
+                continue
+            branch = repo_info.get("default_branch", "main")
+            self._branch_cache[full_name] = branch
+            self.process_repo(full_name, branch=branch,
+                              size=repo_info.get("size", -1),
+                              disabled=False,
+                              pushed_at=repo_info.get("pushed_at", ""),
+                              depth=depth + 1)
 
     # ==================== 回退路径：Contents API ====================
 
