@@ -13,8 +13,11 @@ import os
 
 # ==================== GitHub API 认证 ====================
 
-# GitHub Personal Access Token，从环境变量获取
-# 未认证 API 限额 60 次/小时，认证后 5,000 次/小时。强烈建议设置。
+# GitHub 访问令牌，从环境变量获取。
+# ⚠️ GA 内置的 GITHUB_TOKEN 限额仅 1000/小时，本项目一次运行消耗 3000+ 次核心 API。
+# 强烈建议使用 Personal Access Token (PAT) 以获得 5000/小时的额度。
+# 在仓库 Settings → Secrets and variables → Actions → 添加 GH_PAT
+# 然后修改 workflow：GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
 # ==================== 限流控制 ====================

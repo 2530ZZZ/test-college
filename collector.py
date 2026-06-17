@@ -354,7 +354,7 @@ class Collector:
         self._save_seed_file(TG_CHANNELS_FILE, "channels", channel_seeds)
 
         # ── 最终保存 ──
-        self._finalize(elapsed_seconds=time.time() - start_time)
+        self._finalize(elapsed_seconds=time.time() - self.start_time)
 
     def _collect_github(self, repo_seeds: dict):
         """GitHub 搜索收集。先处理种子仓库，再搜索关键词。"""
