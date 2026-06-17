@@ -488,7 +488,10 @@ def extract_all_strategies(text: str, max_depth: int = 3) -> List[StandardProxy]
     Returns:
         StandardProxy 列表（当前文本内已去重）
     """
-    if not text or len(text) > 10_000_000:
+    # 文件大小限制：默认 100MB。超大文件跳过避免 OOM
+    from config import MAX_FILE_SIZE
+    limit = MAX_FILE_SIZE or 100_000_000
+    if not text or len(text) > limit:
         return []
 
     all_proxies = []
