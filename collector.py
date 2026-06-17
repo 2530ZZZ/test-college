@@ -523,9 +523,8 @@ class Collector:
             stats["files_downloaded"] = len(self.processed_file_shas) - _files_before
 
     def _collect_web(self, stats: dict = None):
-        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。"""
-
-        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致：
+        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
+        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致。"""
         先获取列表，再检查黑名单跳过无效项，不浪费下载请求。
         """
         from parsers import extract_all_strategies
