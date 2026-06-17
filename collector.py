@@ -426,6 +426,132 @@ class Collector:
             self.http = saved
 
 
+    # ── 搜集实现 ──
+
+    def _collect_github(self, repo_seeds: dict, stats: dict = None):
+        """GitHub 搜索收集。先处理种子仓库，再搜索关键词。"""
+        if stats is None:
+            stats = {}
+        _repos_before = self.checked_count
+        _files_before = len(self.processed_file_shas)
+
+        # ── 处理种子仓库 ──
+        seed_list = list(repo_seeds.keys())
+        if seed_list:
+            print(f"[{now_str()}] 种子仓库: {len(seed_list)} 个", flush=True)
+
+        for repo in seed_list:
+            if self.limiter.should_stop() or self._runtime_exceeded():
+                break
+            before = len(self.unique_nodes)
+            try:
+                repo_info = self.http.get_json(
+                    f"https://api.github.com/repos/{repo}",
+                    timeout=FILE_DOWNLOAD_TIMEOUT,
+                    operation_name=f"repo info ({repo})")
+                if not repo_info or repo_info.get('disabled', False):
+                    continue
+                branch = repo_info.get("default_branch", "main")
+                self._branch_cache[repo] = branch
+                self.process_repo(repo, branch=branch,
+                                  size=repo_info.get("size", -1),
+                                  disabled=False,
+                                  pushed_at=repo_info.get("pushed_at", ""))
+            except Exception as e:
+                print(f"[{now_str()}] ⚠️ 种子仓库 {repo}: {e}", flush=True)
+            new_nodes = len(self.unique_nodes) - before
+            self._update_seed_entry(repo_seeds, repo, new_nodes)
+            time.sleep(REPO_SLEEP_SECONDS)
+
+        # 再搜索关键词
+        print(f"[{now_str()}] 🔎 开始 GitHub 搜索 ({len(self.queries)} 个关键词)", flush=True)
+        for idx, query in enumerate(self.queries, 1):
+            if self.limiter.should_stop():
+                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
+                break
+            if self._runtime_exceeded():
+                print(f"[{now_str()}] ⏰ 接近 GA 超时，停止搜索", flush=True)
+                break
+            q_start = time.time()
+            print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
+            try:
+                self.search_query(query)
+            except RuntimeError:
+                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
+                break
+            print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
+
+        with self._state_lock:
+            stats["repos_checked"] = self.checked_count - _repos_before
+            stats["files_downloaded"] = len(self.processed_file_shas) - _files_before
+
+    def _collect_web(self, stats: dict = None):
+        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
+        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致。
+        先获取列表，再检查黑名单跳过无效项，不浪费下载请求。"""
+        from parsers import extract_all_strategies
+        if stats is None:
+            stats = {}
+        print(f"[{now_str()}] 🌐 开始网页搜索 "
+              f"(引擎={WEB_SEARCH_ENGINES}, 关键词={len(self.queries)})", flush=True)
+
+        blacklist = set()
+        if os.path.exists(WEB_BLACKLIST_FILE):
+            with open(WEB_BLACKLIST_FILE, "r", encoding="utf-8") as f:
+                blacklist = {line.strip() for line in f if line.strip()}
+
+        for engine in WEB_SEARCH_ENGINES:
+            for query in self.queries[:10]:  # 减少网络搜索关键词数量
+                if self.limiter.should_stop() or self._runtime_exceeded():
+                    return
+                for page in range(1, WEB_MAX_PAGES + 1):
+                    search_url = self._build_search_url(engine, query, page)
+                    if not search_url:
+                        continue
+                    self.http.user_agent = random.choice(WEB_USER_AGENTS)
+                    print(f"[{now_str()}]   搜索: [{engine}] {query} (第{page}页)", flush=True)
+                    resp = self.http.get(search_url, timeout=WEB_DOWNLOAD_TIMEOUT,
+                                         operation_name=f"web[{engine}]")
+                    if not resp:
+                        if page == 1:
+                            break
+                        else:
+                            continue
+                    result_urls = self._parse_search_results(resp.text, engine)
+                    for url in result_urls:
+                        domain = url.split("/")[2] if "://" in url else url
+                        if domain in blacklist:
+                            continue
+                        content_resp = self.http.get(url, timeout=WEB_DOWNLOAD_TIMEOUT,
+                                                     operation_name=f"web dl: {url[:60]}")
+                        if not content_resp:
+                            continue
+                        before = len(self.unique_nodes)
+                        proxies = extract_all_strategies(content_resp.text)
+                        for p in proxies:
+                            if not p.is_valid():
+                                continue
+                            with self._state_lock:
+                                dedup_key = p.dedup_key(DEDUP_STRATEGY)
+                                if dedup_key in self.global_dedup_keys:
+                                    continue
+                                self.global_dedup_keys.add(dedup_key)
+                                node_uri = p.to_uri()
+                                self.unique_nodes.add(node_uri)
+                                self.batch_buffer.append(node_uri)
+                                if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:
+                                    self._flush_batch()
+                        new_nodes = len(self.unique_nodes) - before
+                        if new_nodes > 0:
+                            print(f"[{now_str()}]     ✅ {url[:80]}: +{new_nodes} 个节点", flush=True)
+                        else:
+                            print(f"[{now_str()}]     ⚪ {url[:80]}: 无新节点", flush=True)
+                            blacklist.add(domain)
+                    time.sleep(WEB_PAGE_SLEEP)
+
+        with open(WEB_BLACKLIST_FILE, "w", encoding="utf-8") as f:
+            f.write("\n".join(blacklist))
+
     # ── 搜索辅助 ──
 
     @staticmethod
