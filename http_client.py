@@ -85,18 +85,21 @@ class HttpClient:
         else:
             return "other"
 
-    def _record_call(self, url: str, status: int = 0):
+    def _record_call(self, url: str, status: int = 0, remaining: int = None):
         """记录一次 API 调用。
 
         Args:
             url: 请求的 URL
             status: HTTP 状态码（0 表示请求未发出）
+            remaining: X-RateLimit-Remaining 值（如果可用）
         """
         self.stats["total"] += 1
         endpoint = self._classify_url(url)
         self.stats["by_endpoint"][endpoint] = self.stats["by_endpoint"].get(endpoint, 0) + 1
         status_group = f"{status // 100}xx" if status else "no_req"
         self.stats["by_status"][status_group] = self.stats["by_status"].get(status_group, 0) + 1
+        if remaining is not None:
+            self.stats["last_quota"] = remaining
 
     def get_stats_report(self) -> str:
         """生成 API 调用统计报告。"""
@@ -113,6 +116,9 @@ class HttpClient:
         lines.append("  按状态码:")
         for st, count in sorted(self.stats["by_status"].items()):
             lines.append(f"    {st:15s} {count}")
+        if "last_quota" in self.stats:
+            lines.append("")
+            lines.append(f"  最后剩余配额: {self.stats['last_quota']}")
         lines.append("=" * 40)
         return "\n".join(lines)
 
@@ -197,7 +203,9 @@ class HttpClient:
                 resp = self.session.get(url, headers=self.headers, timeout=timeout)
 
                 # 不管什么状态码都记录一次调用
-                self._record_call(url, resp.status_code)
+                remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
+                remaining = int(remaining_hdr) if remaining_hdr else None
+                self._record_call(url, resp.status_code, remaining)
 
                 # 成功
                 if resp.status_code == 200:
@@ -218,8 +226,14 @@ class HttpClient:
                 if resp.status_code == 403:
                     wait_seconds = self._parse_ratelimit_wait(resp)
                     if wait_seconds <= 0:
-                        # 无 X-RateLimit-Reset 头 → 是访问拒绝（私有/已删仓库），不是限流
                         print(f"[{_now()}] {operation_name} 403（访问拒绝），跳过", flush=True)
+                        return None
+
+                    # 检查剩余配额：X-RateLimit-Remaining > 0 说明没限流，是访问控制
+                    remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
+                    if remaining_hdr is not None and int(remaining_hdr) > 0:
+                        print(f"[{_now()}] {operation_name} 403（访问被拒，"
+                              f"配额剩余 {int(remaining_hdr)}），跳过", flush=True)
                         return None
 
                     # 计算是否会导致超限
