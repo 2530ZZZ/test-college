@@ -37,6 +37,7 @@ from config import (
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, SUBS_CHECK_BATCH_SIZE, BATCH_DIR,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
+    GITHUB_SEARCH_ENABLED,
     WEB_SEARCH_ENABLED, WEB_SEARCH_ENGINES, WEB_MAX_PAGES, WEB_PER_PAGE,
     WEB_PAGE_SLEEP, WEB_DOWNLOAD_TIMEOUT, WEB_BLACKLIST_FILE, WEB_USER_AGENTS,
     TG_ENABLED, TG_API_ID, TG_API_HASH, TG_MESSAGES_PER_CHANNEL,
@@ -48,20 +49,16 @@ from utils import now_str, timeout_decorator
 
 
 class Collector:
-    """GitHub 节点收集器。
+    """多源并行节点收集器。
 
-    一次运行搜索多个关键词，遍历仓库文件树，提取代理节点，
-    边搜集边按批次持久化写入磁盘。
+    同时启动 GitHub 搜索、网页搜索、Telegram 抓取三个独立线程。
+    共享去重、缓存、批次输出，线程间通过锁保护共享状态。
 
-    Attributes:
-        http: HttpClient 实例
-        limiter: RateLimiter 实例（与 http 共享）
-        queries: 搜索关键词列表
-        unique_nodes: 全局已收集节点 URI 集合
-        global_dedup_keys: 全局去重 key 集合 (server, port, protocol)
-        batch_buffer: 当前批次暂存区（累积后一次写入）
-        batch_id: 批次序号
-        all_links: 来源文件 URL 列表
+    线程安全设计：
+      - _state_lock（RLock）：保护所有共享的 set/dict/list
+      - 每个线程持有独立的 HttpClient 实例（避免连接池竞争）
+      - RateLimiter 仅绑定到 GitHub 线程的 HttpClient
+      - 临界区极短（微秒级的 set/dict 操作），锁竞争可忽略
     """
 
     def __init__(self, token: str = "", queries: List[str] = None,
@@ -72,34 +69,39 @@ class Collector:
             token: GitHub API token
             queries: 搜索关键词列表
             on_batch_flush: 批次刷盘回调，签名: (batch_id, file_path, node_count) -> None
-                            用于将批次文件投喂给测速编排器
         """
-        # HTTP 客户端 + 限流器
-        self.limiter = RateLimiter()
-        self.http = HttpClient(token=token, rate_limiter=self.limiter)
-
+        self.token = token
         self.queries = queries or []
+
+        # ── 共享状态（线程安全保护） ──
+        self._state_lock = threading.RLock()          # 保护下方所有 set/dict/list
         self.all_links: List[str] = []
-        self.unique_nodes: Set[str] = set()          # 所有已持久化的节点
-        self.global_dedup_keys: Set[tuple] = set()   # (server, port, protocol) 全局去重
+        self.unique_nodes: Set[str] = set()            # 全局已收集节点 URI
+        self.global_dedup_keys: Set[tuple] = set()     # (server, port, protocol) 去重
         self.seen_repos: Set[str] = set()
         self.blacklist_repos: Set[str] = set()
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
         self.processed_file_shas: Set[str] = set()
-        self.on_batch_flush = on_batch_flush         # 批次刷盘回调
         self.sha_cache: Dict[str, datetime] = {}
+        self._branch_cache: Dict[str, str] = {}        # repo → 真实分支名
 
-        # 边搜集边持久化
-        self.batch_buffer: List[str] = []            # 当前批次暂存（未持久化）
-        self.batch_id: int = 0                       # 已完成持久化的批次数量
-        self.batch_file_paths: List[str] = []        # 所有批次文件路径
-        self._lock = threading.Lock()                # buffer 线程安全锁
+        # 批次持久化（共享）
+        self.batch_buffer: List[str] = []
+        self.batch_id: int = 0
+        self.batch_file_paths: List[str] = []
+        self.on_batch_flush = on_batch_flush
 
-        # 递归发现
+        # 递归发现计数
         self.recursive_count = 0
-        # 分支名缓存：种子/递归仓库先试 main 再查 API 的模式容易触发限流
-        self._branch_cache: Dict[str, str] = {}  # repo → 真实分支名
+
+        # ── 独立组件（每线程一份） ──
+        self.limiter = RateLimiter()  # 仅 GitHub 线程使用
+        self._max_runtime = MAX_RUNTIME_SECONDS or None
+        self._start_time = 0.0
+
+        # 分渠道统计（每线程一份，_finalize 时汇总）
+        self._channel_stats = {}  # channel_name → dict
 
         # 加载持久化状态
         self.load_blacklist()
@@ -158,24 +160,25 @@ class Collector:
         Returns:
             True 表示需要处理（新内容），False 表示已处理过可跳过
         """
-        if sha in self.sha_cache:
-            self.sha_cache[sha] = datetime.now(timezone.utc)  # LRU: 更新时间戳
-            return False  # 已处理，跳过
-        self.sha_cache[sha] = datetime.now(timezone.utc)
-        return True  # 新内容，需要处理
+        with self._state_lock:
+            if sha in self.sha_cache:
+                self.sha_cache[sha] = datetime.now(timezone.utc)  # LRU: 更新时间戳
+                return False  # 已处理，跳过
+            self.sha_cache[sha] = datetime.now(timezone.utc)
+            return True  # 新内容，需要处理
 
-    # ==================== 批次持久化 ====================
+    # ==================== 批次持久化（线程安全） ====================
 
     def _flush_batch(self):
         """将当前 buffer 刷盘为批次文件。
 
-        线程安全：使用 lock 保护 buffer 操作。
+        线程安全：_state_lock 保护 buffer/id/paths。
         刷盘后调用 on_batch_flush 回调（如果设置），用于投喂测速编排器。
+        多个线程可并发调用，同一时刻只有一个线程执行写盘。
         """
-        with self._lock:
+        with self._state_lock:
             if not self.batch_buffer:
                 return
-
             self.batch_id += 1
             seq = self.batch_id
             nodes_to_write = list(self.batch_buffer)
@@ -210,17 +213,12 @@ class Collector:
             node_uri: 原始 URI 字符串
             proxy: StandardProxy 实例（可选，用于去重 key 生成）
         """
-        with self._lock:
+        with self._state_lock:
             self.unique_nodes.add(node_uri)
             self.batch_buffer.append(node_uri)
+            need_flush = len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE
 
-            # buffer 满了就刷盘
-            if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
-                # 注意：不能在锁内调用 _flush_batch（会死锁）
-                pass  # 由调用者在锁外 flush
-
-        # 在锁外检查是否需要刷盘
-        if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
+        if need_flush:
             self._flush_batch()
 
     # ==================== 种子文件管理 ====================
@@ -305,16 +303,27 @@ class Collector:
     # ==================== 主流程 ====================
 
     def _runtime_exceeded(self) -> bool:
-        """检查是否超出最大运行时间。GA 6 小时超时前 30 分钟触发。"""
-        if self.max_runtime_seconds is None or self.max_runtime_seconds <= 0:
+        """检查是否超出最大运行时间。GA 6 小时超时前 30 分钟触发。
+
+        线程安全：_start_time 只在 run() 中设置一次，此后只读，无需加锁。
+        """
+        if self._max_runtime is None:
             return False
-        return time.time() - self.start_time > self.max_runtime_seconds
+        return time.time() - self._start_time > self._max_runtime
 
     def run(self):
-        """主入口：多来源搜集 → 持久化。各来源独立运行，互不影响。"""
-        print(f"[{now_str()}] 🚀 程序启动", flush=True)
-        self.start_time = time.time()
-        self.max_runtime_seconds = MAX_RUNTIME_SECONDS or None
+        """主入口：并行启动三个搜集线程，所有来源同时运行，互不影响。
+
+        架构：
+          - GitHub 线程：搜索仓库 → Tree API → 下载 → 提取节点
+          - Web 线程：搜索引擎 → 提取 URL → 下载 → 提取节点
+          - TG 线程：Telegram 频道 → 抓取消息 → 提取节点
+
+        每个线程持有独立 HttpClient，共享去重/缓存/批次状态。
+        所有共享操作通过 _state_lock 保护。
+        """
+        print(f"[{now_str()}] 🚀 程序启动（并行三通道）", flush=True)
+        self._start_time = time.time()
 
         # 加载种子文件
         repo_seeds = self._load_seed_file(SEED_REPOS_FILE)
@@ -326,40 +335,132 @@ class Collector:
             shutil.rmtree(batch_dir)
         os.makedirs(batch_dir, exist_ok=True)
 
-        # ── 来源 1: GitHub 搜索 ──
-        try:
-            self._collect_github(repo_seeds)
-        except Exception as e:
-            print(f"[{now_str()}] ❌ GitHub 搜集崩溃: {e}", flush=True)
-            import traceback; traceback.print_exc()
+        # ── 为每个线程创建独立 HttpClient ──
+        gh_http = HttpClient(token=self.token, rate_limiter=self.limiter)
+        web_http = HttpClient(token="", rate_limiter=None)  # 无令牌，不改 GitHub 配额
+        tg_http = HttpClient(token="", rate_limiter=None)
 
-        # ── 来源 2: 网页搜索 ──
+        # ── 启动并行线程 ──
+        threads = []
+        errors = {}
+
+        # GitHub 线程（按开关）
+        if GITHUB_SEARCH_ENABLED:
+            t_gh = threading.Thread(
+                target=self._run_github_thread,
+                args=(gh_http, repo_seeds, errors),
+                name="GitHub",
+                daemon=True)
+            threads.append(t_gh)
+
+        # Web 线程（按开关）
         if WEB_SEARCH_ENABLED:
-            try:
-                self._collect_web()
-            except Exception as e:
-                print(f"[{now_str()}] ❌ 网页搜集崩溃: {e}", flush=True)
-                import traceback; traceback.print_exc()
+            t_web = threading.Thread(
+                target=self._run_web_thread,
+                args=(web_http, errors),
+                name="Web",
+                daemon=True)
+            threads.append(t_web)
 
-        # ── 来源 3: Telegram 抓取 ──
+        # TG 线程（按开关）
         if TG_ENABLED:
-            try:
-                self._collect_telegram(channel_seeds)
-            except Exception as e:
-                print(f"[{now_str()}] ❌ TG 搜集崩溃: {e}", flush=True)
-                import traceback; traceback.print_exc()
+            t_tg = threading.Thread(
+                target=self._run_tg_thread,
+                args=(tg_http, channel_seeds, errors),
+                name="TG",
+                daemon=True)
+            threads.append(t_tg)
+
+        print(f"[{now_str()}] 启动 {len(threads)} 个搜集线程", flush=True)
+        for t in threads:
+            t.start()
+
+        # 等待所有线程完成
+        for t in threads:
+            t.join()
 
         # ── 淘汰无产出来源并写回种子文件 ──
-        repo_seeds = self._prune_seeds(repo_seeds)
-        channel_seeds = self._prune_seeds(channel_seeds)
+        with self._state_lock:
+            repo_seeds = self._prune_seeds(repo_seeds)
+            channel_seeds = self._prune_seeds(channel_seeds)
         self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
         self._save_seed_file(TG_CHANNELS_FILE, "channels", channel_seeds)
 
-        # ── 最终保存 ──
-        self._finalize(elapsed_seconds=time.time() - self.start_time)
+        # 报告线程错误
+        for name, err in errors.items():
+            print(f"[{now_str()}] ⚠️ {name} 线程异常: {err}", flush=True)
 
-    def _collect_github(self, repo_seeds: dict):
+        # ── 最终保存 ──
+        self._finalize(elapsed_seconds=time.time() - self._start_time)
+
+    # ── 线程入口（异常隔离 + 调用实际搜集逻辑） ──
+
+    def _run_github_thread(self, http: HttpClient, repo_seeds: dict, errors: dict):
+        """GitHub 线程入口。"""
+        saved = self.http
+        self.http = http
+        stats = {"name": "GitHub", "repos_checked": 0, "files_downloaded": 0,
+                 "nodes_parsed": 0, "nodes_new": 0,
+                 "nodes_before": len(self.unique_nodes)}
+        try:
+            self._collect_github(repo_seeds, stats)
+        except Exception as e:
+            errors["GitHub"] = str(e)
+            import traceback; traceback.print_exc()
+        finally:
+            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
+            stats["api_calls"] = http.stats.get("total", 0)
+            stats["api_report"] = http.get_stats_report()
+            with self._state_lock:
+                self._channel_stats["GitHub"] = stats
+            self.http = saved
+
+    def _run_web_thread(self, http: HttpClient, errors: dict):
+        """Web 线程入口。"""
+        saved = self.http
+        self.http = http
+        stats = {"name": "Web", "urls_checked": 0, "domains_blacklisted": 0,
+                 "nodes_parsed": 0, "nodes_new": 0,
+                 "nodes_before": len(self.unique_nodes)}
+        try:
+            self._collect_web(stats)
+        except Exception as e:
+            errors["Web"] = str(e)
+            import traceback; traceback.print_exc()
+        finally:
+            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
+            stats["api_calls"] = http.stats.get("total", 0)
+            stats["api_report"] = http.get_stats_report()
+            with self._state_lock:
+                self._channel_stats["Web"] = stats
+            self.http = saved
+
+    def _run_tg_thread(self, http: HttpClient, channel_seeds: dict, errors: dict):
+        """TG 线程入口。"""
+        saved = self.http
+        self.http = http
+        stats = {"name": "TG", "channels_scanned": 0, "messages_fetched": 0,
+                 "nodes_parsed": 0, "nodes_new": 0,
+                 "nodes_before": len(self.unique_nodes)}
+        try:
+            self._collect_telegram(channel_seeds, stats)
+        except Exception as e:
+            errors["TG"] = str(e)
+            import traceback; traceback.print_exc()
+        finally:
+            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
+            stats["api_calls"] = http.stats.get("total", 0)
+            stats["api_report"] = http.get_stats_report()
+            with self._state_lock:
+                self._channel_stats["TG"] = stats
+            self.http = saved
+
+    def _collect_github(self, repo_seeds: dict, stats: dict = None):
         """GitHub 搜索收集。先处理种子仓库，再搜索关键词。"""
+        if stats is None:
+            stats = {}
+        _repos_before = self.checked_count
+        _files_before = len(self.processed_file_shas)
         # ── 处理种子仓库 ──
         seed_list = list(repo_seeds.keys())
         if seed_list:
@@ -410,8 +511,13 @@ class Collector:
 
             print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
 
-    def _collect_web(self):
-        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
+        # 更新渠道统计
+        with self._state_lock:
+            stats["repos_checked"] = self.checked_count - _repos_before
+            stats["files_downloaded"] = len(self.processed_file_shas) - _files_before
+
+    def _collect_web(self, stats: dict = None):
+        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。"""
 
         域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致：
         先获取列表，再检查黑名单跳过无效项，不浪费下载请求。
@@ -488,7 +594,7 @@ class Collector:
         with open(WEB_BLACKLIST_FILE, "w", encoding="utf-8") as f:
             f.write("\n".join(blacklist))
 
-    def _collect_telegram(self, channel_seeds: dict):
+    def _collect_telegram(self, channel_seeds: dict, stats: dict = None):
         """Telegram 频道抓取。
 
         Telethon 是异步库，这里用 asyncio.run() 在同步上下文中运行异步逻辑。
@@ -496,9 +602,9 @@ class Collector:
         """
         import asyncio
         print(f"[{now_str()}] 📱 开始 TG 抓取", flush=True)
-        asyncio.run(self._collect_telegram_async(channel_seeds))
+        asyncio.run(self._collect_telegram_async(channel_seeds, stats or {}))
 
-    async def _collect_telegram_async(self, channel_seeds: dict):
+    async def _collect_telegram_async(self, channel_seeds: dict, stats: dict):
         """TG 抓取异步实现。"""
         try:
             from telethon import TelegramClient
@@ -603,9 +709,9 @@ class Collector:
 
     def _finalize(self, elapsed_seconds: float = 0):
         """最终保存和统计。即使之前发生错误也能安全调用。"""
-        if self.max_runtime_seconds and elapsed_seconds > self.max_runtime_seconds:
+        if self._max_runtime and elapsed_seconds > self._max_runtime:
             print(f"[{now_str()}] ⚠️ 运行时间 {elapsed_seconds:.0f}s 超出上限 "
-                  f"{self.max_runtime_seconds}s（已提前停止搜集）", flush=True)
+                  f"{self._max_runtime}s（已提前停止搜集）", flush=True)
         try:
             self._flush_batch()
         except Exception as e:
@@ -619,14 +725,36 @@ class Collector:
         except Exception as e:
             print(f"[{now_str()}] ⚠️ SHA 缓存保存异常: {e}", flush=True)
 
-        # 统计信息（包含 API 调用量，含 raw 下载统计）
-        print(f"\n[{now_str()}] 🎉 收集完成，总耗时 {elapsed_seconds:.0f}s", flush=True)
-        print(f"[{now_str()}] 检查仓库: {self.checked_count}, "
-              f"源链接: {len(self.all_links)}, "
-              f"节点: {len(self.unique_nodes)}, "
-              f"批次: {len(self.batch_file_paths)}", flush=True)
-        print(f"[{now_str()}] 累计限流等待: {self.limiter.total_wait:.0f} 秒", flush=True)
-        print(f"[{now_str()}] API 调用统计:\n{self.http.get_stats_report()}", flush=True)
+        # ── 分渠道统计 ──
+        print(f"\n{'='*60}")
+        print(f"  搜集完成 — 总耗时 {elapsed_seconds:.0f}s")
+        print(f"{'='*60}")
+        for name, st in sorted(self._channel_stats.items()):
+            print(f"  [{name}]")
+            if name == "GitHub":
+                print(f"    检查仓库: {st.get('repos_checked', 0)}, "
+                      f"下载文件: {st.get('files_downloaded', 0)}")
+            elif name == "Web":
+                print(f"    检查URL: {st.get('urls_checked', 0)}, "
+                      f"域名黑名单: {st.get('domains_blacklisted', 0)}")
+            elif name == "TG":
+                print(f"    扫描频道: {st.get('channels_scanned', 0)}, "
+                      f"抓取消息: {st.get('messages_fetched', 0)}")
+            print(f"    新增节点: {st.get('nodes_new', 0)}, "
+                  f"API 调用: {st.get('api_calls', 0)}")
+            if st.get('api_report'):
+                print(f"    API 详情:\n{st['api_report']}")
+
+        # ── 汇总 ──
+        total_new = sum(s.get("nodes_new", 0) for s in self._channel_stats.values())
+        total_api = sum(s.get("api_calls", 0) for s in self._channel_stats.values())
+        print(f"  ─────────────────────────")
+        print(f"  节点总数: {len(self.unique_nodes)}, "
+              f"批次: {len(self.batch_file_paths)}, "
+              f"源链接: {len(self.all_links)}")
+        print(f"  新增节点: {total_new}, 总API: {total_api}")
+        print(f"  限流等待: {self.limiter.total_wait:.0f}s")
+        print(f"{'='*60}", flush=True)
 
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
@@ -1029,7 +1157,10 @@ class Collector:
             self.processed_file_shas.add(sha)
             return
 
+        content_size_mb = len(content) / 1024 / 1024
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
+            print(f"[{now_str()}] 📄 {raw_url} ⚠️ 文件过大 "
+                  f"({content_size_mb:.1f}MB)，跳过", flush=True)
             self.processed_file_shas.add(sha)
             return
 
@@ -1052,44 +1183,43 @@ class Collector:
             self.processed_file_shas.add(sha)
             return
 
-        # ---- 过滤 + 去重 + 入 buffer ----
+        # ---- 过滤 + 去重 + 入 buffer（线程安全） ----
+        raw_count = len(proxies)
+        valid_count = 0
         new_count = 0
-        has_valid_nodes = False  # 是否提取到任何有效节点（用于黑名单判断）
         for proxy in proxies:
             if not proxy.is_valid():
                 continue
-            has_valid_nodes = True  # 只要有解析成功且合法的节点就算
+            valid_count += 1
 
-            # 全局去重
-            if DEDUP_ENABLED:
-                dedup_key = proxy.dedup_key(DEDUP_STRATEGY)
-                if dedup_key in self.global_dedup_keys:
-                    continue
-                self.global_dedup_keys.add(dedup_key)
+            # 全局去重 + 写入 — 整个"检查-添加"操作必须原子
+            with self._state_lock:
+                if DEDUP_ENABLED:
+                    dedup_key = proxy.dedup_key(DEDUP_STRATEGY)
+                    if dedup_key in self.global_dedup_keys:
+                        continue
+                    self.global_dedup_keys.add(dedup_key)
 
-            node_uri = proxy.to_uri()
-            self.unique_nodes.add(node_uri)
-            self.batch_buffer.append(node_uri)
-            new_count += 1
+                node_uri = proxy.to_uri()
+                self.unique_nodes.add(node_uri)
+                self.batch_buffer.append(node_uri)
+                new_count += 1
 
-        if has_valid_nodes:
-            self.all_links.append(raw_url)
-            has_nodes[0] = True  # 无论是否重复，有节点就不进黑名单
+        with self._state_lock:
+            if valid_count > 0:
+                self.all_links.append(raw_url)
+                has_nodes[0] = True
+            self.processed_file_shas.add(sha)
 
-        if new_count:
-            print(f"[{now_str()}] 📄 {raw_url} "
-                  f"✅ 提取 {len(proxies)} 个候选，新增 {new_count} 个", flush=True)
+        if valid_count == 0:
+            print(f"[{now_str()}] 📄 {raw_url} ❌ 未提取出节点 "
+                  f"(原始 {raw_count} 个候选全部验证失败)", flush=True)
+        elif new_count > 0:
+            print(f"[{now_str()}] 📄 {raw_url} ✅ 解析 {raw_count} 候选 → "
+                  f"{valid_count} 个有效节点 → 去重后新增 {new_count} 个", flush=True)
         else:
-            if len(proxies) == 0:
-                print(f"[{now_str()}] 📄 {raw_url} ❌ 无节点", flush=True)
-            elif has_valid_nodes:
-                print(f"[{now_str()}] 📄 {raw_url} "
-                      f"⚪ 解析出 {len(proxies)} 个节点但全部重复", flush=True)
-            else:
-                print(f"[{now_str()}] 📄 {raw_url} "
-                      f"⚪ 解析出 {len(proxies)} 个节点但全部验证失败", flush=True)
-
-        self.processed_file_shas.add(sha)
+            print(f"[{now_str()}] 📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
+                  f"{valid_count} 个有效节点，全部重复", flush=True)
 
         # ---- 自动刷盘 ----
         if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:

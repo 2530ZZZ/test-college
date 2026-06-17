@@ -33,6 +33,12 @@ MAX_TOTAL_RATE_LIMIT_WAIT = 3600
 # 默认 19800（5.5 小时）。设为 0 或 None 表示不限制。
 MAX_RUNTIME_SECONDS = 19800
 
+# ==================== 搜集渠道开关 ====================
+
+# 是否启用 GitHub 搜索（搜索仓库 → 下载文件 → 提取节点）
+# 默认 True。关闭时可单独调试网页/TG 渠道。
+GITHUB_SEARCH_ENABLED = True
+
 # ==================== GitHub 搜索配置 ====================
 
 # 每个关键词搜索的最大页数
@@ -146,12 +152,12 @@ SOURCE_STALE_DAYS = 7
 
 # 是否启用网页搜索（搜索引擎抓取）
 # 默认 False。需要配合 WEB_SEARCH_ENGINES 使用。
-WEB_SEARCH_ENABLED = False
+WEB_SEARCH_ENABLED = True
 
 # 搜索引擎列表（可多选）
 # 支持: "google", "bing", "duckduckgo", "yandex"
 # 每个引擎的搜索结果都会被下载和提取。
-WEB_SEARCH_ENGINES = ["duckduckgo", "bing"]
+WEB_SEARCH_ENGINES = ["duckduckgo", "bing", "yandex"]
 
 # 每个关键词搜索的最大页数
 # 默认 2，取值范围 1-5。
@@ -159,7 +165,7 @@ WEB_MAX_PAGES = 2
 
 # 每页搜索结果数
 # 默认 30，取值范围 10-100。
-WEB_PER_PAGE = 30
+WEB_PER_PAGE = 50
 
 # 搜索结果页间休眠（秒）
 # 默认 3.0，取值范围 1.0-10.0。
@@ -185,7 +191,7 @@ WEB_USER_AGENTS = [
 
 # 是否启用 Telegram 频道抓取
 # 默认 False。需要申请 Telegram API ID 和 API Hash。
-TG_ENABLED = False
+TG_ENABLED = True
 
 # Telegram API 凭证（从 my.telegram.org 申请）
 TG_API_ID = ""        # 数字 ID

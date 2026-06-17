@@ -61,6 +61,12 @@ class Tee:
         self.file.flush()
         self.stream.flush()
 
+    def close(self):
+        self.flush()
+        if self.file:
+            self.file.close()
+        # 不关闭 self.stream（原始 stdout），避免影响后续输出
+
 
 log_file = open(log_path, "a", encoding="utf-8")
 sys.stdout = Tee(log_file, sys.__stdout__)
