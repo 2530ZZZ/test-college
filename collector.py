@@ -377,7 +377,8 @@ class Collector:
                 print(f"[{now_str()}] ⚠️ 种子仓库 {repo}: {e}", flush=True)
             new_nodes = len(self.unique_nodes) - before
             self._update_seed_entry(repo_seeds, repo, new_nodes)
-            time.sleep(REPO_SLEEP_SECONDS)
+            self._branch_cache.pop(repo, None)  # 清理缓存，允许下次重试
+            time.sleep(REPO_SLEEP_SECONDS * 2)  # 种子仓库间多用一点延迟
 
         # 再搜索关键词
         print(f"[{now_str()}] 🔎 开始 GitHub 搜索 ({len(self.queries)} 个关键词)", flush=True)
@@ -1118,6 +1119,7 @@ class Collector:
             print(f"[{now_str()}] 🔗 递归发现仓库 {full_name} "
                   f"(来源 {source_url})", flush=True)
             self.recursive_count += 1
+            time.sleep(REPO_SLEEP_SECONDS)  # 递归仓库间休眠，避免连续请求触发限流
             self.process_repo(full_name, depth=depth + 1)
 
     # ==================== 回退路径：Contents API ====================

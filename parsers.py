@@ -15,7 +15,7 @@
 import re
 import json
 import os
-from typing import List, Set
+from typing import List, Set, Optional
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 from models import StandardProxy, dict_to_standard_proxy
@@ -220,6 +220,23 @@ def extract_clash_yaml(text: str) -> List[StandardProxy]:
                         proxies.append(proxy)
             except Exception:
                 pass
+
+    # ── 策略 3b: 逐行 YAML flow 格式（- {key: value, ...}，兜底） ──
+    # YAML 库对某些包含特殊字符的文件会静默失败，用逐行正则作为保底
+    if not proxies:
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line.startswith('- {'):
+                continue
+            # 去掉前导 "- " 和首尾空格
+            obj_str = line[2:].strip()
+            if obj_str.startswith('{') and obj_str.endswith('}'):
+                proxy = _parse_flow_object(obj_str)
+                if proxy and proxy.is_valid():
+                    key = proxy.dedup_key("server_port_protocol")
+                    if key not in seen:
+                        seen.add(key)
+                        proxies.append(proxy)
 
     # ── 策略 4: 多行 YAML 代理块 ──
     for m in CLASH_MULTI_RE.finditer(text):
@@ -506,6 +523,83 @@ def extract_all_strategies(text: str, max_depth: int = 3) -> List[StandardProxy]
 
 
 # ==================== 兼容旧接口 ====================
+
+def _parse_flow_object(obj_str: str) -> Optional[StandardProxy]:
+    """逐行解析 YAML flow 对象 {key: value, ...}。
+
+    处理嵌套花括号（如 ws-opts: {path: /xxx, headers: {Host: yyy}}），
+    用括号计数找到真正的键值对边界。
+    """
+    if not (obj_str.startswith('{') and obj_str.endswith('}')):
+        return None
+    inner = obj_str[1:-1].strip()
+    pairs = _split_flow_kv(inner)
+    d = {}
+    for k, v in pairs:
+        # 值可能是嵌套对象，尝试 YAML 解析，失败就用原始字符串
+        if v.startswith('{') and v.endswith('}'):
+            try:
+                import yaml
+                v = yaml.safe_load(v)
+            except Exception:
+                pass
+        elif v in ('true', 'True'):
+            v = True
+        elif v in ('false', 'False'):
+            v = False
+        else:
+            try:
+                v = int(v)
+            except ValueError:
+                v = v.strip('"').strip("'")
+        d[k] = v
+    return dict_to_standard_proxy(d)
+
+
+def _split_flow_kv(s: str) -> list:
+    """在 YAML flow 对象字符串中分割 key: value 对，容忍嵌套花括号。"""
+    pairs = []
+    i = 0
+    while i < len(s):
+        # 跳过前导空格和逗号
+        while i < len(s) and s[i] in ' ,':
+            i += 1
+        if i >= len(s):
+            break
+        # 找到 key（':' 之前）
+        j = i
+        while j < len(s) and s[j] != ':':
+            j += 1
+        key = s[i:j].strip()
+        j += 1  # 跳过 ':'
+        # 跳过空格
+        while j < len(s) and s[j] == ' ':
+            j += 1
+        # 找到 value
+        if j < len(s) and s[j] == '{':
+            # 嵌套对象：数括号找到匹配的 }
+            depth = 0
+            start = j
+            while j < len(s):
+                if s[j] == '{':
+                    depth += 1
+                elif s[j] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        j += 1
+                        break
+                j += 1
+            val = s[start:j]
+        else:
+            # 简单值：到下一个 ',' 或字符串结束
+            start = j
+            while j < len(s) and s[j] != ',':
+                j += 1
+            val = s[start:j].strip().rstrip(',')
+        pairs.append((key, val.strip()))
+        i = j
+    return pairs
+
 
 def extract_raw_candidates(text: str) -> List[str]:
     """提取 所有候选 URI 字符串（原始格式，未经协议解析）。
