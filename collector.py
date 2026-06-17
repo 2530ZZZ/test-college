@@ -370,15 +370,24 @@ class Collector:
                 break
             before = len(self.unique_nodes)
             try:
-                # 种子仓库无搜索结果，默认尝试 main，失败则查真实分支
-                self.process_repo(repo, branch="main",
-                                  size=-1, disabled=False, pushed_at="")
+                # 种子仓库先调 repo info 拿分支名，避免 main→404 模式触发次级限流
+                repo_info = self.http.get_json(
+                    f"https://api.github.com/repos/{repo}",
+                    timeout=FILE_DOWNLOAD_TIMEOUT,
+                    operation_name=f"repo info ({repo})")
+                if not repo_info or repo_info.get('disabled', False):
+                    continue
+                branch = repo_info.get("default_branch", "main")
+                self._branch_cache[repo] = branch
+                self.process_repo(repo, branch=branch,
+                                  size=repo_info.get("size", -1),
+                                  disabled=False,
+                                  pushed_at=repo_info.get("pushed_at", ""))
             except Exception as e:
                 print(f"[{now_str()}] ⚠️ 种子仓库 {repo}: {e}", flush=True)
             new_nodes = len(self.unique_nodes) - before
             self._update_seed_entry(repo_seeds, repo, new_nodes)
-            self._branch_cache.pop(repo, None)  # 清理缓存，允许下次重试
-            time.sleep(REPO_SLEEP_SECONDS * 2)  # 种子仓库间多用一点延迟
+            time.sleep(REPO_SLEEP_SECONDS)
 
         # 再搜索关键词
         print(f"[{now_str()}] 🔎 开始 GitHub 搜索 ({len(self.queries)} 个关键词)", flush=True)

@@ -214,9 +214,13 @@ class HttpClient:
                 print(f"[{_now()}] {operation_name} 返回 {resp.status_code} "
                       f"(尝试 {attempt}/{max_retries})", flush=True)
 
-                # ---- 403 限流处理 ----
+                # ---- 403 处理 ----
                 if resp.status_code == 403:
                     wait_seconds = self._parse_ratelimit_wait(resp)
+                    if wait_seconds <= 0:
+                        # 无 X-RateLimit-Reset 头 → 是访问拒绝（私有/已删仓库），不是限流
+                        print(f"[{_now()}] {operation_name} 403（访问拒绝），跳过", flush=True)
+                        return None
 
                     # 计算是否会导致超限
                     if self.limiter.total_wait + wait_seconds > self.limiter.max_wait:
@@ -225,21 +229,10 @@ class HttpClient:
                         self.limiter.exceeded = True
                         return None
 
-                    if wait_seconds > 0:
-                        print(f"[{_now()}] 触发限流，等待 {wait_seconds}s ...", flush=True)
-                        ok = self.limiter.record_wait(wait_seconds)
-                        if not ok:
-                            return None
-                    else:
-                        # 无法解析等待时间，保守等待 30s
-                        if self.limiter.total_wait + 30 > self.limiter.max_wait:
-                            print(f"[{_now()}] 保守等待 30s 后将超过阈值，放弃后续请求", flush=True)
-                            self.limiter.exceeded = True
-                            return None
-                        print(f"[{_now()}] 无法解析限流重置时间，保守等待 30s ...", flush=True)
-                        ok = self.limiter.record_wait(30)
-                        if not ok:
-                            return None
+                    print(f"[{_now()}] 触发限流，等待 {wait_seconds}s ...", flush=True)
+                    ok = self.limiter.record_wait(wait_seconds)
+                    if not ok:
+                        return None
                     continue  # 等待结束，重试本次请求
 
                 # 其他可重试错误（500, 502, 503 等）
