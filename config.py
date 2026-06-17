@@ -187,28 +187,6 @@ WEB_USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
 ]
 
-# ==================== Telegram 抓取配置 ====================
-
-# 是否启用 Telegram 频道抓取
-# 默认 False。需要申请 Telegram API ID 和 API Hash。
-TG_ENABLED = False
-
-# Telegram API 凭证（从 my.telegram.org 申请）
-TG_API_ID = ""        # 数字 ID
-TG_API_HASH = ""      # 字符串 Hash
-
-# 每次从每个频道抓取的消息数
-# 默认 200，取值范围 50-500。
-TG_MESSAGES_PER_CHANNEL = 200
-
-# 频道间休眠（秒）
-TG_CHANNEL_SLEEP = 2.0
-
-# TG 频道种子文件路径（JSON 对象，{"channels": ["@channel1", ...]}）
-# 作为数据文件独立存储，与代码分离，便于动态更新。
-# 系统每次运行会将此文件中的频道加入抓取队列，并通过 sources.json 追踪产出。
-TG_CHANNELS_FILE = "seed_channels.json"
-
 # ==================== 搜索关键词 ====================
 
 # 基础搜索关键词列表（纯文本，不含时间/语言限定符）
@@ -365,7 +343,7 @@ MAX_RECURSIVE_DEPTH = 2
 
 # ==================== 输出配置 ====================
 
-# 批次文件存放目录（用于 subs-check 测速）
+# 批次文件存放目录（节点边搜集边分批次持久化）
 # 默认 "batches"，在项目根目录下创建。
 BATCH_DIR = "batches"
 
@@ -375,108 +353,6 @@ CHUNK_SIZE = 10000
 
 # 存活节点输出文件
 ALIVE_NODE_FILE = "alive.txt"
-
-# mihomo 兼容配置文件输出
-MIHOMO_OUTPUT_FILE = "mihomo.yaml"
-
-# mihomo 配置模板文件
-MIHOMO_TEMPLATE_FILE = "new.yaml"
-
-# ==================== mihomo 信息（仅用于最终输出 YAML，不用于测速） ====================
-
-# mihomo 版本号。通过环境变量 MIHOMO_VERSION 指定，默认 v1.18.7。
-# 注意：版本获取逻辑已移出 config，避免 import 时触发网络请求。
-# 如需自动获取最新版本，在使用处调用 _fetch_latest_mihomo_version()。
-MIHOMO_VERSION = os.getenv("MIHOMO_VERSION", "v1.18.7")
-
-# mihomo 下载 URL 模板
-MIHOMO_URL_TEMPLATE = (
-    "https://github.com/MetaCubeX/mihomo/releases/download/"
-    "{version}/mihomo-linux-amd64-{version}.gz"
-)
-MIHOMO_BIN = "mihomo"
-MIHOMO_MIXED_PORT = 7890
-MIHOMO_API_PORT = 9090
-
-# ==================== TCP 预筛选 ====================
-
-# 是否在保存 alive.txt 前进行 TCP 端口预筛选
-# 快速过滤明显不可达的节点（端口未开放、服务器宕机等）。
-# 注意：TCP 通 ≠ 节点可用，TCP 不通 = 节点一定不可用。
-# 数据中心 IP（如 GitHub Actions）下大部分免费节点会屏蔽 TCP 连接。
-TCP_PRESCREEN_ENABLED = False
-
-# TCP 连接超时（秒）
-# 默认 2.0，取值范围 0.5-5.0。越小越快但可能漏掉高延迟节点。
-TCP_PRESCREEN_TIMEOUT = 2.0
-
-# TCP 扫描并发线程数
-# 默认 500，取值范围 50-2000。
-TCP_PRESCREEN_WORKERS = 500
-
-# ==================== 测速开关 ====================
-
-# 是否启用测速。若关闭，则只搜集节点并保存，不执行 subs-check 测速。
-# 默认 True。如果测速环境不可用（如 GitHub Actions 网络受限），设为 False。
-SPEED_TEST_ENABLED = False
-
-# ==================== subs-check 测速配置 ====================
-
-# subs-check 二进制文件路径
-# 默认 "subs-check"。如果在 PATH 中可直接用命令名，否则用绝对路径。
-SUBS_CHECK_BIN = "subs-check"
-
-# 每批节点数（边搜集边测速模式下，每凑够此数量就持久化并投喂给 subs-check）
-# 默认 10000，取值范围 1000-50000。值越小单批越快但启动开销占比高。
-SUBS_CHECK_BATCH_SIZE = 10000
-
-# 最大并发 subs-check 实例数
-# 默认 3，取值范围 1-5。GitHub Actions (2核/7GB) 不建议超过 3。
-SUBS_CHECK_MAX_CONCURRENT = 3
-
-# 单批次测速超时（秒）
-# 默认 1200（20 分钟），取值范围 300-18000。超时后 kill 进程并标记该批次失败。
-SUBS_CHECK_BATCH_TIMEOUT = 18000
-
-# subs-check 实例起始端口
-# 默认 7890，每个并发实例递增 10 避免端口冲突。
-SUBS_CHECK_BASE_PORT = 7890
-
-# subs-check 并发测速线程数（goroutines）
-# 默认 10，取值范围 1-50。GitHub Actions (2核/7GB) 建议 5-10。
-# 本地高配机器可设 20+。这个参数对测速耗时影响最大。
-SUBS_CHECK_CONCURRENT = 10
-
-# 测速目标 URL — 延迟测试
-# 使用 Google 的 generate_204 端点，全球 CDN，响应快且稳定。
-SUBS_CHECK_LATENCY_URL = "https://www.gstatic.com/generate_204"
-
-# 测速目标 URL — 下载速度测试
-# 使用 Cloudflare 的测速端点。bytes 参数为文件大小（字节），默认 10MB。
-SUBS_CHECK_SPEED_TEST_URL = "https://speed.cloudflare.com/__down?bytes=10485760"
-
-# ==================== 测速过滤阈值 ====================
-
-# 延迟测试超时（毫秒）
-# GA 网络下大多数节点会超时，设短一点让无用节点快速失败
-# 默认 2000，取值范围 500-10000。
-LATENCY_TIMEOUT = 2000
-
-# 最大允许延迟（毫秒），超过此值的节点将被过滤
-# 默认 3000，取值范围 500-10000。
-MAX_LATENCY = 3000
-
-# 速度测试超时（秒）
-# 默认 10，取值范围 5-60。
-SPEED_TIMEOUT = 10
-
-# 最小下载字节数，低于此值视为下载失败
-# 默认 5MB = 5242880，取值范围 1048576-104857600。
-MIN_DOWNLOAD_BYTES = 5 * 1024 * 1024
-
-# 最小下载速度（MB/s），低于此值的节点将被过滤
-# 默认 0.5，取值范围 0.0-100.0。设为 0 表示不过滤。
-MIN_SPEED_MB = 0.5
 
 # ==================== 去重策略 ====================
 

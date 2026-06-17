@@ -40,8 +40,6 @@ from config import (
     GITHUB_SEARCH_ENABLED,
     WEB_SEARCH_ENABLED, WEB_SEARCH_ENGINES, WEB_MAX_PAGES, WEB_PER_PAGE,
     WEB_PAGE_SLEEP, WEB_DOWNLOAD_TIMEOUT, WEB_BLACKLIST_FILE, WEB_USER_AGENTS,
-    TG_ENABLED, TG_API_ID, TG_API_HASH, TG_MESSAGES_PER_CHANNEL,
-    TG_CHANNEL_SLEEP, TG_CHANNELS_FILE,
 )
 from http_client import HttpClient, RateLimiter
 from parsers import extract_all_strategies
@@ -72,6 +70,9 @@ class Collector:
         """
         self.token = token
         self.queries = queries or []
+
+        # 默认 HTTP 客户端（单线程或主线程使用，各线程入口可覆盖）
+        self.http = HttpClient(token=token)
 
         # ── 共享状态（线程安全保护） ──
         self._state_lock = threading.RLock()          # 保护下方所有 set/dict/list
@@ -327,7 +328,6 @@ class Collector:
 
         # 加载种子文件
         repo_seeds = self._load_seed_file(SEED_REPOS_FILE)
-        channel_seeds = self._load_seed_file(TG_CHANNELS_FILE)
 
         # 清空上次运行的批次文件
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
@@ -338,7 +338,6 @@ class Collector:
         # ── 为每个线程创建独立 HttpClient ──
         gh_http = HttpClient(token=self.token, rate_limiter=self.limiter)
         web_http = HttpClient(token="", rate_limiter=None)  # 无令牌，不改 GitHub 配额
-        tg_http = HttpClient(token="", rate_limiter=None)
 
         # ── 启动并行线程 ──
         threads = []
@@ -362,15 +361,6 @@ class Collector:
                 daemon=True)
             threads.append(t_web)
 
-        # TG 线程（按开关）
-        if TG_ENABLED:
-            t_tg = threading.Thread(
-                target=self._run_tg_thread,
-                args=(tg_http, channel_seeds, errors),
-                name="TG",
-                daemon=True)
-            threads.append(t_tg)
-
         print(f"[{now_str()}] 启动 {len(threads)} 个搜集线程", flush=True)
         for t in threads:
             t.start()
@@ -382,9 +372,7 @@ class Collector:
         # ── 淘汰无产出来源并写回种子文件 ──
         with self._state_lock:
             repo_seeds = self._prune_seeds(repo_seeds)
-            channel_seeds = self._prune_seeds(channel_seeds)
         self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
-        self._save_seed_file(TG_CHANNELS_FILE, "channels", channel_seeds)
 
         # 报告线程错误
         for name, err in errors.items():
@@ -437,305 +425,6 @@ class Collector:
                 self._channel_stats["Web"] = stats
             self.http = saved
 
-    def _run_tg_thread(self, http: HttpClient, channel_seeds: dict, errors: dict):
-        """TG 线程入口。"""
-        saved = self.http
-        self.http = http
-        t0 = time.time()
-        ch_before = len(channel_seeds)
-        stats = {"name": "TG", "channels_scanned": 0, "messages_fetched": 0,
-                 "channels_before": ch_before,
-                 "nodes_before": len(self.unique_nodes)}
-        try:
-            self._collect_telegram(channel_seeds, stats)
-        except Exception as e:
-            errors["TG"] = str(e)
-            import traceback; traceback.print_exc()
-        finally:
-            stats["elapsed"] = f"{time.time() - t0:.0f}s"
-            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
-            stats["api_calls"] = http.stats.get("total", 0)
-            stats["api_report"] = http.get_stats_report()
-            stats["channels_after"] = len(channel_seeds)
-            with self._state_lock:
-                self._channel_stats["TG"] = stats
-            self.http = saved
-
-    def _collect_github(self, repo_seeds: dict, stats: dict = None):
-        """GitHub 搜索收集。先处理种子仓库，再搜索关键词。"""
-        if stats is None:
-            stats = {}
-        _repos_before = self.checked_count
-        _files_before = len(self.processed_file_shas)
-        # ── 处理种子仓库 ──
-        seed_list = list(repo_seeds.keys())
-        if seed_list:
-            print(f"[{now_str()}] 种子仓库: {len(seed_list)} 个", flush=True)
-
-        for repo in seed_list:
-            if self.limiter.should_stop() or self._runtime_exceeded():
-                break
-            before = len(self.unique_nodes)
-            try:
-                # 种子仓库先调 repo info 拿分支名，避免 main→404 模式触发次级限流
-                repo_info = self.http.get_json(
-                    f"https://api.github.com/repos/{repo}",
-                    timeout=FILE_DOWNLOAD_TIMEOUT,
-                    operation_name=f"repo info ({repo})")
-                if not repo_info or repo_info.get('disabled', False):
-                    continue
-                branch = repo_info.get("default_branch", "main")
-                self._branch_cache[repo] = branch
-                self.process_repo(repo, branch=branch,
-                                  size=repo_info.get("size", -1),
-                                  disabled=False,
-                                  pushed_at=repo_info.get("pushed_at", ""))
-            except Exception as e:
-                print(f"[{now_str()}] ⚠️ 种子仓库 {repo}: {e}", flush=True)
-            new_nodes = len(self.unique_nodes) - before
-            self._update_seed_entry(repo_seeds, repo, new_nodes)
-            time.sleep(REPO_SLEEP_SECONDS)
-
-        # 再搜索关键词
-        print(f"[{now_str()}] 🔎 开始 GitHub 搜索 ({len(self.queries)} 个关键词)", flush=True)
-        for idx, query in enumerate(self.queries, 1):
-            if self.limiter.should_stop():
-                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
-                break
-            if self._runtime_exceeded():
-                print(f"[{now_str()}] ⏰ 接近 GA 超时，停止搜索", flush=True)
-                break
-
-            q_start = time.time()
-            print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
-
-            try:
-                self.search_query(query)
-            except RuntimeError:
-                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
-                break
-
-            print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
-
-        # 更新渠道统计
-        with self._state_lock:
-            stats["repos_checked"] = self.checked_count - _repos_before
-            stats["files_downloaded"] = len(self.processed_file_shas) - _files_before
-
-    def _collect_web(self, stats: dict = None):
-        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
-        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致。
-        先获取列表，再检查黑名单跳过无效项，不浪费下载请求。"""
-        from parsers import extract_all_strategies
-        print(f"[{now_str()}] 🌐 开始网页搜索 "
-              f"(引擎={WEB_SEARCH_ENGINES}, 关键词={len(self.queries)})", flush=True)
-
-        blacklist = set()
-        if os.path.exists(WEB_BLACKLIST_FILE):
-            with open(WEB_BLACKLIST_FILE, "r", encoding="utf-8") as f:
-                blacklist = {line.strip() for line in f if line.strip()}
-
-        for engine in WEB_SEARCH_ENGINES:
-            for query in self.queries[:10]:  # 减少网络搜索关键词数量
-                if self.limiter.should_stop():
-                    return
-
-                for page in range(1, WEB_MAX_PAGES + 1):
-                    search_url = self._build_search_url(engine, query, page)
-                    if not search_url:
-                        continue
-
-                    # UA 轮换：HttpClient.get() 使用 self.headers 构造请求头，
-                    # headers 属性从 self.user_agent 取值 -> 设置 user_agent 属性即可
-                    self.http.user_agent = random.choice(WEB_USER_AGENTS)
-
-                    print(f"[{now_str()}]   搜索: [{engine}] {query} (第{page}页)", flush=True)
-                    resp = self.http.get(search_url, timeout=WEB_DOWNLOAD_TIMEOUT,
-                                         operation_name=f"web[{engine}]")
-                    if not resp:
-                        if page == 1:
-                            break  # 首页失败说明引擎不可用，跳过
-                        else:
-                            continue  # 后续页失败可能是翻页到末尾，继续其他关键词
-
-                    # 提取搜索结果中的 URL
-                    result_urls = self._parse_search_results(resp.text, engine)
-                    for url in result_urls:
-                        domain = url.split("/")[2] if "://" in url else url
-                        if domain in blacklist:
-                            continue
-
-                        content_resp = self.http.get(url, timeout=WEB_DOWNLOAD_TIMEOUT,
-                                                     operation_name=f"web dl: {url[:60]}")
-                        if not content_resp:
-                            continue
-
-                        before = len(self.unique_nodes)
-                        proxies = extract_all_strategies(content_resp.text)
-                        for p in proxies:
-                            if not p.is_valid():
-                                continue
-                            dedup_key = p.dedup_key(DEDUP_STRATEGY)
-                            if dedup_key not in self.global_dedup_keys:
-                                self.global_dedup_keys.add(dedup_key)
-                                node_uri = p.to_uri()
-                                self.unique_nodes.add(node_uri)
-                                self.batch_buffer.append(node_uri)
-                                if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
-                                    self._flush_batch()
-
-                        new_nodes = len(self.unique_nodes) - before
-                        if new_nodes > 0:
-                            print(f"[{now_str()}]     ✅ {url[:80]}: +{new_nodes} 个节点", flush=True)
-                            blacklist_pending.pop(domain, None)  # 成功则重置计数
-                        else:
-                            print(f"[{now_str()}]     ⚪ {url[:80]}: 无新节点", flush=True)
-                            blacklist.add(domain)
-
-                    time.sleep(WEB_PAGE_SLEEP)
-
-        # 保存黑名单
-        with open(WEB_BLACKLIST_FILE, "w", encoding="utf-8") as f:
-            f.write("\n".join(blacklist))
-
-    def _collect_telegram(self, channel_seeds: dict, stats: dict = None):
-        """TG 频道抓取。有 API 凭证用 Telethon，否则用网页版 t.me/s。"""
-        if TG_API_ID and TG_API_HASH:
-            import asyncio
-            print(f"[{now_str()}] 📱 TG 抓取 (Telethon)", flush=True)
-            asyncio.run(self._collect_telegram_async(channel_seeds, stats or {}))
-        else:
-            print(f"[{now_str()}] 📱 TG 网页抓取 (t.me/s，无需 API)", flush=True)
-            self._collect_telegram_web(channel_seeds, stats or {})
-
-    async def _collect_telegram_async(self, channel_seeds: dict, stats: dict):
-        """TG 抓取异步实现。"""
-        try:
-            from telethon import TelegramClient
-            from telethon.errors import FloodWaitError
-        except ImportError:
-            print(f"[{now_str()}] ⚠️ telethon 未安装，跳过 TG 抓取", flush=True)
-            return
-
-        if not TG_API_ID or not TG_API_HASH:
-            print(f"[{now_str()}] ⚠️ TG API 凭证未配置，跳过", flush=True)
-            return
-
-        from parsers import extract_all_strategies
-
-        tg_channels = list(channel_seeds.keys())
-        if not tg_channels:
-            print(f"[{now_str()}] ⚠️ 无 TG 频道种子", flush=True)
-            return
-        print(f"[{now_str()}] TG 频道: {len(tg_channels)} 个", flush=True)
-
-        client = TelegramClient("tg_session", int(TG_API_ID), TG_API_HASH)
-        try:
-            await client.start()
-
-            for channel in tg_channels:
-                before = len(self.unique_nodes)
-                try:
-                    messages = await client.get_messages(channel, limit=TG_MESSAGES_PER_CHANNEL)
-                    for msg in messages:
-                        text = msg.text or ""
-                        proxies = extract_all_strategies(text)
-                        for p in proxies:
-                            if not p.is_valid():
-                                continue
-                            dedup_key = p.dedup_key(DEDUP_STRATEGY)
-                            if dedup_key not in self.global_dedup_keys:
-                                self.global_dedup_keys.add(dedup_key)
-                                node_uri = p.to_uri()
-                                self.unique_nodes.add(node_uri)
-                                self.batch_buffer.append(node_uri)
-                                if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
-                                    self._flush_batch()
-
-                    new_nodes = len(self.unique_nodes) - before
-                    print(f"[{now_str()}]   {channel}: +{new_nodes} 个节点", flush=True)
-                    self._update_seed_entry(channel_seeds, channel, new_nodes)
-                except FloodWaitError as e:
-                    print(f"[{now_str()}]   {channel}: Flood wait {e.seconds}s，跳过", flush=True)
-                except Exception as e:
-                    print(f"[{now_str()}]   {channel}: 抓取失败 ({e})", flush=True)
-
-                time.sleep(TG_CHANNEL_SLEEP)
-
-        finally:
-            await client.disconnect()
-
-    def _collect_telegram_web(self, channel_seeds: dict, stats: dict):
-        """TG 网页抓取（无 API 凭证方案）。
-
-        通过 t.me/s/channel_name 抓取公开频道的网页版预览。
-        不需要 API 凭证，但会被 TG 限流（建议频道间休眠 3-5 秒）。
-        """
-        from parsers import extract_all_strategies
-        import html as _html
-        import requests
-
-        tg_channels = list(channel_seeds.keys())
-        if not tg_channels:
-            return
-
-        print(f"[{now_str()}] TG 频道: {len(tg_channels)} 个 (网页抓取)", flush=True)
-
-        # 简单的 HTML 消息提取正则（TG 网页版结构较稳定）
-        msg_re = re.compile(
-            r'<div[^>]*class="tgme_widget_message_text[^"]*"[^>]*>'
-            r'(.*?)</div>',
-            re.DOTALL)
-
-        # URL 提取（html 实体编码的）
-        url_re = re.compile(r'href="(https?://[^"]+)"')
-
-        for channel in tg_channels:
-            before = len(self.unique_nodes)
-            try:
-                # 去掉 @ 前缀，直接用频道名
-                ch_name = channel.lstrip("@")
-                url = f"https://t.me/s/{ch_name}"
-                resp = requests.get(
-                    url,
-                    headers={"User-Agent": random.choice(WEB_USER_AGENTS)},
-                    timeout=30)
-                if resp.status_code != 200:
-                    print(f"[{now_str()}]   {channel}: HTTP {resp.status_code}", flush=True)
-                    continue
-
-                # 提取消息文本
-                messages = msg_re.findall(resp.text)
-                total_text = " ".join(messages)
-
-                # HTML 解码 + 提取代理节点
-                decoded = _html.unescape(total_text)
-                proxies = extract_all_strategies(decoded)
-                for p in proxies:
-                    if not p.is_valid():
-                        continue
-                    with self._state_lock:
-                        dedup_key = p.dedup_key(DEDUP_STRATEGY)
-                        if dedup_key in self.global_dedup_keys:
-                            continue
-                        self.global_dedup_keys.add(dedup_key)
-                        node_uri = p.to_uri()
-                        self.unique_nodes.add(node_uri)
-                        self.batch_buffer.append(node_uri)
-                        if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
-                            self._flush_batch()
-
-                new_nodes = len(self.unique_nodes) - before
-                print(f"[{now_str()}]   {channel}: {len(messages)} 条消息, "
-                      f"+{new_nodes} 个节点", flush=True)
-                stats["messages_fetched"] = stats.get("messages_fetched", 0) + len(messages)
-                stats["channels_scanned"] = stats.get("channels_scanned", 0) + 1
-                self._update_seed_entry(channel_seeds, channel, new_nodes)
-
-            except Exception as e:
-                print(f"[{now_str()}]   {channel}: 抓取失败 ({e})", flush=True)
-
-            time.sleep(TG_CHANNEL_SLEEP * 2)  # 网页抓取用更长的延迟
 
     # ── 搜索辅助 ──
 

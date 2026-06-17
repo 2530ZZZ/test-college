@@ -1,4 +1,4 @@
-name: 动态搜集 + 测速
+name: 节点搜集
 on:
   schedule:
     - cron: '37 14 * * *'   # UTC 14:37 → 北京时间 22:37
@@ -24,50 +24,17 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: 安装 Python 依赖
+      - name: 安装依赖
         run: pip install requests pyyaml
 
-      - name: 下载 subs-check
-        run: |
-          set +e
-          FALLBACK_TAG="v1.6.0"
-
-          download_and_extract() {
-            local tag="$1"
-            local url="https://github.com/beck-8/subs-check/releases/download/${tag}/subs-check_Linux_x86_64.tar.gz"
-            echo "  下载 ${url} ..."
-            curl -sL "$url" -o subs-check.tar.gz
-            if [ -f subs-check.tar.gz ] && [ -s subs-check.tar.gz ]; then
-              tar xzf subs-check.tar.gz
-              chmod +x subs-check
-              return 0
-            fi
-            return 1
-          }
-
-          # 获取最新 tag
-          TAG=$(curl -s "https://api.github.com/repos/beck-8/subs-check/releases/latest" \
-            | grep '"tag_name":' | cut -d'"' -f4)
-          echo "最新版本: ${TAG:-获取失败}"
-
-          # 尝试最新版
-          if [ -n "$TAG" ] && download_and_extract "$TAG"; then
-            echo "subs-check ${TAG} 就绪"
-          elif download_and_extract "$FALLBACK_TAG"; then
-            echo "最新版下载失败，回退到 ${FALLBACK_TAG}"
-          else
-            echo "subs-check 所有版本下载失败，测速将跳过"
-          fi
-        continue-on-error: true
-
-      - name: 运行搜集 + 测速
+      - name: 运行搜集
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: python main.py
 
-      - name: 提交所有结果
+      - name: 提交结果
         if: always()
         run: |
           git config --global user.name "github-actions[bot]"
@@ -76,13 +43,12 @@ jobs:
           BEIJING_TIME=$(date -u -d '+8 hours' +'%Y-%m-%d %H:%M:%S')
           export GIT_AUTHOR_DATE="$BEIJING_TIME +0800"
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
-          # 逐个添加，避免某个文件不存在导致全部失败
-          git add no/ 2>/dev/null; git add -A no/ 2>/dev/null || true
-          for f in no.txt no_li.txt no_w_li.txt ljck.txt sha_cache.pkl alive.txt mihomo.yaml; do
+          git add no/ 2>/dev/null || true
+          git add -A no/ 2>/dev/null || true
+          for f in no.txt no_li.txt no_w_li.txt ljck.txt sha_cache.pkl alive.txt; do
             [ -f "$f" ] && git add "$f" || true
           done
           [ -d batches/ ] && git add batches/ || true
           [ -d log/ ] && git add log/ || true
-          [ -f subs-check ] && git add subs-check || true
-          git commit -m "自动更新 + 测速 - $BEIJING_TIME CST" || echo "No changes to commit"
+          git commit -m "自动更新 - $BEIJING_TIME CST" || echo "No changes to commit"
           git push

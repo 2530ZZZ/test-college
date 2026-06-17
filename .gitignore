@@ -16,10 +16,3 @@ venv/
 batches/
 # 日志
 log/
-# 测速二进制（每次从 release 下载）
-subs-check
-mihomo
-# Telethon 会话
-tg_session.session
-# subs-check 临时配置文件
-subs_check_batch_*.yaml
