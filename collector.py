@@ -399,8 +399,8 @@ class Collector:
         """GitHub 线程入口。"""
         saved = self.http
         self.http = http
+        t0 = time.time()
         stats = {"name": "GitHub", "repos_checked": 0, "files_downloaded": 0,
-                 "nodes_parsed": 0, "nodes_new": 0,
                  "nodes_before": len(self.unique_nodes)}
         try:
             self._collect_github(repo_seeds, stats)
@@ -408,6 +408,7 @@ class Collector:
             errors["GitHub"] = str(e)
             import traceback; traceback.print_exc()
         finally:
+            stats["elapsed"] = f"{time.time() - t0:.0f}s"
             stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
             stats["api_calls"] = http.stats.get("total", 0)
             stats["api_report"] = http.get_stats_report()
@@ -419,8 +420,8 @@ class Collector:
         """Web 线程入口。"""
         saved = self.http
         self.http = http
+        t0 = time.time()
         stats = {"name": "Web", "urls_checked": 0, "domains_blacklisted": 0,
-                 "nodes_parsed": 0, "nodes_new": 0,
                  "nodes_before": len(self.unique_nodes)}
         try:
             self._collect_web(stats)
@@ -428,6 +429,7 @@ class Collector:
             errors["Web"] = str(e)
             import traceback; traceback.print_exc()
         finally:
+            stats["elapsed"] = f"{time.time() - t0:.0f}s"
             stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
             stats["api_calls"] = http.stats.get("total", 0)
             stats["api_report"] = http.get_stats_report()
@@ -439,8 +441,10 @@ class Collector:
         """TG 线程入口。"""
         saved = self.http
         self.http = http
+        t0 = time.time()
+        ch_before = len(channel_seeds)
         stats = {"name": "TG", "channels_scanned": 0, "messages_fetched": 0,
-                 "nodes_parsed": 0, "nodes_new": 0,
+                 "channels_before": ch_before,
                  "nodes_before": len(self.unique_nodes)}
         try:
             self._collect_telegram(channel_seeds, stats)
@@ -448,9 +452,11 @@ class Collector:
             errors["TG"] = str(e)
             import traceback; traceback.print_exc()
         finally:
+            stats["elapsed"] = f"{time.time() - t0:.0f}s"
             stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
             stats["api_calls"] = http.stats.get("total", 0)
             stats["api_report"] = http.get_stats_report()
+            stats["channels_after"] = len(channel_seeds)
             with self._state_lock:
                 self._channel_stats["TG"] = stats
             self.http = saved
@@ -595,14 +601,14 @@ class Collector:
             f.write("\n".join(blacklist))
 
     def _collect_telegram(self, channel_seeds: dict, stats: dict = None):
-        """Telegram 频道抓取。
-
-        Telethon 是异步库，这里用 asyncio.run() 在同步上下文中运行异步逻辑。
-        如果 session 文件首次使用，需要交互式输入，故 GA 环境需预先建立 session。
-        """
-        import asyncio
-        print(f"[{now_str()}] 📱 开始 TG 抓取", flush=True)
-        asyncio.run(self._collect_telegram_async(channel_seeds, stats or {}))
+        """TG 频道抓取。有 API 凭证用 Telethon，否则用网页版 t.me/s。"""
+        if TG_API_ID and TG_API_HASH:
+            import asyncio
+            print(f"[{now_str()}] 📱 TG 抓取 (Telethon)", flush=True)
+            asyncio.run(self._collect_telegram_async(channel_seeds, stats or {}))
+        else:
+            print(f"[{now_str()}] 📱 TG 网页抓取 (t.me/s，无需 API)", flush=True)
+            self._collect_telegram_web(channel_seeds, stats or {})
 
     async def _collect_telegram_async(self, channel_seeds: dict, stats: dict):
         """TG 抓取异步实现。"""
@@ -659,7 +665,79 @@ class Collector:
                 time.sleep(TG_CHANNEL_SLEEP)
 
         finally:
-            client.disconnect()
+            await client.disconnect()
+
+    def _collect_telegram_web(self, channel_seeds: dict, stats: dict):
+        """TG 网页抓取（无 API 凭证方案）。
+
+        通过 t.me/s/channel_name 抓取公开频道的网页版预览。
+        不需要 API 凭证，但会被 TG 限流（建议频道间休眠 3-5 秒）。
+        """
+        from parsers import extract_all_strategies
+        import html as _html
+        import requests
+
+        tg_channels = list(channel_seeds.keys())
+        if not tg_channels:
+            return
+
+        print(f"[{now_str()}] TG 频道: {len(tg_channels)} 个 (网页抓取)", flush=True)
+
+        # 简单的 HTML 消息提取正则（TG 网页版结构较稳定）
+        msg_re = re.compile(
+            r'<div[^>]*class="tgme_widget_message_text[^"]*"[^>]*>'
+            r'(.*?)</div>',
+            re.DOTALL)
+
+        # URL 提取（html 实体编码的）
+        url_re = re.compile(r'href="(https?://[^"]+)"')
+
+        for channel in tg_channels:
+            before = len(self.unique_nodes)
+            try:
+                # 去掉 @ 前缀，直接用频道名
+                ch_name = channel.lstrip("@")
+                url = f"https://t.me/s/{ch_name}"
+                resp = requests.get(
+                    url,
+                    headers={"User-Agent": random.choice(WEB_USER_AGENTS)},
+                    timeout=30)
+                if resp.status_code != 200:
+                    print(f"[{now_str()}]   {channel}: HTTP {resp.status_code}", flush=True)
+                    continue
+
+                # 提取消息文本
+                messages = msg_re.findall(resp.text)
+                total_text = " ".join(messages)
+
+                # HTML 解码 + 提取代理节点
+                decoded = _html.unescape(total_text)
+                proxies = extract_all_strategies(decoded)
+                for p in proxies:
+                    if not p.is_valid():
+                        continue
+                    with self._state_lock:
+                        dedup_key = p.dedup_key(DEDUP_STRATEGY)
+                        if dedup_key in self.global_dedup_keys:
+                            continue
+                        self.global_dedup_keys.add(dedup_key)
+                        node_uri = p.to_uri()
+                        self.unique_nodes.add(node_uri)
+                        self.batch_buffer.append(node_uri)
+                        if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
+                            self._flush_batch()
+
+                new_nodes = len(self.unique_nodes) - before
+                print(f"[{now_str()}]   {channel}: {len(messages)} 条消息, "
+                      f"+{new_nodes} 个节点", flush=True)
+                stats["messages_fetched"] = stats.get("messages_fetched", 0) + len(messages)
+                stats["channels_scanned"] = stats.get("channels_scanned", 0) + 1
+                self._update_seed_entry(channel_seeds, channel, new_nodes)
+
+            except Exception as e:
+                print(f"[{now_str()}]   {channel}: 抓取失败 ({e})", flush=True)
+
+            time.sleep(TG_CHANNEL_SLEEP * 2)  # 网页抓取用更长的延迟
 
     # ── 搜索辅助 ──
 
@@ -731,15 +809,24 @@ class Collector:
         print(f"{'='*60}")
         for name, st in sorted(self._channel_stats.items()):
             print(f"  [{name}]")
+            elapsed = st.get('elapsed', '?')
             if name == "GitHub":
                 print(f"    检查仓库: {st.get('repos_checked', 0)}, "
-                      f"下载文件: {st.get('files_downloaded', 0)}")
+                      f"下载文件: {st.get('files_downloaded', 0)}, "
+                      f"耗时: {elapsed}")
             elif name == "Web":
                 print(f"    检查URL: {st.get('urls_checked', 0)}, "
-                      f"域名黑名单: {st.get('domains_blacklisted', 0)}")
+                      f"域名黑名单: {st.get('domains_blacklisted', 0)}, "
+                      f"耗时: {elapsed}")
             elif name == "TG":
-                print(f"    扫描频道: {st.get('channels_scanned', 0)}, "
-                      f"抓取消息: {st.get('messages_fetched', 0)}")
+                ch_before = st.get('channels_before', 0)
+                ch_after = st.get('channels_after', ch_before)
+                ch_delta = ch_after - ch_before
+                delta_str = f"+{ch_delta}" if ch_delta > 0 else str(ch_delta)
+                print(f"    频道: {ch_before}→{ch_after} ({delta_str}), "
+                      f"扫描: {st.get('channels_scanned', 0)}, "
+                      f"消息: {st.get('messages_fetched', 0)}, "
+                      f"耗时: {elapsed}")
             print(f"    新增节点: {st.get('nodes_new', 0)}, "
                   f"API 调用: {st.get('api_calls', 0)}")
             if st.get('api_report'):

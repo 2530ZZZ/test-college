@@ -37,7 +37,7 @@ MAX_RUNTIME_SECONDS = 19800
 
 # 是否启用 GitHub 搜索（搜索仓库 → 下载文件 → 提取节点）
 # 默认 True。关闭时可单独调试网页/TG 渠道。
-GITHUB_SEARCH_ENABLED = True
+GITHUB_SEARCH_ENABLED = False
 
 # ==================== GitHub 搜索配置 ====================
 
@@ -191,7 +191,7 @@ WEB_USER_AGENTS = [
 
 # 是否启用 Telegram 频道抓取
 # 默认 False。需要申请 Telegram API ID 和 API Hash。
-TG_ENABLED = True
+TG_ENABLED = False
 
 # Telegram API 凭证（从 my.telegram.org 申请）
 TG_API_ID = ""        # 数字 ID
