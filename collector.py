@@ -35,7 +35,7 @@ from config import (
     MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
     SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
-    CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, SUBS_CHECK_BATCH_SIZE, BATCH_DIR,
+    CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
     GITHUB_SEARCH_ENABLED,
     WEB_SEARCH_ENABLED, WEB_SEARCH_ENGINES, WEB_MAX_PAGES, WEB_PER_PAGE,
@@ -217,7 +217,7 @@ class Collector:
         with self._state_lock:
             self.unique_nodes.add(node_uri)
             self.batch_buffer.append(node_uri)
-            need_flush = len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE
+            need_flush = len(self.batch_buffer) >= BATCH_FLUSH_SIZE
 
         if need_flush:
             self._flush_batch()
@@ -996,7 +996,7 @@ class Collector:
                   f"{valid_count} 个有效节点，全部重复", flush=True)
 
         # ---- 自动刷盘 ----
-        if len(self.batch_buffer) >= SUBS_CHECK_BATCH_SIZE:
+        if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:
             self._flush_batch()
 
         # ---- raw 链接递归发现 ----
