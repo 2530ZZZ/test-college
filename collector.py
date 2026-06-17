@@ -98,6 +98,8 @@ class Collector:
 
         # 递归发现
         self.recursive_count = 0
+        # 分支名缓存：种子/递归仓库先试 main 再查 API 的模式容易触发限流
+        self._branch_cache: Dict[str, str] = {}  # repo → 真实分支名
 
         # 加载持久化状态
         self.load_blacklist()
@@ -718,6 +720,10 @@ class Collector:
             print(f"[{now_str()}] ⚠️ 仓库 {github_url} 已禁用，跳过", flush=True)
             return
 
+        # 缓存中有已知分支名，直接用，跳过初始 404
+        if branch == "main" and repo in self._branch_cache and self._branch_cache[repo]:
+            branch = self._branch_cache[repo]
+
         print(f"[{now_str()}] 仓库 {github_url} (分支: {branch}, "
               f"size: {size}KB, pushed: {pushed_at})", flush=True)
 
@@ -875,30 +881,31 @@ class Collector:
     # ==================== 懒分支名解析 ====================
 
     def _resolve_branch(self, repo: str, current_branch: str) -> Optional[str]:
-        """懒获取仓库真实分支名。
+        """懒获取仓库真实分支名（带缓存）。
 
-        只在树 API 失败时调用。搜索结果已自带正确的 default_branch，
-        所以只需处理种子仓库和递归发现的仓库（它们都是进来就默认 main）。
-        每仓库最多消耗 1 次 API 调用。
-
-        Args:
-            repo: 仓库全名
-            current_branch: 当前尝试的分支名
+        种子仓库和递归仓库都是传入默认 main，树 API 失败时调用此方法。
+        结果按 repo 缓存，避免同组织下连续多次 repo info 调用触发次级限流。
 
         Returns:
-            真实默认分支名，或 None（API 失败时）
+            真实分支名，或 None（API 失败/new_branch 不存在）
         """
-        # 搜索结果自带的分支名不需要修正（已验证为正确）
         if current_branch != "main":
             return None
+
+        # 缓存命中 → 不用调 API
+        if repo in self._branch_cache:
+            return self._branch_cache[repo]
 
         repo_data = self.http.get_json(
             f"https://api.github.com/repos/{repo}",
             timeout=FILE_DOWNLOAD_TIMEOUT,
             operation_name=f"repo info ({repo})")
         if not repo_data:
+            self._branch_cache[repo] = ""  # 缓存失败，避免重复调 API
             return None
-        return repo_data.get("default_branch", "main")
+        branch = repo_data.get("default_branch", "main")
+        self._branch_cache[repo] = branch
+        return branch
 
     # ==================== 仓库级文件变更查询 ====================
 

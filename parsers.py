@@ -125,8 +125,18 @@ def extract_clash_yaml(text: str) -> List[StandardProxy]:
         doc = yaml.safe_load(text)
         if isinstance(doc, dict):
             _walk_dict_for_proxies(doc, proxies, seen)
-            if proxies:
-                return proxies
+        elif isinstance(doc, list):
+            # 直接就是代理列表（如 sub/list/00.txt）
+            for item in doc:
+                if isinstance(item, dict):
+                    proxy = dict_to_standard_proxy(item)
+                    if proxy and proxy.is_valid():
+                        key = proxy.dedup_key("server_port_protocol")
+                        if key not in seen:
+                            seen.add(key)
+                            proxies.append(proxy)
+        if proxies:
+            return proxies
     except ImportError:
         pass
     except Exception:
