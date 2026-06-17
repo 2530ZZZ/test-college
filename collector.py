@@ -524,9 +524,8 @@ class Collector:
 
     def _collect_web(self, stats: dict = None):
         """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
-        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致。"""
-        先获取列表，再检查黑名单跳过无效项，不浪费下载请求。
-        """
+        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致。
+        先获取列表，再检查黑名单跳过无效项，不浪费下载请求。"""
         from parsers import extract_all_strategies
         print(f"[{now_str()}] 🌐 开始网页搜索 "
               f"(引擎={WEB_SEARCH_ENGINES}, 关键词={len(self.queries)})", flush=True)
