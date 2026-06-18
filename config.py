@@ -37,7 +37,7 @@ MAX_RUNTIME_SECONDS = 19800
 
 # 是否启用 GitHub 搜索（搜索仓库 → 下载文件 → 提取节点）
 # 默认 True。关闭时可单独调试网页/TG 渠道。
-GITHUB_SEARCH_ENABLED = False
+GITHUB_SEARCH_ENABLED = True
 
 # ==================== GitHub 搜索配置 ====================
 
@@ -152,7 +152,7 @@ SOURCE_STALE_DAYS = 7
 
 # 是否启用网页搜索（搜索引擎抓取）
 # 默认 False。需要配合 WEB_SEARCH_ENGINES 使用。
-WEB_SEARCH_ENABLED = True
+WEB_SEARCH_ENABLED = False
 
 # 搜索引擎列表（可多选）
 # 支持: "google", "bing", "duckduckgo", "yandex"
