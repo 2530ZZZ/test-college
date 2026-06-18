@@ -362,7 +362,7 @@ BATCH_DIR = "batches"
 
 # 每个分片文件包含的节点数
 # 默认 10000，取值范围 1000-50000。
-CHUNK_SIZE = 10000
+CHUNK_SIZE = 5000
 
 # 存活节点输出文件
 ALIVE_NODE_FILE = "alive.txt"

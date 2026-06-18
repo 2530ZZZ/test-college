@@ -113,13 +113,68 @@ class StandardProxy:
         }
 
     def to_uri(self) -> str:
-        """还原为标准 URI 链接。
+        """还原为标准 URI 链接，subs-check / v2rayN 等工具可直接识别。
 
-        优先返回 raw_link（原始格式），
-        如果不存在则序列化为 JSON（用于 vmess 等协议）。
+        优先返回 raw_link（原始格式），否则按协议构建标准 URI。
         """
+        import base64
+        from urllib.parse import quote
         if self.raw_link:
             return self.raw_link
+
+        p = self.protocol.lower()
+        host = f"{self.server}:{self.port}"
+        userinfo = quote(self.uuid, safe='')
+        remark = quote(self.remark, safe='') if self.remark else ""
+        fragment = f"#{remark}" if remark else ""
+
+        if p == "vmess":
+            # vmess://base64(json)
+            obj = {"v": "2", "ps": self.remark, "add": self.server,
+                   "port": self.port, "id": self.uuid, "aid": 0,
+                   "scy": self.security or "auto", "net": self.transport,
+                   "tls": "tls" if self.tls else ""}
+            if self.sni:
+                obj["sni"] = self.sni
+            payload = base64.b64encode(json.dumps(obj).encode()).decode()
+            return f"vmess://{payload}"
+
+        if p == "ss":
+            # ss://base64(method:password)@server:port#remark
+            creds = base64.b64encode(
+                f"{self.security or 'aes-256-gcm'}:{self.uuid}".encode()
+            ).decode().rstrip("=")
+            return f"ss://{creds}@{host}{fragment}"
+
+        if p == "ssr":
+            # ssr://base64(...)
+            from urllib.parse import quote as q
+            body = f"{self.server}:{self.port}:{self.extra.get('ssr_protocol','origin')}:{self.security or 'aes-256-cfb'}:{self.extra.get('ssr_obfs','plain')}:{base64.b64encode(self.uuid.encode()).decode()}"
+            params = f"?obfsparam={q(self.extra.get('obfsparam',''),safe='')}&remarks={q(self.remark,safe='')}"
+            payload = base64.b64encode(f"{body}/{params}".encode()).decode()
+            return f"ssr://{payload}"
+
+        # trojan, vless, hysteria2, tuic: URL 格式
+        params = []
+        if self.sni and self.sni != self.server:
+            params.append(f"sni={quote(self.sni, safe='')}")
+        if self.transport != "tcp":
+            params.append(f"type={quote(self.transport, safe='')}")
+        if self.security and p in ("ss",):
+            pass  # handled above
+        query = "&".join(params)
+        query_str = f"?{query}" if query else ""
+
+        if p == "trojan":
+            return f"trojan://{userinfo}@{host}{query_str}{fragment}"
+        if p == "vless":
+            return f"vless://{userinfo}@{host}{query_str}{fragment}"
+        if p in ("hysteria2", "hy2", "hysteria"):
+            return f"hysteria2://{userinfo}@{host}{query_str}{fragment}"
+        if p == "tuic":
+            return f"tuic://{userinfo}@{host}{query_str}{fragment}"
+
+        # 无法识别的协议 → JSON 兜底
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
     def __hash__(self) -> int:
