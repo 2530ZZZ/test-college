@@ -33,6 +33,7 @@ from config import (
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
+    PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
     SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
@@ -336,8 +337,9 @@ class Collector:
         os.makedirs(batch_dir, exist_ok=True)
 
         # ── 为每个线程创建独立 HttpClient ──
-        gh_http = HttpClient(token=self.token, rate_limiter=self.limiter)
-        web_http = HttpClient(token="", rate_limiter=None)  # 无令牌，不改 GitHub 配额
+        gh_http = HttpClient(token=self.token, rate_limiter=self.limiter,
+                             pool_connections=20, pool_maxsize=20)  # 并行下载需要更大连接池
+        web_http = HttpClient(token="", rate_limiter=None)
 
         # ── 启动并行线程 ──
         threads = []
@@ -914,11 +916,27 @@ class Collector:
         print(f"[{now_str()}] 仓库 https://github.com/{repo} "
               f"候选文件 {len(files_to_check)} 个", flush=True)
 
-        # ---- 处理文件 ----
-        for file_path, sha in files_to_check:
-            if self.limiter.should_stop():
-                raise RuntimeError("限流超限")
-            self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
+        # ---- 并行下载处理 ----
+        # 小量文件串行（省线程开销），大量文件用线程池并发下载
+        if len(files_to_check) <= PARALLEL_DOWNLOAD_THRESHOLD:
+            for file_path, sha in files_to_check:
+                if self.limiter.should_stop():
+                    raise RuntimeError("限流超限")
+                self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
+        else:
+            with ThreadPoolExecutor(max_workers=PARALLEL_DOWNLOAD_WORKERS) as executor:
+                futures = {executor.submit(
+                    self._handle_one_file, repo, branch, fp, s, has_nodes, depth
+                ): fp for fp, s in files_to_check}
+                for future in as_completed(futures):
+                    if self.limiter.should_stop():
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise RuntimeError("限流超限")
+                    try:
+                        future.result()
+                    except Exception as e:
+                        print(f"[{now_str()}] ⚠️ 并行下载异常: "
+                              f"{futures[future]}: {e}", flush=True)
 
         return True
 

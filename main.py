@@ -99,6 +99,10 @@ def main():
 
     total_elapsed = time.time() - start_time
     print(f"[{now_str()}] 🎉 全部完成，总耗时 {total_elapsed:.1f} 秒", flush=True)
+
+    # 恢复原始 stdout/stderr，避免 Python 退出时 flush 已关闭的 Tee 导致 exit code 120
+    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__
     log_file.close()
 
 

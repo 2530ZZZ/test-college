@@ -105,6 +105,14 @@ SHA_CACHE_MAX_ENTRIES = 1000000
 # 默认 None。限制值可设为 50，避免超大仓库消耗过多资源。
 MAX_COMMITS_PER_REPO = None
 
+# 并行下载阈值：候选文件数超过此值启用线程池并发下载
+# 默认 10。大部分仓库只有 2-5 个候选文件，串行更省开销。
+PARALLEL_DOWNLOAD_THRESHOLD = 10
+
+# 并行下载最大线程数
+# 默认 8。GitHub Actions 2核下 8 线程足够。raw 下载不占 API 配额，无限制风险。
+PARALLEL_DOWNLOAD_WORKERS = 8
+
 # ==================== API 请求超时设置 ====================
 
 # 超时格式: (connect_timeout, read_timeout)，单位秒
