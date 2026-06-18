@@ -211,7 +211,11 @@ class HttpClient:
                 if resp.status_code == 200:
                     return resp
 
-                # 404 / 409：快速失败，不重试
+                # 202 / 404 / 409：快速失败，不重试
+                # 202 = DuckDuckGo 限流信号，重试只会加重限流
+                if resp.status_code == 202:
+                    print(f"[{_now()}] {operation_name} 202 (限流)，跳过", flush=True)
+                    return None
                 if resp.status_code == 404:
                     print(f"[{_now()}] {operation_name} 404，跳过", flush=True)
                     return None

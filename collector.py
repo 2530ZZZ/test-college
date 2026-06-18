@@ -500,23 +500,29 @@ class Collector:
             with open(WEB_BLACKLIST_FILE, "r", encoding="utf-8") as f:
                 blacklist = {line.strip() for line in f if line.strip()}
 
+        engine_failures = {}  # engine → 连续失败次数，>=3 则跳过
         for engine in WEB_SEARCH_ENGINES:
-            for query in self.queries[:10]:  # 减少网络搜索关键词数量
+            for query in self.queries[:5]:  # 每个引擎只用前 5 个关键词
                 if self.limiter.should_stop() or self._runtime_exceeded():
                     return
+                if engine_failures.get(engine, 0) >= 3:
+                    print(f"[{now_str()}] ⚠️ [{engine}] 连续失败，切换到下一个引擎", flush=True)
+                    break
                 for page in range(1, WEB_MAX_PAGES + 1):
                     search_url = self._build_search_url(engine, query, page)
                     if not search_url:
                         continue
                     self.http.user_agent = random.choice(WEB_USER_AGENTS)
-                    print(f"[{now_str()}]   搜索: [{engine}] {query} (第{page}页)", flush=True)
+                    print(f"[{now_str()}]   搜索: [{engine}] {query[:40]} (第{page}页)", flush=True)
                     resp = self.http.get(search_url, timeout=WEB_DOWNLOAD_TIMEOUT,
                                          operation_name=f"web[{engine}]")
                     if not resp:
+                        engine_failures[engine] = engine_failures.get(engine, 0) + 1
                         if page == 1:
                             break
                         else:
                             continue
+                    engine_failures[engine] = 0  # 成功后重置
                     result_urls = self._parse_search_results(resp.text, engine)
                     for url in result_urls:
                         domain = url.split("/")[2] if "://" in url else url

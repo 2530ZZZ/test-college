@@ -157,7 +157,8 @@ WEB_SEARCH_ENABLED = True
 # 搜索引擎列表（可多选）
 # 支持: "google", "bing", "duckduckgo", "yandex"
 # 每个引擎的搜索结果都会被下载和提取。
-WEB_SEARCH_ENGINES = ["duckduckgo", "bing", "yandex"]
+# DuckDuckGo 对 DC IP 限流严格（202），bing/yandex 更宽松，bing 放首位
+WEB_SEARCH_ENGINES = ["bing", "duckduckgo", "yandex"]
 
 # 每个关键词搜索的最大页数
 # 默认 2，取值范围 1-5。
