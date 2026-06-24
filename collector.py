@@ -37,7 +37,7 @@ from config import (
     FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
     MAX_PARENT_TRACE_DEPTH, FORK_CHAIN_CHILD_DEPTH,
     AUTO_SEED_ENABLED, AUTO_SEED_MIN_CONSECUTIVE, AUTO_SEED_MIN_NODES,
-    TOPIC_SEARCH_ENABLED, TOPIC_QUERIES,
+    TOPIC_SEARCH_ENABLED, TOPIC_QUERIES, REPO_MAX_AGE_HOURS,
     USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
     SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
@@ -203,6 +203,8 @@ class Collector:
         print(f"[{now_str()}] 📦 批次 {seq:04d} 已持久化: "
               f"{filepath} ({node_count} 个节点, "
               f"累计 {len(self.unique_nodes)} 个)", flush=True)
+        # 批次刷盘时顺带保存 SHA 缓存，防止中途崩溃丢失
+        self.save_sha_cache()
 
         # 通知测速编排器
         if self.on_batch_flush:
@@ -801,13 +803,33 @@ class Collector:
             print(f"[{now_str()}] 仓库在黑名单中: {github_url}", flush=True)
             return
 
-        # 有效性检查（使用搜索结果数据，无需额外 API 调用）
+        # 有效性检查
         if size == 0:
             print(f"[{now_str()}] ⚠️ 仓库 {github_url} 大小为 0，跳过", flush=True)
             return
         if disabled:
             print(f"[{now_str()}] ⚠️ 仓库 {github_url} 已禁用，跳过", flush=True)
             return
+
+        # 非搜索来源的时间筛选
+        if REPO_MAX_AGE_HOURS > 0 and pushed_at:
+            try:
+                pushed_time = datetime.fromisoformat(
+                    pushed_at.replace("Z", "+00:00"))
+                age_hours = (datetime.now(timezone.utc) - pushed_time).total_seconds() / 3600
+                if age_hours > REPO_MAX_AGE_HOURS:
+                    print(f"[{now_str()}] ⚠️ 仓库 {github_url} "
+                          f"{age_hours:.0f}h 未更新，废弃 → 加入黑名单", flush=True)
+                    self.blacklist_repos.add(github_url)
+                    with open(BLACKLIST_FILE, "a", encoding="utf-8") as bf:
+                        bf.write(github_url + "\n")
+                    return
+                elif age_hours > 24:
+                    print(f"[{now_str()}] ⏭️ 仓库 {github_url} "
+                          f"{age_hours:.0f}h 未更新，跳过", flush=True)
+                    return
+            except Exception:
+                pass  # 时间解析失败，放行
 
         # 缓存中有已知分支名，直接用，跳过初始 404
         if branch == "main" and repo in self._branch_cache and self._branch_cache[repo]:
