@@ -34,6 +34,11 @@ from config import (
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
     PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
+    FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
+    MAX_PARENT_TRACE_DEPTH, FORK_CHAIN_CHILD_DEPTH,
+    AUTO_SEED_ENABLED, AUTO_SEED_MIN_CONSECUTIVE, AUTO_SEED_MIN_NODES,
+    TOPIC_SEARCH_ENABLED, TOPIC_QUERIES,
+    USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
     SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
@@ -274,13 +279,16 @@ class Collector:
 
     @staticmethod
     def _update_seed_entry(seeds: dict, key: str, new_node_count: int):
-        """更新种子条目：有新节点则刷新时间戳。"""
+        """更新种子条目：有新节点则刷新时间戳和连续产出计数。"""
         if key not in seeds:
             seeds[key] = {}
         if new_node_count > 0:
             seeds[key]["last_new_node"] = datetime.now(timezone.utc).isoformat()
             seeds[key]["total_new_nodes"] = (seeds[key].get("total_new_nodes", 0)
                                               + new_node_count)
+            seeds[key]["consecutive_runs"] = seeds[key].get("consecutive_runs", 0) + 1
+        else:
+            seeds[key]["consecutive_runs"] = 0
 
     @staticmethod
     def _prune_seeds(seeds: dict) -> dict:
@@ -329,6 +337,7 @@ class Collector:
 
         # 加载种子文件
         repo_seeds = self._load_seed_file(SEED_REPOS_FILE)
+        self._initial_seed_keys = set(repo_seeds.keys())  # 记录初始种子，用于自动收录
 
         # 清空上次运行的批次文件
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
@@ -465,9 +474,19 @@ class Collector:
             self._update_seed_entry(repo_seeds, repo, new_nodes)
             time.sleep(REPO_SLEEP_SECONDS)
 
-        # 再搜索关键词
-        print(f"[{now_str()}] 🔎 开始 GitHub 搜索 ({len(self.queries)} 个关键词)", flush=True)
-        for idx, query in enumerate(self.queries, 1):
+        # 构建完整搜索列表：关键词 + topic（按开关）
+        all_queries = list(self.queries)
+        if TOPIC_SEARCH_ENABLED and TOPIC_QUERIES:
+            for t in TOPIC_QUERIES:
+                topic_q = f"topic:{t} pushed:>{(datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+                if SEARCH_FORK:
+                    topic_q += " fork:true"
+                all_queries.append(topic_q)
+
+        # 搜索所有查询（关键词 + topic）
+        print(f"[{now_str()}] 🔎 开始 GitHub 搜索 "
+              f"(关键词={len(self.queries)}, topic={len(TOPIC_QUERIES) if TOPIC_SEARCH_ENABLED else 0})", flush=True)
+        for idx, query in enumerate(all_queries, 1):
             if self.limiter.should_stop():
                 print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
                 break
@@ -486,6 +505,23 @@ class Collector:
         with self._state_lock:
             stats["repos_checked"] = self.checked_count - _repos_before
             stats["files_downloaded"] = len(self.processed_file_shas) - _files_before
+
+        # ── 自动收录种子仓库 ──
+        if AUTO_SEED_ENABLED:
+            auto_added = 0
+            for repo_key, meta in list(repo_seeds.items()):
+                consecutive = meta.get("consecutive_runs", 0)
+                last_nodes = meta.get("total_new_nodes", 0)
+                if (consecutive >= AUTO_SEED_MIN_CONSECUTIVE
+                        and last_nodes >= AUTO_SEED_MIN_NODES):
+                    if repo_key not in self._initial_seed_keys:
+                        # 新收录到种子文件
+                        print(f"[{now_str()}] 🌱 自动收录种子: {repo_key} "
+                              f"(连续 {consecutive} 次, {last_nodes} 个节点)", flush=True)
+                        auto_added += 1
+            if auto_added:
+                # 立即写回种子文件
+                self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
 
     def _collect_web(self, stats: dict = None):
         """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
@@ -716,6 +752,7 @@ class Collector:
                 self.checked_count += 1
                 print(f"[{now_str()}] 开始处理仓库 {github_url}", flush=True)
 
+                before_repo = len(self.unique_nodes)
                 try:
                     # 使用搜索结果的字段替代 Repo Info API
                     self.process_repo(
@@ -730,6 +767,12 @@ class Collector:
                     return
                 except Exception as e:
                     print(f"[{now_str()}] ⚠️ 处理仓库异常 {github_url}: {e}", flush=True)
+
+                # 自动种子追踪：搜索发现的仓库也记录产出
+                if AUTO_SEED_ENABLED:
+                    new_nodes = len(self.unique_nodes) - before_repo
+                    if new_nodes >= AUTO_SEED_MIN_NODES:
+                        self._update_seed_entry(repo_seeds, repo, new_nodes)
 
                 time.sleep(REPO_SLEEP_SECONDS)
 
@@ -820,6 +863,197 @@ class Collector:
             with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                 f.write(github_url + "\n")
 
+        # Fork 链追踪：有节点产出的仓库 → 查子仓库 + 回溯父仓库 + 查兄弟仓库
+        if FORK_CHAIN_ENABLED and has_nodes_flag[0] and depth < MAX_PARENT_TRACE_DEPTH:
+            if FORK_CHAIN_CHILD_DEPTH > 0:
+                self._trace_child_forks(repo, branch, depth)
+            self._trace_fork_chain(repo, branch, pushed_at, depth)
+
+        # 同用户仓库遍历：有节点产出 → 扫光该用户所有公开仓库
+        if USER_REPOS_ENABLED and has_nodes_flag[0]:
+            self._trace_user_repos(repo, branch, depth)
+
+    # ==================== Fork 链追踪 ====================
+
+    def _trace_fork_chain(self, repo: str, branch: str,
+                          pushed_at: str, depth: int):
+        """追溯 fork 仓库的父仓库，遍历其所有 fork 仓库。
+
+        触发条件：当前仓库产出了节点（has_nodes=True）。
+        流程：
+          1. 查询当前仓库的 parent
+          2. 获取父仓库的 fork 列表
+          3. 逐个处理未在 seen_repos 中的 fork 仓库
+        """
+        print(f"[{now_str()}] 🔗 开始 Fork 链追踪 ({repo})", flush=True)
+
+        # 1. 查父仓库
+        repo_data = self.http.get_json(
+            f"https://api.github.com/repos/{repo}",
+            timeout=FILE_DOWNLOAD_TIMEOUT,
+            operation_name=f"repo info ({repo})")
+        if not repo_data:
+            return
+        parent = repo_data.get("parent")
+        if not parent:
+            return
+        parent_name = parent.get("full_name")
+        if not parent_name:
+            return
+        print(f"[{now_str()}]   父仓库: {parent_name}", flush=True)
+
+        # 2. 如果父仓库还没处理过，先处理父仓库
+        if parent_name not in self.seen_repos:
+            before_parent = len(self.unique_nodes)
+            try:
+                self.process_repo(parent_name,
+                                  branch=parent.get("default_branch", branch),
+                                  size=parent.get("size", -1),
+                                  disabled=False,
+                                  pushed_at=parent.get("pushed_at", ""),
+                                  depth=depth + 1)
+            except Exception as e:
+                print(f"[{now_str()}]   ⚠️ 父仓库 {parent_name}: {e}", flush=True)
+            new_parent = len(self.unique_nodes) - before_parent
+            print(f"[{now_str()}]   父仓库 +{new_parent} 个节点", flush=True)
+
+        # 3. 遍历父仓库的 fork 列表
+        for page in range(1, 3):
+            forks = self.http.get_json(
+                f"https://api.github.com/repos/{parent_name}/forks"
+                f"?sort=newest&per_page=30&page={page}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"forks of {parent_name} (p{page})")
+            if not forks or not isinstance(forks, list):
+                break
+
+            count = 0
+            for fork in forks:
+                fork_name = fork.get("full_name")
+                if not fork_name or fork_name in self.seen_repos:
+                    continue
+                if count >= FORK_CHAIN_MAX_FORKS:
+                    break
+                self.seen_repos.add(fork_name)
+                count += 1
+                before = len(self.unique_nodes)
+                try:
+                    self.process_repo(fork_name,
+                                      branch=fork.get("default_branch", branch),
+                                      size=fork.get("size", -1),
+                                      disabled=fork.get("disabled", False),
+                                      pushed_at=fork.get("pushed_at", ""),
+                                      depth=depth + 1)
+                except Exception as e:
+                    print(f"[{now_str()}]   ⚠️ fork {fork_name}: {e}", flush=True)
+                new_nodes = len(self.unique_nodes) - before
+                if new_nodes > 0:
+                    print(f"[{now_str()}]   🍴 {fork_name}: +{new_nodes}", flush=True)
+                time.sleep(REPO_SLEEP_SECONDS)
+
+    def _trace_child_forks(self, repo: str, branch: str, depth: int):
+        """遍历本仓库的直接 fork（子仓库），查其节点产出。
+
+        子遍历层数由 FORK_CHAIN_CHILD_DEPTH 控制。
+        触发条件：仓库产出了节点。
+        """
+        print(f"[{now_str()}] 🍴 查子仓库: {repo}", flush=True)
+        for page in range(1, 3):
+            forks = self.http.get_json(
+                f"https://api.github.com/repos/{repo}/forks"
+                f"?sort=newest&per_page=30&page={page}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"forks of {repo} (p{page})")
+            if not forks or not isinstance(forks, list):
+                break
+
+            count = 0
+            for fork in forks:
+                fork_name = fork.get("full_name")
+                if not fork_name or fork_name in self.seen_repos:
+                    continue
+                if count >= FORK_CHAIN_MAX_FORKS:
+                    break
+                self.seen_repos.add(fork_name)
+                count += 1
+                before = len(self.unique_nodes)
+                try:
+                    self.process_repo(fork_name,
+                                      branch=fork.get("default_branch", branch),
+                                      size=fork.get("size", -1),
+                                      disabled=fork.get("disabled", False),
+                                      pushed_at=fork.get("pushed_at", ""),
+                                      depth=depth + 1)
+                except Exception as e:
+                    print(f"[{now_str()}]   ⚠️ 子仓库 {fork_name}: {e}", flush=True)
+                new_nodes = len(self.unique_nodes) - before
+                if new_nodes > 0:
+                    print(f"[{now_str()}]   🍴 {fork_name}: +{new_nodes}", flush=True)
+                time.sleep(REPO_SLEEP_SECONDS)
+
+    def _trace_user_repos(self, repo: str, branch: str, depth: int):
+        """遍历同用户名下的所有公开仓库，查是否有节点产出。
+
+        触发条件：仓库产出了节点（不管是否重复）。
+        通过 GET /users/{owner}/repos API 获取仓库列表，逐个检查。
+
+        Args:
+            repo: 仓库全名 (owner/name)
+            branch: 分支名（用作新仓库的默认值）
+            depth: 当前递归深度
+        """
+        owner = repo.split("/")[0]
+        print(f"[{now_str()}] 👤 遍历用户仓库: {owner}", flush=True)
+
+        repo_pattern = re.compile(
+            r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
+        )
+        found = set()
+        count = 0
+        for page in range(1, 5):
+            repos_data = self.http.get_json(
+                f"https://api.github.com/users/{owner}/repos"
+                f"?sort=updated&per_page=100&page={page}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"user repos {owner} (p{page})")
+            if not repos_data or not isinstance(repos_data, list):
+                break
+
+            for r in repos_data:
+                full_name = r.get("full_name")
+                if (not full_name or full_name in self.seen_repos
+                        or f"https://github.com/{full_name}" in self.blacklist_repos):
+                    continue
+                if full_name in found:
+                    continue
+                found.add(full_name)
+
+                if USER_REPOS_MAX_PER_USER and count >= USER_REPOS_MAX_PER_USER:
+                    break
+
+                self.seen_repos.add(full_name)
+                count += 1
+                before = len(self.unique_nodes)
+                try:
+                    self.process_repo(full_name,
+                                      branch=r.get("default_branch", branch),
+                                      size=r.get("size", -1),
+                                      disabled=r.get("disabled", False),
+                                      pushed_at=r.get("pushed_at", ""),
+                                      depth=depth + 1)
+                except Exception as e:
+                    print(f"[{now_str()}]   ⚠️ 用户仓库 {full_name}: {e}", flush=True)
+
+                new_nodes = len(self.unique_nodes) - before
+                if new_nodes > 0:
+                    print(f"[{now_str()}]   👤 {full_name}: +{new_nodes}", flush=True)
+                time.sleep(REPO_SLEEP_SECONDS)
+
+            if USER_REPOS_MAX_PER_USER and count >= USER_REPOS_MAX_PER_USER:
+                break
+
+        print(f"[{now_str()}]   用户 {owner} 共查 {count} 个仓库", flush=True)
+
     # ==================== 递归树 API 处理 ====================
 
     def _process_with_recursive_tree(self, repo: str, branch: str,
@@ -905,6 +1139,7 @@ class Collector:
         if not files_to_check:
             print(f"[{now_str()}] 仓库 https://github.com/{repo} "
                   f"候选文件经时间过滤后为空", flush=True)
+            has_nodes[0] = True  # 24h 无新文件 ≠ 无节点，避免误加入黑名单
             return True
 
         # 限制处理数量（安全闸，防止极端情况）
@@ -1155,12 +1390,24 @@ class Collector:
             self._discover_recursive(raw_url, content, depth)
 
     def _discover_recursive(self, source_url: str, content: str, depth: int):
-        """从下载文件中发现其他 GitHub raw 链接，递归处理。"""
+        """从下载文件中发现其他 GitHub 仓库链接和 raw 链接，递归处理。
+
+        两种模式：
+          1. raw 链接：https://raw.githubusercontent.com/user/repo/branch/file
+          2. 仓库链接：https://github.com/user/repo（种子仓库的聚合资源）
+        """
+        # 模式 1：raw 文件链接
         raw_pattern = re.compile(
             r'https://raw\.githubusercontent\.com/([^/]+/[^/]+)/([^/]+)/([^\s"\'`#]+)'
         )
+        # 模式 2：GitHub 仓库链接
+        repo_pattern = re.compile(
+            r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
+            r'(?!/blob/|/tree/|/raw/|/issues|/pull|/releases|/wiki)'
+        )
         found = set()
 
+        # ── 处理 raw 链接 ──
         for match in raw_pattern.finditer(content):
             full_name = match.group(1)
             ref = match.group(2)
@@ -1184,6 +1431,36 @@ class Collector:
             self.recursive_count += 1
             time.sleep(REPO_SLEEP_SECONDS)
             # 递归仓库也先调 repo_info 拿分支名，避免 main→404 模式触发次级限流
+            repo_info = self.http.get_json(
+                f"https://api.github.com/repos/{full_name}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"repo info ({full_name})")
+            if not repo_info or repo_info.get('disabled', False):
+                continue
+            branch = repo_info.get("default_branch", "main")
+            self._branch_cache[full_name] = branch
+            self.process_repo(full_name, branch=branch,
+                              size=repo_info.get("size", -1),
+                              disabled=False,
+                              pushed_at=repo_info.get("pushed_at", ""),
+                              depth=depth + 1)
+
+        # ── 处理仓库链接 ──
+        for match in repo_pattern.finditer(content):
+            full_name = match.group(1)
+            if full_name in found or full_name in self.seen_repos:
+                continue
+            github_url = f"https://github.com/{full_name}"
+            if github_url in self.blacklist_repos:
+                continue
+            found.add(full_name)
+            if self.recursive_count >= MAX_RECURSIVE_REPOS:
+                break
+
+            print(f"[{now_str()}] 🔗 发现仓库链接 {full_name} "
+                  f"(来源 {source_url})", flush=True)
+            self.recursive_count += 1
+            time.sleep(REPO_SLEEP_SECONDS)
             repo_info = self.http.get_json(
                 f"https://api.github.com/repos/{full_name}",
                 timeout=FILE_DOWNLOAD_TIMEOUT,

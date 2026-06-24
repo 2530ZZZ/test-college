@@ -202,9 +202,12 @@ class HttpClient:
             try:
                 resp = self.session.get(url, headers=self.headers, timeout=timeout)
 
-                # 不管什么状态码都记录一次调用
+                # 记录调用和配额。只对 api.github.com 追踪剩余配额，
+                # raw.githubusercontent.com 走的 CDN，不计核心 API 配额。
                 remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
-                remaining = int(remaining_hdr) if remaining_hdr else None
+                remaining = None
+                if remaining_hdr and "api.github.com" in url:
+                    remaining = int(remaining_hdr)
                 self._record_call(url, resp.status_code, remaining)
 
                 # 成功

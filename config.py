@@ -65,7 +65,7 @@ REPO_TIMEOUT_SECONDS = 120
 # 候选文件数 ≤ 此值时，直接通过 raw URL 下载（无 API 消耗）。
 # 候选文件数 > 此值时，用 GitHub Compare API 获取 24h 内变更的文件集合（3 次 API 调用）。
 # 默认 20，取值范围 5-100。
-MAX_RAW_DOWNLOADS_PER_REPO = 20
+MAX_RAW_DOWNLOADS_PER_REPO = 100
 
 # 单仓库最大候选文件处理数，None 表示不限制
 # 默认 None。限制值可设为 50，避免超大仓库消耗过多资源。
@@ -99,11 +99,69 @@ SHA_CACHE_FILE = "sha_cache.pkl"
 # 默认 1000000（一百万条），约 4MB 文件、200MB 内存。GA 7GB 内存下完全可接受。
 # 加载耗时约 0.2 秒，查重为微秒级。
 # 取值范围 50000-5000000。超过 500 万条时注意内存占用 (~1GB)。
-SHA_CACHE_MAX_ENTRIES = 1000000
+SHA_CACHE_MAX_ENTRIES = 5000000
 
 # 单仓库最大候选文件处理数，None 表示不限制
 # 默认 None。限制值可设为 50，避免超大仓库消耗过多资源。
 MAX_COMMITS_PER_REPO = None
+
+# ==================== Fork 链追踪 ====================
+
+# 是否追踪 fork 链（发现 fork 仓库后追溯父仓库，再查父仓库的所有 fork）
+# 默认 False。可发现同一模板在不同 fork 中的不同节点。
+FORK_CHAIN_ENABLED = True
+
+# 每个仓库最多查几个 fork（分页，每页 30），用于子仓库和兄弟仓库遍历
+# 默认 30，取值范围 10-100。
+FORK_CHAIN_MAX_FORKS = 30
+
+# 往上追溯父仓库的层数
+# 默认 1。1 层通常够，更深的链路中节点高度重复。
+MAX_PARENT_TRACE_DEPTH = 1
+
+# Fork 链中本仓库的子仓库遍历层数。
+# 0 表示不查子仓库。1 表示查本仓库的直接 fork，2 表示还查 fork 的 fork。
+FORK_CHAIN_CHILD_DEPTH = 1
+
+
+# ==================== 同用户仓库遍历 ====================
+
+# 是否在发现节点后遍历该用户名下的所有公开仓库
+# 默认 False。节点搜集者通常有多个相关仓库，一次发现可扫光。
+USER_REPOS_ENABLED = True
+
+# 每个用户最多额外查询几个仓库（通过 repos API 分页获取）
+# 默认 30，取值范围 5-100。设为 0 表示不限制。
+USER_REPOS_MAX_PER_USER = 5
+
+# ==================== 种子仓库自动维护 ====================
+
+# 是否自动收录高产出仓库到种子文件
+# 默认 False。满足所有阈值条件的仓库会被自动写入 seed_repos.json。
+AUTO_SEED_ENABLED = False
+
+# 连续 N 次运行都产出新节点才收录。0 表示不限制。
+# 默认 3，取值范围 0-10。
+AUTO_SEED_MIN_CONSECUTIVE = 3
+
+# 每次至少产出 N 个新节点才计数。0 表示不限制。
+# 默认 10，取值范围 0-100。
+AUTO_SEED_MIN_NODES = 10
+
+# ==================== GitHub Topic 搜索 ====================
+
+# 是否启用 GitHub 话题（topic）搜索
+# 默认 False。Topic 搜索比关键词搜仓库名更精准。
+TOPIC_SEARCH_ENABLED = True
+
+# Topic 搜索词列表（每个会被拓展为 topic:xxx pushed:>24h）
+TOPIC_QUERIES = [
+    "proxypool",
+    "v2ray",
+    "free-proxy",
+    "clash-subscribe",
+    "v2ray-subscribe",
+]
 
 # 并行下载阈值：候选文件数超过此值启用线程池并发下载
 # 默认 10。大部分仓库只有 2-5 个候选文件，串行更省开销。
@@ -151,10 +209,11 @@ SEED_REPOS_FILE = "seed_repos.json"
 # ==================== 来源种子管理 ====================
 
 # 来源淘汰天数
-# 默认 7。超过此天数未产生新节点的来源视为失效，自动从种子文件移除。
-# 种子文件（seed_repos.json / seed_channels.json）直接存储来源及元数据，
-# 每次运行时由系统自动更新和清理。
-SOURCE_STALE_DAYS = 7
+# 默认 7。种子仓库的价值不仅在于自身产出，更在于其 fork 链和聚合资源。
+# 只有当种子仓库自身 + 其 fork 链 + 其发现的其他仓库 全部超过此天数
+# 无新节点时，才视为失效并从种子文件移除。
+# 设为 0 表示不自动淘汰。
+SOURCE_STALE_DAYS = 1
 
 # ==================== 网页搜索配置 ====================
 
