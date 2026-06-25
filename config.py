@@ -236,7 +236,7 @@ WEB_SEARCH_ENGINES = ["bing", "duckduckgo", "yandex"]
 
 # 每个关键词搜索的最大页数
 # 默认 2，取值范围 1-5。
-WEB_MAX_PAGES = 2
+WEB_MAX_PAGES = 5
 
 # 每页搜索结果数
 # 默认 30，取值范围 10-100。
@@ -410,7 +410,7 @@ ENABLE_RAW_RECURSIVE = True
 
 # 最多递归发现的仓库数量
 # 默认 5，取值范围 0-20。
-MAX_RECURSIVE_REPOS = 5
+MAX_RECURSIVE_REPOS = 20
 
 # 最大递归深度
 # 默认 2，取值范围 1-3。过深可能导致链式爬取失控。
