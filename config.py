@@ -104,7 +104,7 @@ SHA_CACHE_DIR = "sha_cache"
 SHA_CACHE_MAX_BYTES = 90_000_000
 
 # SHA 缓存最大条目数（总上限，0 表示不限制）
-SHA_CACHE_MAX_ENTRIES = 0
+SHA_CACHE_MAX_ENTRIES = 5000000
 
 # 单仓库最大候选文件处理数，None 表示不限制
 # 默认 None。限制值可设为 50，避免超大仓库消耗过多资源。
@@ -142,7 +142,7 @@ USER_REPOS_ENABLED = True
 
 # 每个用户最多额外查询几个仓库（通过 repos API 分页获取）
 # 默认 30，取值范围 5-100。设为 0 表示不限制。
-USER_REPOS_MAX_PER_USER = 5
+USER_REPOS_MAX_PER_USER = 30
 
 # 用户仓库遍历是否并行处理
 USER_REPOS_PARALLEL = True
