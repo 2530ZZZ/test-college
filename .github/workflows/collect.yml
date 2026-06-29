@@ -45,7 +45,10 @@ jobs:
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"
           git add no/ 2>/dev/null || true
           git add -A no/ 2>/dev/null || true
-          for f in no.txt no_li.txt no_w_li.txt ljck.txt sha_cache.pkl alive.txt; do
+          for f in no.txt no_li.txt no_w_li.txt ljck.txt alive.txt; do
+            [ -f "$f" ] && git add "$f" || true
+          done
+          [ -d sha_cache/ ] && git add sha_cache/ || true
             [ -f "$f" ] && git add "$f" || true
           done
           [ -d batches/ ] && git add batches/ || true

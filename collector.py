@@ -36,10 +36,13 @@ from config import (
     PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
     FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
     MAX_PARENT_TRACE_DEPTH, FORK_CHAIN_CHILD_DEPTH,
+    FORK_CHAIN_PARALLEL, FORK_CHAIN_WORKERS,
     AUTO_SEED_ENABLED, AUTO_SEED_MIN_CONSECUTIVE, AUTO_SEED_MIN_NODES,
     TOPIC_SEARCH_ENABLED, TOPIC_QUERIES, REPO_MAX_AGE_HOURS,
     USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
-    SHA_CACHE_FILE, SHA_CACHE_MAX_ENTRIES,
+    USER_REPOS_PARALLEL, USER_REPOS_WORKERS,
+    VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES,
+    SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
@@ -77,8 +80,9 @@ class Collector:
         self.token = token
         self.queries = queries or []
 
-        # 默认 HTTP 客户端（单线程或主线程使用，各线程入口可覆盖）
-        self.http = HttpClient(token=token)
+        # 主 HTTP 客户端 + 线程局部存储（并行 fork/用户仓库用）
+        self._main_http = HttpClient(token=token)
+        self._http_local = threading.local()
 
         # ── 共享状态（线程安全保护） ──
         self._state_lock = threading.RLock()          # 保护下方所有 set/dict/list
@@ -114,6 +118,18 @@ class Collector:
         self.load_blacklist()
         self.load_sha_cache()
 
+    # ── 线程安全 HTTP 客户端 ──
+
+    @property
+    def http(self):
+        """线程局部 HTTP 客户端。并行线程各自持有，主线程用默认。"""
+        h = getattr(self._http_local, 'http', None)
+        return h if h is not None else self._main_http
+
+    @http.setter
+    def http(self, val):
+        self._http_local.http = val
+
     # ==================== 持久化 IO ====================
 
     def load_blacklist(self):
@@ -127,33 +143,72 @@ class Collector:
             print(f"[{now_str()}] 已加载黑名单: {len(self.blacklist_repos)} 个", flush=True)
 
     def load_sha_cache(self):
-        """加载 SHA 缓存（pickle 格式）。"""
-        if os.path.exists(SHA_CACHE_FILE):
-            try:
-                with open(SHA_CACHE_FILE, 'rb') as f:
-                    self.sha_cache = pickle.load(f)
-                print(f"[{now_str()}] 加载 SHA 缓存 {len(self.sha_cache)} 条", flush=True)
-            except Exception as e:
-                print(f"[{now_str()}] 加载 SHA 缓存失败: {e}", flush=True)
-                self.sha_cache = {}
+        """加载 SHA 缓存（分片 pickle 目录）。"""
+        if not os.path.isdir(SHA_CACHE_DIR):
+            self.sha_cache = {}
+            return
+        self.sha_cache = {}
+        total = 0
+        try:
+            for fname in sorted(os.listdir(SHA_CACHE_DIR)):
+                if fname.endswith('.pkl'):
+                    with open(os.path.join(SHA_CACHE_DIR, fname), 'rb') as f:
+                        chunk = pickle.load(f)
+                        self.sha_cache.update(chunk)
+                        total += len(chunk)
+        except Exception as e:
+            print(f"[{now_str()}] 加载 SHA 缓存失败: {e}", flush=True)
+            self.sha_cache = {}
+            return
+        print(f"[{now_str()}] 加载 SHA 缓存 {total} 条 "
+              f"({len(os.listdir(SHA_CACHE_DIR))} 分片)", flush=True)
 
     def save_sha_cache(self):
-        """保存 SHA 缓存，按数量上限清理。
+        """保存 SHA 缓存到分片目录。每片 ≤ SHA_CACHE_MAX_BYTES。
 
         策略：
-          1. 按时间戳排序，保留最近的 SHA_CACHE_MAX_ENTRIES 条
-          2. 同时清理 30 天前的条目（安全兜底）
+          1. 清理 30 天前的条目
+          2. 按时间排序，保留最近的 SHA_CACHE_MAX_ENTRIES 条（若设了上限）
+          3. 分片写入，每片不超过 GitHub 100MB 限制
         """
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
         self.sha_cache = {sha: ts for sha, ts in self.sha_cache.items() if ts > cutoff}
-        if len(self.sha_cache) > SHA_CACHE_MAX_ENTRIES:
+        if SHA_CACHE_MAX_ENTRIES > 0 and len(self.sha_cache) > SHA_CACHE_MAX_ENTRIES:
             sorted_items = sorted(self.sha_cache.items(), key=lambda x: x[1], reverse=True)
             self.sha_cache = dict(sorted_items[:SHA_CACHE_MAX_ENTRIES])
+
+        os.makedirs(SHA_CACHE_DIR, exist_ok=True)
+        # 清除旧分片
+        for old in os.listdir(SHA_CACHE_DIR):
+            if old.endswith('.pkl'):
+                os.remove(os.path.join(SHA_CACHE_DIR, old))
+
+        # 按时间戳排序，分片写入
+        sorted_items = sorted(self.sha_cache.items(), key=lambda x: x[1])
+        chunk = {}
+        seq = 0
+        for sha, ts in sorted_items:
+            chunk[sha] = ts
+            # 估算：每个条目约 60 字节（sha40 + datetime20）
+            if len(chunk) * 60 >= SHA_CACHE_MAX_BYTES:
+                self._write_sha_chunk(seq, chunk)
+                chunk.clear()
+                seq += 1
+        if chunk:
+            self._write_sha_chunk(seq, chunk)
+
+        total_files = seq + (1 if chunk else 0)
+        print(f"[{now_str()}] SHA 缓存已保存: {len(self.sha_cache)} 条, {total_files} 分片", flush=True)
+
+    @staticmethod
+    def _write_sha_chunk(seq: int, chunk: dict):
+        """写入单个 SHA 缓存分片。"""
+        path = os.path.join(SHA_CACHE_DIR, f"sha_{seq:04d}.pkl")
         try:
-            with open(SHA_CACHE_FILE, 'wb') as f:
-                pickle.dump(self.sha_cache, f)
+            with open(path, 'wb') as f:
+                pickle.dump(chunk, f)
         except Exception as e:
-            print(f"[{now_str()}] 保存 SHA 缓存失败: {e}", flush=True)
+            print(f"[{now_str()}] SHA 分片写入失败: {e}", flush=True)
 
     def _is_file_updated(self, sha: str) -> bool:
         """检查文件 SHA 是否从未处理过。
@@ -398,8 +453,7 @@ class Collector:
 
     def _run_github_thread(self, http: HttpClient, repo_seeds: dict, errors: dict):
         """GitHub 线程入口。"""
-        saved = self.http
-        self.http = http
+        self._main_http = http
         t0 = time.time()
         stats = {"name": "GitHub", "repos_checked": 0, "files_downloaded": 0,
                  "nodes_before": len(self.unique_nodes)}
@@ -415,12 +469,10 @@ class Collector:
             stats["api_report"] = http.get_stats_report()
             with self._state_lock:
                 self._channel_stats["GitHub"] = stats
-            self.http = saved
 
     def _run_web_thread(self, http: HttpClient, errors: dict):
         """Web 线程入口。"""
-        saved = self.http
-        self.http = http
+        self._main_http = http
         t0 = time.time()
         stats = {"name": "Web", "urls_checked": 0, "domains_blacklisted": 0,
                  "nodes_before": len(self.unique_nodes)}
@@ -436,7 +488,7 @@ class Collector:
             stats["api_report"] = http.get_stats_report()
             with self._state_lock:
                 self._channel_stats["Web"] = stats
-            self.http = saved
+            pass  # http was thread-local, cleaned up by garbage collection
 
 
     # ── 搜集实现 ──
@@ -447,11 +499,15 @@ class Collector:
             stats = {}
         _repos_before = self.checked_count
         _files_before = len(self.processed_file_shas)
+        _stage_start = time.time()
 
-        # ── 处理种子仓库 ──
+        # ── 阶段 1: 种子仓库 ──
         seed_list = list(repo_seeds.keys())
         if seed_list:
-            print(f"[{now_str()}] 种子仓库: {len(seed_list)} 个", flush=True)
+            print(f"\n{'='*60}", flush=True)
+            print(f"[{now_str()}] 🔵 [阶段1] 种子仓库处理 | {len(seed_list)} 个",
+                  flush=True)
+            print(f"{'='*60}", flush=True)
 
         for repo in seed_list:
             if self.limiter.should_stop() or self._runtime_exceeded():
@@ -485,10 +541,20 @@ class Collector:
                     topic_q += " fork:true"
                 all_queries.append(topic_q)
 
-        # 搜索所有查询（关键词 + topic）
-        print(f"[{now_str()}] 🔎 开始 GitHub 搜索 "
-              f"(关键词={len(self.queries)}, topic={len(TOPIC_QUERIES) if TOPIC_SEARCH_ENABLED else 0})", flush=True)
+        # ── 阶段 2: 关键词 + Topic 搜索 ──
+        _seed_elapsed = time.time() - _stage_start
+        total_queries = len(all_queries)
+        kw_count = len(self.queries)
+        topic_count = len(TOPIC_QUERIES) if TOPIC_SEARCH_ENABLED else 0
+        print(f"\n{'='*60}", flush=True)
+        print(f"[{now_str()}] 🔵 [阶段2] 关键词+Topic搜索 | "
+              f"关键词={kw_count} | topic={topic_count} | 总计={total_queries} | "
+              f"种子阶段耗时={_seed_elapsed:.0f}s", flush=True)
+        print(f"{'='*60}", flush=True)
+
         for idx, query in enumerate(all_queries, 1):
+            q_start = time.time()
+            _nodes_before_query = len(self.unique_nodes)
             if self.limiter.should_stop():
                 print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
                 break
@@ -502,7 +568,10 @@ class Collector:
             except RuntimeError:
                 print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
                 break
-            print(f"[{now_str()}]   关键词耗时: {time.time() - q_start:.1f}s", flush=True)
+            q_elapsed = time.time() - q_start
+            q_new = len(self.unique_nodes) - _nodes_before_query
+            print(f"[{now_str()}] ⏱️ [{idx}/{total_queries}] {query[:50]} | "
+                  f"耗时 {q_elapsed:.0f}s | 新增 {q_new} 节点", flush=True)
 
         with self._state_lock:
             stats["repos_checked"] = self.checked_count - _repos_before
@@ -949,37 +1018,38 @@ class Collector:
             if not forks or not isinstance(forks, list):
                 break
 
-            count = 0
+            # 收集合格兄弟 fork
+            qualified = []
             for fork in forks:
-                fork_name = fork.get("full_name")
-                if not fork_name or fork_name in self.seen_repos:
-                    continue
-                if count >= FORK_CHAIN_MAX_FORKS:
-                    break
-                self.seen_repos.add(fork_name)
-                count += 1
-                before = len(self.unique_nodes)
-                try:
-                    self.process_repo(fork_name,
-                                      branch=fork.get("default_branch", branch),
-                                      size=fork.get("size", -1),
-                                      disabled=fork.get("disabled", False),
-                                      pushed_at=fork.get("pushed_at", ""),
-                                      depth=depth + 1)
-                except Exception as e:
-                    print(f"[{now_str()}]   ⚠️ fork {fork_name}: {e}", flush=True)
-                new_nodes = len(self.unique_nodes) - before
-                if new_nodes > 0:
-                    print(f"[{now_str()}]   🍴 {fork_name}: +{new_nodes}", flush=True)
-                time.sleep(REPO_SLEEP_SECONDS)
+                fn = fork.get("full_name")
+                if not fn or fn in self.seen_repos: continue
+                if len(qualified) >= FORK_CHAIN_MAX_FORKS: break
+                self.seen_repos.add(fn)
+                qualified.append(fork)
+
+        if qualified:
+            self._run_fork_batch(qualified, branch, depth, "🍴 兄弟仓库")
+
+    def _process_fork_repo(self, fork: dict, branch: str, depth: int) -> tuple:
+        """并行工作线程：处理单个 fork/用户仓库。每个线程拥有独立 HttpClient。"""
+        self.http = HttpClient(token=self.token, rate_limiter=None)
+        fork_name = fork.get("full_name")
+        before = len(self.unique_nodes)
+        try:
+            self.process_repo(fork_name,
+                              branch=fork.get("default_branch", branch),
+                              size=fork.get("size", -1),
+                              disabled=fork.get("disabled", False),
+                              pushed_at=fork.get("pushed_at", ""),
+                              depth=depth + 1)
+        except Exception as e:
+            print(f"[{now_str()}]   ⚠️ {fork_name}: {e}", flush=True)
+        new_nodes = len(self.unique_nodes) - before
+        return (fork_name, new_nodes)
 
     def _trace_child_forks(self, repo: str, branch: str, depth: int):
-        """遍历本仓库的直接 fork（子仓库），查其节点产出。
-
-        子遍历层数由 FORK_CHAIN_CHILD_DEPTH 控制。
-        触发条件：仓库产出了节点。
-        """
-        print(f"[{now_str()}] 🍴 查子仓库: {repo}", flush=True)
+        """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
+        print(f"[{now_str()}] 🔗 查子仓库: {repo}", flush=True)
         for page in range(1, 3):
             forks = self.http.get_json(
                 f"https://api.github.com/repos/{repo}/forks"
@@ -989,28 +1059,35 @@ class Collector:
             if not forks or not isinstance(forks, list):
                 break
 
-            count = 0
+            # 收集合格 fork
+            qualified = []
             for fork in forks:
-                fork_name = fork.get("full_name")
-                if not fork_name or fork_name in self.seen_repos:
-                    continue
-                if count >= FORK_CHAIN_MAX_FORKS:
-                    break
-                self.seen_repos.add(fork_name)
-                count += 1
-                before = len(self.unique_nodes)
-                try:
-                    self.process_repo(fork_name,
-                                      branch=fork.get("default_branch", branch),
-                                      size=fork.get("size", -1),
-                                      disabled=fork.get("disabled", False),
-                                      pushed_at=fork.get("pushed_at", ""),
-                                      depth=depth + 1)
-                except Exception as e:
-                    print(f"[{now_str()}]   ⚠️ 子仓库 {fork_name}: {e}", flush=True)
-                new_nodes = len(self.unique_nodes) - before
-                if new_nodes > 0:
-                    print(f"[{now_str()}]   🍴 {fork_name}: +{new_nodes}", flush=True)
+                fn = fork.get("full_name")
+                if not fn or fn in self.seen_repos: continue
+                if len(qualified) >= FORK_CHAIN_MAX_FORKS: break
+                self.seen_repos.add(fn)
+                qualified.append(fork)
+
+        if qualified:
+            self._run_fork_batch(qualified, branch, depth, "🍴 子仓库")
+
+    def _run_fork_batch(self, forks: list, branch: str, depth: int, label: str,
+                         workers: int = None):
+        """并行或串行处理一批 fork/用户仓库。"""
+        w = workers or FORK_CHAIN_WORKERS
+        if FORK_CHAIN_PARALLEL and len(forks) > 1:
+            print(f"[{now_str()}]   {label}: 并行 {len(forks)} 个 "
+                  f"({w} 线程)", flush=True)
+            with ThreadPoolExecutor(max_workers=w) as ex:
+                futures = {ex.submit(self._process_fork_repo, f, branch, depth): f
+                           for f in forks}
+                for future in as_completed(futures):
+                    fn, nn = future.result()
+                    if nn > 0: print(f"[{now_str()}]   {label}: {fn} +{nn}", flush=True)
+        else:
+            for fork in forks:
+                fn, nn = self._process_fork_repo(fork, branch, depth)
+                if nn > 0: print(f"[{now_str()}]   {label}: {fn} +{nn}", flush=True)
                 time.sleep(REPO_SLEEP_SECONDS)
 
     def _trace_user_repos(self, repo: str, branch: str, depth: int):
@@ -1046,35 +1123,20 @@ class Collector:
                 if (not full_name or full_name in self.seen_repos
                         or f"https://github.com/{full_name}" in self.blacklist_repos):
                     continue
-                if full_name in found:
-                    continue
+                if full_name in found: continue
                 found.add(full_name)
-
-                if USER_REPOS_MAX_PER_USER and count >= USER_REPOS_MAX_PER_USER:
+                if USER_REPOS_MAX_PER_USER and len(found) >= USER_REPOS_MAX_PER_USER:
                     break
-
                 self.seen_repos.add(full_name)
+                r["full_name"] = full_name  # ensure key exists for _process_fork_repo
                 count += 1
-                before = len(self.unique_nodes)
-                try:
-                    self.process_repo(full_name,
-                                      branch=r.get("default_branch", branch),
-                                      size=r.get("size", -1),
-                                      disabled=r.get("disabled", False),
-                                      pushed_at=r.get("pushed_at", ""),
-                                      depth=depth + 1)
-                except Exception as e:
-                    print(f"[{now_str()}]   ⚠️ 用户仓库 {full_name}: {e}", flush=True)
 
-                new_nodes = len(self.unique_nodes) - before
-                if new_nodes > 0:
-                    print(f"[{now_str()}]   👤 {full_name}: +{new_nodes}", flush=True)
-                time.sleep(REPO_SLEEP_SECONDS)
-
-            if USER_REPOS_MAX_PER_USER and count >= USER_REPOS_MAX_PER_USER:
-                break
-
-        print(f"[{now_str()}]   用户 {owner} 共查 {count} 个仓库", flush=True)
+        if found:
+            qualified = [r for r in repos_data
+                        if r.get("full_name") in found]
+            self._run_fork_batch(qualified, branch, depth, "👤 用户仓库",
+                                 workers=USER_REPOS_WORKERS)
+        print(f"[{now_str()}]   用户 {owner} 共查 {len(found)} 个仓库", flush=True)
 
     # ==================== 递归树 API 处理 ====================
 
@@ -1392,15 +1454,16 @@ class Collector:
                 has_nodes[0] = True
             self.processed_file_shas.add(sha)
 
-        if valid_count == 0:
-            print(f"[{now_str()}] 📄 {raw_url} ❌ 未提取出节点 "
-                  f"(原始 {raw_count} 个候选全部验证失败)", flush=True)
-        elif new_count > 0:
-            print(f"[{now_str()}] 📄 {raw_url} ✅ 解析 {raw_count} 候选 → "
-                  f"{valid_count} 个有效节点 → 去重后新增 {new_count} 个", flush=True)
-        else:
-            print(f"[{now_str()}] 📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
-                  f"{valid_count} 个有效节点，全部重复", flush=True)
+        if VERBOSE_LOG or new_count > 0:
+            if valid_count == 0:
+                print(f"[{now_str()}] 📄 {raw_url} ❌ 未提取出节点 "
+                      f"(原始 {raw_count} 个候选全部验证失败)", flush=True)
+            elif new_count > 0:
+                print(f"[{now_str()}] 📄 {raw_url} ✅ 解析 {raw_count} 候选 → "
+                      f"{valid_count} 个有效节点 → 去重后新增 {new_count} 个", flush=True)
+            else:
+                print(f"[{now_str()}] 📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
+                      f"{valid_count} 个有效节点，全部重复", flush=True)
 
         # ---- 自动刷盘 ----
         if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:

@@ -29,9 +29,9 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 MAX_TOTAL_RATE_LIMIT_WAIT = 3600
 
 # 程序最大运行时间（秒），超出后停止搜集、开始保存。
-# GA 默认超时 6 小时（21600s），提前 30 分钟收尾留足保存和提交时间。
-# 默认 19800（5.5 小时）。设为 0 或 None 表示不限制。
-MAX_RUNTIME_SECONDS = 19800
+# GA 默认超时 6 小时（21600s），提前 1 小时收尾留足保存和提交时间。
+# 默认 18000（5 小时）。设为 0 或 None 表示不限制。
+MAX_RUNTIME_SECONDS = 18000
 
 # ==================== 搜集渠道开关 ====================
 
@@ -96,17 +96,15 @@ FILE_PROCESS_TIMEOUT = None
 # 存储已验证无节点或广告仓库的 GitHub URL，每行一个。跨运行持久化。
 BLACKLIST_FILE = "ljck.txt"
 
-# SHA 缓存文件路径
-# 存储已处理文件 SHA → 时间戳的 pickle 字典。跨运行持久化。
-SHA_CACHE_FILE = "sha_cache.pkl"
+# SHA 缓存目录（分片存储，每片 ≤ 90MB 避免 GitHub 100MB 硬限制）
+# 加载时遍历目录合并到内存一个 dict。写入时分片保证每文件不超限。
+SHA_CACHE_DIR = "sha_cache"
 
-# SHA 缓存最大条目数
-# SHA 是内容哈希，内容不变则 SHA 不变，缓存应长期保留。
-# 有上限时文件大小固定，不会随时间无限增长。
-# 默认 1000000（一百万条），约 4MB 文件、200MB 内存。GA 7GB 内存下完全可接受。
-# 加载耗时约 0.2 秒，查重为微秒级。
-# 取值范围 50000-5000000。超过 500 万条时注意内存占用 (~1GB)。
-SHA_CACHE_MAX_ENTRIES = 5000000
+# SHA 缓存每片最大字节数（默认 90MB，GitHub 硬限制 100MB）
+SHA_CACHE_MAX_BYTES = 90_000_000
+
+# SHA 缓存最大条目数（总上限，0 表示不限制）
+SHA_CACHE_MAX_ENTRIES = 0
 
 # 单仓库最大候选文件处理数，None 表示不限制
 # 默认 None。限制值可设为 50，避免超大仓库消耗过多资源。
@@ -130,6 +128,11 @@ MAX_PARENT_TRACE_DEPTH = 1
 # 0 表示不查子仓库。1 表示查本仓库的直接 fork，2 表示还查 fork 的 fork。
 FORK_CHAIN_CHILD_DEPTH = 1
 
+# Fork 链是否并行处理
+FORK_CHAIN_PARALLEL = True
+
+# Fork 链并行线程数（默认 4，GA 2核下够用）
+FORK_CHAIN_WORKERS = 4
 
 # ==================== 同用户仓库遍历 ====================
 
@@ -140,6 +143,18 @@ USER_REPOS_ENABLED = True
 # 每个用户最多额外查询几个仓库（通过 repos API 分页获取）
 # 默认 30，取值范围 5-100。设为 0 表示不限制。
 USER_REPOS_MAX_PER_USER = 5
+
+# 用户仓库遍历是否并行处理
+USER_REPOS_PARALLEL = True
+
+# 用户仓库并行线程数
+USER_REPOS_WORKERS = 4
+
+# ==================== 日志配置 ====================
+
+# 详细日志模式。True=输出每个文件的提取结果，False=仅摘要。
+# 日常保持 False，排查问题时临时改为 True。
+VERBOSE_LOG = False
 
 # ==================== 种子仓库自动维护 ====================
 
