@@ -64,9 +64,10 @@ class HttpClient:
         """将 URL 分类为端点类型，用于统计。
 
         Returns:
-            端点类型名称，如 "search", "repo", "tree", "commits", "raw", "compare", "other"
+            端点类型名称，如 "search", "repo", "tree", "commits", "raw", "compare"
         """
-        if "/search/repositories" in url:
+        # 按优先级匹配，`/search/` 比 `/repos/` 更具体
+        if "/search/" in url:
             return "search"
         elif "/git/trees/" in url:
             return "tree"
@@ -82,6 +83,8 @@ class HttpClient:
             return "repo"
         elif "raw.githubusercontent.com" in url:
             return "raw"
+        elif "api.github.com" in url:
+            return "api_other"
         else:
             return "other"
 

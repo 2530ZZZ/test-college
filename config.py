@@ -47,7 +47,7 @@ MAX_PAGES = 5
 
 # 每页搜索结果数
 # 默认 30，取值范围 1-100（GitHub API 上限）。
-PER_PAGE = 50
+PER_PAGE = 80
 
 # 仓库间休眠（秒），避免连续请求触发限流
 # 默认 0.5，取值范围 0.1-2.0。
@@ -73,9 +73,6 @@ REPO_MAX_AGE_HOURS = 168
 # 候选文件数 > 此值时，用 GitHub Compare API 获取 24h 内变更的文件集合（3 次 API 调用）。
 # 默认 20，取值范围 5-100。
 MAX_RAW_DOWNLOADS_PER_REPO = 100
-
-# 单仓库最大候选文件处理数，None 表示不限制
-# 默认 None。限制值可设为 50，避免超大仓库消耗过多资源。
 
 # ==================== 文件收集配置 ====================
 
@@ -184,6 +181,74 @@ TOPIC_QUERIES = [
     "clash-subscribe",
     "v2ray-subscribe",
 ]
+
+# ==================== README 内容搜索 ====================
+
+# 是否启用 README 内容搜索（in:readme 限定，只搜 README 文件内容）
+# 默认 False。命中精度极高——README 里提到配置名的仓库必然相关。
+README_SEARCH_ENABLED = True
+
+# README 搜索关键词（独立于 BASE_QUERIES，侧重软件生态名和配置字段名）
+README_QUERIES = [
+    "Clash.Meta 订阅",
+    "v2rayN 订阅",
+    "v2rayNG 配置",
+    "sing-box config",
+    "Shadowrocket 订阅",
+    "Nekobox 配置",
+    "FlClash 节点",
+    "Hiddify config",
+    "mihomo 订阅",
+    "proxy-groups clash",
+    "vmess:// vless://",
+    "trojan:// ss://",
+    "机场订阅",
+    "免费节点 订阅链接",
+    "clash 订阅 节点",
+]
+
+# README 搜索最大页数（命中率高，浅页即可）
+# 默认 2，取值范围 1-5。
+README_MAX_PAGES = 5
+
+# ==================== Code 文件内容搜索 ====================
+
+# 是否启用 GitHub Code Search（搜文件内容中的 URI 字符串和配置字段）
+# 默认 False。命中精度几乎 100%，直接定位到包含节点 URI 的文件。
+CODE_SEARCH_ENABLED = True
+
+# Code 搜索词列表
+CODE_QUERIES = [
+    # URI 前缀（最高命中率，文件里出现 vmess:// 必然是节点文件）
+    "vmess:// extension:yaml",
+    "vless:// extension:yaml",
+    "trojan:// extension:yaml",
+    "ss:// extension:yaml",
+    "vmess:// extension:txt",
+    "vless:// extension:txt",
+    "trojan:// extension:txt",
+    "ss:// extension:txt",
+    "vmess:// extension:json",
+    "vless:// extension:json",
+    # Clash / Sing-box 配置字段
+    "proxy-groups extension:yaml",
+    "outbounds extension:json",
+    # 搜其他搜集器代码（找到后遍历作者仓库）
+    "v2ray aggregator extension:py",
+    "proxy collector extension:py",
+    "vmess:// raw.githubusercontent extension:py",
+]
+
+# Code 搜索最大页数（每页 100 个文件）
+# 默认 3，取值范围 1-5。
+CODE_MAX_PAGES = 5
+
+# ==================== 中文关键词翻页 ====================
+
+# 中文关键词的翻页倍数（相较于 base MAX_PAGES）。中文仓库前几页广告多，
+# 需要翻更多页才能找到真正的节点仓库。
+# 默认 2。实际页数 = MAX_PAGES * MAX_PAGES_ZH_MULTIPLIER。
+MAX_PAGES_ZH_MULTIPLIER = 2
 
 # 并行下载阈值：候选文件数超过此值启用线程池并发下载
 # 默认 10。大部分仓库只有 2-5 个候选文件，串行更省开销。

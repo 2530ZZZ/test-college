@@ -28,7 +28,7 @@ from typing import List, Set, Optional, Tuple, Dict
 from config import (
     GITHUB_TOKEN, MAX_PAGES, PER_PAGE, REPO_SLEEP_SECONDS, PAGE_SLEEP_SECONDS, SEARCH_FORK,
     REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, FILE_PROCESS_TIMEOUT,
-    ALLOWED_EXTENSIONS, BLACKLIST_FILE,
+    ALLOWED_EXTENSIONS, BLACKLIST_FILE, README_SPAM_KEYWORDS,
     SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
@@ -39,6 +39,9 @@ from config import (
     FORK_CHAIN_PARALLEL, FORK_CHAIN_WORKERS,
     AUTO_SEED_ENABLED, AUTO_SEED_MIN_CONSECUTIVE, AUTO_SEED_MIN_NODES,
     TOPIC_SEARCH_ENABLED, TOPIC_QUERIES, REPO_MAX_AGE_HOURS,
+    README_SEARCH_ENABLED, README_QUERIES, README_MAX_PAGES,
+    CODE_SEARCH_ENABLED, CODE_QUERIES, CODE_MAX_PAGES,
+    MAX_PAGES_ZH_MULTIPLIER,
     USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
     USER_REPOS_PARALLEL, USER_REPOS_WORKERS,
     VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES,
@@ -429,6 +432,16 @@ class Collector:
                 daemon=True)
             threads.append(t_web)
 
+        # Code 搜索线程
+        if CODE_SEARCH_ENABLED:
+            code_http = HttpClient(token=self.token, rate_limiter=self.limiter)
+            t_code = threading.Thread(
+                target=self._run_code_thread,
+                args=(code_http, errors),
+                name="Code",
+                daemon=True)
+            threads.append(t_code)
+
         print(f"[{now_str()}] 启动 {len(threads)} 个搜集线程", flush=True)
         for t in threads:
             t.start()
@@ -452,23 +465,33 @@ class Collector:
     # ── 线程入口（异常隔离 + 调用实际搜集逻辑） ──
 
     def _run_github_thread(self, http: HttpClient, repo_seeds: dict, errors: dict):
-        """GitHub 线程入口。"""
+        """GitHub 线程入口。种子和关键词分别统计。"""
         self._main_http = http
         t0 = time.time()
-        stats = {"name": "GitHub", "repos_checked": 0, "files_downloaded": 0,
-                 "nodes_before": len(self.unique_nodes)}
+        _nodes_start = len(self.unique_nodes)
+        _repos_start = self.checked_count
+        _files_start = len(self.processed_file_shas)
         try:
-            self._collect_github(repo_seeds, stats)
+            self._collect_github(repo_seeds)
         except Exception as e:
             errors["GitHub"] = str(e)
             import traceback; traceback.print_exc()
         finally:
-            stats["elapsed"] = f"{time.time() - t0:.0f}s"
-            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
-            stats["api_calls"] = http.stats.get("total", 0)
-            stats["api_report"] = http.get_stats_report()
+            elapsed = f"{time.time() - t0:.0f}s"
+            total_new = len(self.unique_nodes) - _nodes_start
+            # 种子仓库统计（取自 _collect_github 内的 _seed_stats）
+            seed_st = getattr(self, '_seed_stats', {})
+            # 汇总统计
+            stats = {"name": "GitHub",
+                     "repos_checked": self.checked_count - _repos_start,
+                     "files_downloaded": len(self.processed_file_shas) - _files_start,
+                     "elapsed": elapsed, "nodes_new": total_new,
+                     "api_calls": http.stats.get("total", 0),
+                     "api_report": http.get_stats_report()}
             with self._state_lock:
                 self._channel_stats["GitHub"] = stats
+                if seed_st:
+                    self._channel_stats["种子仓库"] = seed_st
 
     def _run_web_thread(self, http: HttpClient, errors: dict):
         """Web 线程入口。"""
@@ -493,12 +516,11 @@ class Collector:
 
     # ── 搜集实现 ──
 
-    def _collect_github(self, repo_seeds: dict, stats: dict = None):
+    def _collect_github(self, repo_seeds: dict):
         """GitHub 搜索收集。先处理种子仓库，再搜索关键词。"""
-        if stats is None:
-            stats = {}
         _repos_before = self.checked_count
         _files_before = len(self.processed_file_shas)
+        _nodes_before = len(self.unique_nodes)
         _stage_start = time.time()
 
         # ── 阶段 1: 种子仓库 ──
@@ -532,24 +554,40 @@ class Collector:
             self._update_seed_entry(repo_seeds, repo, new_nodes)
             time.sleep(REPO_SLEEP_SECONDS)
 
-        # 构建完整搜索列表：关键词 + topic（按开关）
+        # 构建完整搜索列表：关键词 + topic + README（按开关）
+        _time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')
         all_queries = list(self.queries)
+        # Topic 搜索
         if TOPIC_SEARCH_ENABLED and TOPIC_QUERIES:
             for t in TOPIC_QUERIES:
-                topic_q = f"topic:{t} pushed:>{(datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')}"
-                if SEARCH_FORK:
-                    topic_q += " fork:true"
-                all_queries.append(topic_q)
+                q = f"topic:{t} pushed:>{_time_sfx}"
+                if SEARCH_FORK: q += " fork:true"
+                all_queries.append(q)
+        # README 搜索
+        if README_SEARCH_ENABLED and README_QUERIES:
+            for rq in README_QUERIES:
+                q = f"{rq} in:readme pushed:>{_time_sfx}"
+                if SEARCH_FORK: q += " fork:true"
+                all_queries.append(q)
 
         # ── 阶段 2: 关键词 + Topic 搜索 ──
         _seed_elapsed = time.time() - _stage_start
+        self._seed_stats = {
+            "name": "种子仓库",
+            "repos_checked": self.checked_count - _repos_before,
+            "files_downloaded": len(self.processed_file_shas) - _files_before,
+            "elapsed": f"{_seed_elapsed:.0f}s",
+            "nodes_new": len(self.unique_nodes) - _nodes_before,
+        }
         total_queries = len(all_queries)
         kw_count = len(self.queries)
         topic_count = len(TOPIC_QUERIES) if TOPIC_SEARCH_ENABLED else 0
+        readme_count = len(README_QUERIES) if README_SEARCH_ENABLED else 0
         print(f"\n{'='*60}", flush=True)
-        print(f"[{now_str()}] 🔵 [阶段2] 关键词+Topic搜索 | "
-              f"关键词={kw_count} | topic={topic_count} | 总计={total_queries} | "
-              f"种子阶段耗时={_seed_elapsed:.0f}s", flush=True)
+        print(f"[{now_str()}] 🔵 [阶段2] 关键词搜索 | "
+              f"关键词={kw_count} | topic={topic_count} | "
+              f"README={readme_count} | 总计={total_queries} | "
+              f"种子耗时={_seed_elapsed:.0f}s", flush=True)
         print(f"{'='*60}", flush=True)
 
         for idx, query in enumerate(all_queries, 1):
@@ -572,10 +610,6 @@ class Collector:
             q_new = len(self.unique_nodes) - _nodes_before_query
             print(f"[{now_str()}] ⏱️ [{idx}/{total_queries}] {query[:50]} | "
                   f"耗时 {q_elapsed:.0f}s | 新增 {q_new} 节点", flush=True)
-
-        with self._state_lock:
-            stats["repos_checked"] = self.checked_count - _repos_before
-            stats["files_downloaded"] = len(self.processed_file_shas) - _files_before
 
         # ── 自动收录种子仓库 ──
         if AUTO_SEED_ENABLED:
@@ -667,6 +701,82 @@ class Collector:
         with open(WEB_BLACKLIST_FILE, "w", encoding="utf-8") as f:
             f.write("\n".join(blacklist))
 
+    # ── Code 文件搜索 ──
+
+    def _run_code_thread(self, http: HttpClient, errors: dict):
+        """Code 搜索线程。"""
+        self._main_http = http
+        t0 = time.time()
+        stats = {"name": "Code", "files_found": 0, "repos_processed": 0,
+                 "nodes_before": len(self.unique_nodes)}
+        try:
+            self._collect_code(stats)
+        except Exception as e:
+            errors["Code"] = str(e)
+            import traceback; traceback.print_exc()
+        finally:
+            stats["elapsed"] = f"{time.time() - t0:.0f}s"
+            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
+            stats["api_calls"] = http.stats.get("total", 0)
+            with self._state_lock:
+                self._channel_stats["Code"] = stats
+
+    def _collect_code(self, stats: dict):
+        """GitHub Code Search：搜索文件内容中的 URI/配置字段，提取仓库名后走 process_repo。"""
+        print(f"[{now_str()}] 📝 开始 Code 搜索 "
+              f"({len(CODE_QUERIES)} 个查询)", flush=True)
+
+        repo_set = set()
+        for q in CODE_QUERIES:
+            if self.limiter.should_stop() or self._runtime_exceeded():
+                return
+            for page in range(1, CODE_MAX_PAGES + 1):
+                url = (f"https://api.github.com/search/code"
+                       f"?q={quote(q)}&sort=indexed&order=desc"
+                       f"&per_page=100&page={page}")
+                resp = self.http.get(url, timeout=SEARCH_TIMEOUT,
+                                     operation_name=f"code[{q[:30]}]")
+                if not resp:
+                    break
+                data = resp.json()
+                items = data.get("items", [])
+                for item in items:
+                    r = item.get("repository", {})
+                    fn = r.get("full_name")
+                    if fn and fn not in self.seen_repos:
+                        repo_set.add(fn)
+                stats["files_found"] = stats.get("files_found", 0) + len(items)
+                if len(items) < 100:
+                    break  # 最后一页
+                time.sleep(PAGE_SLEEP_SECONDS)
+
+        if not repo_set:
+            return
+
+        print(f"[{now_str()}] Code 搜索: {stats['files_found']} 个文件, "
+              f"{len(repo_set)} 个唯一仓库", flush=True)
+
+        for repo in repo_set:
+            if self.limiter.should_stop() or self._runtime_exceeded():
+                break
+            if repo in self.seen_repos:
+                continue
+            self.seen_repos.add(repo)
+            stats["repos_processed"] = stats.get("repos_processed", 0) + 1
+            repo_info = self.http.get_json(
+                f"https://api.github.com/repos/{repo}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"repo info ({repo})")
+            if not repo_info or repo_info.get("disabled", False):
+                continue
+            branch = repo_info.get("default_branch", "main")
+            self._branch_cache[repo] = branch
+            self.process_repo(repo, branch=branch,
+                              size=repo_info.get("size", -1),
+                              disabled=False,
+                              pushed_at=repo_info.get("pushed_at", ""))
+            time.sleep(REPO_SLEEP_SECONDS)
+
     # ── 搜索辅助 ──
 
     @staticmethod
@@ -746,14 +856,13 @@ class Collector:
                 print(f"    检查URL: {st.get('urls_checked', 0)}, "
                       f"域名黑名单: {st.get('domains_blacklisted', 0)}, "
                       f"耗时: {elapsed}")
-            elif name == "TG":
-                ch_before = st.get('channels_before', 0)
-                ch_after = st.get('channels_after', ch_before)
-                ch_delta = ch_after - ch_before
-                delta_str = f"+{ch_delta}" if ch_delta > 0 else str(ch_delta)
-                print(f"    频道: {ch_before}→{ch_after} ({delta_str}), "
-                      f"扫描: {st.get('channels_scanned', 0)}, "
-                      f"消息: {st.get('messages_fetched', 0)}, "
+            elif name == "种子仓库":
+                print(f"    检查仓库: {st.get('repos_checked', 0)}, "
+                      f"下载文件: {st.get('files_downloaded', 0)}, "
+                      f"耗时: {elapsed}")
+            elif name == "Code":
+                print(f"    文件匹配: {st.get('files_found', 0)}, "
+                      f"仓库处理: {st.get('repos_processed', 0)}, "
                       f"耗时: {elapsed}")
             print(f"    新增节点: {st.get('nodes_new', 0)}, "
                   f"API 调用: {st.get('api_calls', 0)}")
@@ -777,7 +886,11 @@ class Collector:
         Args:
             query: GitHub 搜索查询字符串
         """
-        for page in range(1, MAX_PAGES + 1):
+        # 中文关键词翻更多页（前几页广告多）
+        has_cjk = bool(re.search(r'[一-鿿]', query))
+        max_p = (MAX_PAGES * MAX_PAGES_ZH_MULTIPLIER) if has_cjk else MAX_PAGES
+
+        for page in range(1, max_p + 1):
             # 每次翻页前检查限流和运行时间
             if self.limiter.should_stop() or self._runtime_exceeded():
                 return
@@ -947,9 +1060,13 @@ class Collector:
             except RuntimeError:
                 raise
 
-        # 未提取到节点 → 加入黑名单
+        # 未提取到节点 → 检查 README 广告（有广告才加黑名单）
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
-            print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
+            is_spam = self._check_readme_spam(repo, branch)
+            if is_spam:
+                print(f"[{now_str()}] 仓库 {github_url} README 含广告词，加入黑名单", flush=True)
+            else:
+                print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
             self.blacklist_repos.add(github_url)
             with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                 f.write(github_url + "\n")
@@ -1012,7 +1129,7 @@ class Collector:
         for page in range(1, 3):
             forks = self.http.get_json(
                 f"https://api.github.com/repos/{parent_name}/forks"
-                f"?sort=newest&per_page=30&page={page}",
+                f"?sort=stargazers&per_page=30&page={page}",
                 timeout=FILE_DOWNLOAD_TIMEOUT,
                 operation_name=f"forks of {parent_name} (p{page})")
             if not forks or not isinstance(forks, list):
@@ -1053,7 +1170,7 @@ class Collector:
         for page in range(1, 3):
             forks = self.http.get_json(
                 f"https://api.github.com/repos/{repo}/forks"
-                f"?sort=newest&per_page=30&page={page}",
+                f"?sort=stargazers&per_page=30&page={page}",
                 timeout=FILE_DOWNLOAD_TIMEOUT,
                 operation_name=f"forks of {repo} (p{page})")
             if not forks or not isinstance(forks, list):
@@ -1137,6 +1254,21 @@ class Collector:
             self._run_fork_batch(qualified, branch, depth, "👤 用户仓库",
                                  workers=USER_REPOS_WORKERS)
         print(f"[{now_str()}]   用户 {owner} 共查 {len(found)} 个仓库", flush=True)
+
+    def _check_readme_spam(self, repo: str, branch: str) -> bool:
+        """下载仓库 README 并检查广告关键词。只在无节点时调用。
+
+        Returns: True 表示 README 包含广告词（应加黑名单）。
+        """
+        if not README_SPAM_KEYWORDS:
+            return False
+        readme_url = f"https://raw.githubusercontent.com/{repo}/{branch}/README.md"
+        resp = self.http.get(readme_url, timeout=FILE_DOWNLOAD_TIMEOUT,
+                             operation_name=f"README ({repo})")
+        if not resp:
+            return False
+        content = resp.text.lower()
+        return any(kw.lower() in content for kw in README_SPAM_KEYWORDS)
 
     # ==================== 递归树 API 处理 ====================
 

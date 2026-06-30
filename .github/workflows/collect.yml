@@ -49,8 +49,6 @@ jobs:
             [ -f "$f" ] && git add "$f" || true
           done
           [ -d sha_cache/ ] && git add sha_cache/ || true
-            [ -f "$f" ] && git add "$f" || true
-          done
           [ -d batches/ ] && git add batches/ || true
           [ -d log/ ] && git add log/ || true
           git commit -m "自动更新 - $BEIJING_TIME CST" || echo "No changes to commit"
