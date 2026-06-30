@@ -666,7 +666,8 @@ class Collector:
                         else:
                             continue
                     engine_failures[engine] = 0  # 成功后重置
-                    result_urls = self._parse_search_results(resp.text, engine)
+                    result_urls = self._parse_search_results(
+                        resp.content.decode('utf-8', errors='replace'), engine)
                     for url in result_urls:
                         domain = url.split("/")[2] if "://" in url else url
                         if domain in blacklist:
@@ -676,7 +677,11 @@ class Collector:
                         if not content_resp:
                             continue
                         before = len(self.unique_nodes)
-                        proxies = extract_all_strategies(content_resp.text)
+                        try:
+                            web_content = content_resp.content.decode('utf-8', errors='replace')
+                        except Exception:
+                            web_content = ""
+                        proxies = extract_all_strategies(web_content)
                         for p in proxies:
                             if not p.is_valid():
                                 continue
@@ -1225,6 +1230,7 @@ class Collector:
             r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
         )
         found = set()
+        qualified = []
         count = 0
         for page in range(1, 5):
             repos_data = self.http.get_json(
@@ -1248,9 +1254,22 @@ class Collector:
                 r["full_name"] = full_name  # ensure key exists for _process_fork_repo
                 count += 1
 
-        if found:
-            qualified = [r for r in repos_data
-                        if r.get("full_name") in found]
+        # 汇总所有页面的合格仓库
+        qualified = []
+        for page in range(1, 5):
+            repos_data = self.http.get_json(
+                f"https://api.github.com/users/{owner}/repos"
+                f"?sort=updated&per_page=100&page={page}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"user repos {owner} (p{page})")
+            if not repos_data or not isinstance(repos_data, list):
+                break
+            for r in repos_data:
+                fn = r.get("full_name")
+                if fn and fn in found:
+                    qualified.append(r)
+
+        if qualified:
             self._run_fork_batch(qualified, branch, depth, "👤 用户仓库",
                                  workers=USER_REPOS_WORKERS)
         print(f"[{now_str()}]   用户 {owner} 共查 {len(found)} 个仓库", flush=True)
@@ -1518,13 +1537,13 @@ class Collector:
             self.processed_file_shas.add(sha)
             return
 
-        # 读取内容
+        # 读取内容（surrogate 字符兼容）
         content = None
         try:
-            content = file_resp.text
-        except UnicodeDecodeError:
+            content = file_resp.content.decode('utf-8', errors='replace')
+        except Exception:
             try:
-                content = file_resp.content.decode('latin-1')
+                content = file_resp.content.decode('latin-1', errors='replace')
             except Exception:
                 pass
 

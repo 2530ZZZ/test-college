@@ -124,7 +124,7 @@ class StandardProxy:
 
         p = self.protocol.lower()
         host = f"{self.server}:{self.port}"
-        userinfo = quote(self.uuid, safe='')
+        userinfo = quote(self.uuid or "", safe='')
         remark = quote(self.remark, safe='') if self.remark else ""
         fragment = f"#{remark}" if remark else ""
 
