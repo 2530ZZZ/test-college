@@ -115,7 +115,6 @@ class Collector:
         # 分渠道统计（每线程一份，_finalize 时汇总）
         self._channel_stats = {}  # channel_name → dict
         self._channel_new_nodes = {}  # channel_name → 本渠道新增计数（线程安全）
-        self._parallel_sem = threading.BoundedSemaphore(MAX_TOTAL_PARALLEL)
 
         # 加载持久化状态
         self.load_blacklist()
@@ -1018,12 +1017,10 @@ class Collector:
             self._run_fork_batch(qualified, branch, depth, "🍴 兄弟仓库")
 
     def _process_fork_repo(self, fork: dict, branch: str, depth: int) -> tuple:
-        """并行工作线程：处理单个 fork/用户仓库。每个线程拥有独立 HttpClient。"""
-        self._parallel_sem.acquire()
-        try:
-            self.http = HttpClient(token=self.token, rate_limiter=None)
-            fork_name = fork.get("full_name")
-            before = len(self.unique_nodes)
+        """处理单个 fork/用户仓库（串行降级路径）。"""
+        self.http = HttpClient(token=self.token, rate_limiter=None)
+        fork_name = fork.get("full_name")
+        before = len(self.unique_nodes)
         try:
             self.process_repo(fork_name,
                               branch=fork.get("default_branch", branch),
@@ -1033,10 +1030,8 @@ class Collector:
                               depth=depth + 1)
         except Exception as e:
             print(f"[{now_str()}]   ⚠️ {fork_name}: {e}", flush=True)
-            new_nodes = len(self.unique_nodes) - before
-            return (fork_name, new_nodes)
-        finally:
-            self._parallel_sem.release()
+        new_nodes = len(self.unique_nodes) - before
+        return (fork_name, new_nodes)
 
     def _trace_child_forks(self, repo: str, branch: str, depth: int):
         """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
