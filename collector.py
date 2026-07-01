@@ -1098,31 +1098,6 @@ class Collector:
         )
         found = set()
         qualified = []
-        count = 0
-        for page in range(1, 5):
-            repos_data = self.http.get_json(
-                f"https://api.github.com/users/{owner}/repos"
-                f"?sort=updated&per_page=100&page={page}",
-                timeout=FILE_DOWNLOAD_TIMEOUT,
-                operation_name=f"user repos {owner} (p{page})")
-            if not repos_data or not isinstance(repos_data, list):
-                break
-
-            for r in repos_data:
-                full_name = r.get("full_name")
-                if (not full_name or full_name in self.seen_repos
-                        or f"https://github.com/{full_name}" in self.blacklist_repos):
-                    continue
-                if full_name in found: continue
-                found.add(full_name)
-                if USER_REPOS_MAX_PER_USER and len(found) >= USER_REPOS_MAX_PER_USER:
-                    break
-                self.seen_repos.add(full_name)
-                r["full_name"] = full_name  # ensure key exists for _process_fork_repo
-                count += 1
-
-        # 汇总所有页面的合格仓库
-        qualified = []
         for page in range(1, 5):
             repos_data = self.http.get_json(
                 f"https://api.github.com/users/{owner}/repos"
@@ -1133,13 +1108,19 @@ class Collector:
                 break
             for r in repos_data:
                 fn = r.get("full_name")
-                if fn and fn in found:
-                    qualified.append(r)
+                if (not fn or fn in self.seen_repos
+                        or f"https://github.com/{fn}" in self.blacklist_repos):
+                    continue
+                if fn in found: continue
+                found.add(fn)
+                if USER_REPOS_MAX_PER_USER and len(qualified) >= USER_REPOS_MAX_PER_USER:
+                    break
+                self.seen_repos.add(fn)
+                qualified.append(r)
 
         if qualified:
-            self._run_fork_batch(qualified, branch, depth, "👤 用户仓库",
-                                 workers=USER_REPOS_WORKERS)
-        print(f"[{now_str()}]   用户 {owner} 共查 {len(found)} 个仓库", flush=True)
+            self._run_fork_batch(qualified, branch, depth, "👤 用户仓库")
+        print(f"[{now_str()}]   用户 {owner} 共查 {len(qualified)} 个仓库", flush=True)
 
     def _check_readme_spam(self, repo: str, branch: str) -> bool:
         """下载仓库 README 并检查广告关键词。只在无节点时调用。
