@@ -46,8 +46,8 @@ GITHUB_SEARCH_ENABLED = True
 MAX_PAGES = 5
 
 # 每页搜索结果数
-# 默认 30，取值范围 1-100（GitHub API 上限）。
-PER_PAGE = 80
+# 默认 100（GitHub API 上限）。越大翻页越少、搜索越快。
+PER_PAGE = 100
 
 # 仓库间休眠（秒），避免连续请求触发限流
 # 默认 0.5，取值范围 0.1-2.0。
@@ -59,7 +59,7 @@ PAGE_SLEEP_SECONDS = 2.0
 
 # 单仓库处理总超时（秒），None 表示不限制
 # 默认 120，取值范围 30-300。超时后跳过该仓库继续处理下一个。
-REPO_TIMEOUT_SECONDS = 120
+REPO_TIMEOUT_SECONDS = 300
 
 # 仓库最 后更新时间阈值（小时）。非搜索来源的仓库超过此时间未推送则直接跳过。
 # ≤ 24h → 正常处理（可能有新文件）
@@ -125,12 +125,6 @@ MAX_PARENT_TRACE_DEPTH = 1
 # 0 表示不查子仓库。1 表示查本仓库的直接 fork，2 表示还查 fork 的 fork。
 FORK_CHAIN_CHILD_DEPTH = 1
 
-# Fork 链是否并行处理
-FORK_CHAIN_PARALLEL = True
-
-# Fork 链并行线程数（默认 4，GA 2核下够用）
-FORK_CHAIN_WORKERS = 4
-
 # ==================== 同用户仓库遍历 ====================
 
 # 是否在发现节点后遍历该用户名下的所有公开仓库
@@ -140,12 +134,6 @@ USER_REPOS_ENABLED = True
 # 每个用户最多额外查询几个仓库（通过 repos API 分页获取）
 # 默认 30，取值范围 5-100。设为 0 表示不限制。
 USER_REPOS_MAX_PER_USER = 30
-
-# 用户仓库遍历是否并行处理
-USER_REPOS_PARALLEL = True
-
-# 用户仓库并行线程数
-USER_REPOS_WORKERS = 4
 
 # ==================== 日志配置 ====================
 
@@ -254,9 +242,18 @@ MAX_PAGES_ZH_MULTIPLIER = 2
 # 默认 10。大部分仓库只有 2-5 个候选文件，串行更省开销。
 PARALLEL_DOWNLOAD_THRESHOLD = 10
 
-# 并行下载最大线程数
-# 默认 8。GitHub Actions 2核下 8 线程足够。raw 下载不占 API 配额，无限制风险。
-PARALLEL_DOWNLOAD_WORKERS = 8
+# 并行下载最大线程数（raw CDN 不限流，设大加速）
+PARALLEL_DOWNLOAD_WORKERS = 16
+
+# ==================== 共用线程池 ====================
+
+# 共用线程池 Worker 数（处理仓库/fork/用户仓库等所有类型任务）
+# 默认 8。GA 2核下 I/O 密集型任务 8 线程合理。
+SHARED_POOL_WORKERS = 8
+
+# 共用任务队列最大长度（背压控制，防止内存爆炸）
+# 默认 200。队列满时生产者阻塞，等待消费者腾出空间。
+SHARED_POOL_QUEUE_SIZE = 200
 
 # ==================== API 请求超时设置 ====================
 
@@ -302,45 +299,6 @@ SEED_REPOS_FILE = "seed_repos.json"
 # 设为 0 表示不自动淘汰。
 SOURCE_STALE_DAYS = 1
 
-# ==================== 网页搜索配置 ====================
-
-# 是否启用网页搜索（搜索引擎抓取）
-# 默认 False。需要配合 WEB_SEARCH_ENGINES 使用。
-WEB_SEARCH_ENABLED = False
-
-# 搜索引擎列表（可多选）
-# 支持: "google", "bing", "duckduckgo", "yandex"
-# 每个引擎的搜索结果都会被下载和提取。
-# DuckDuckGo 对 DC IP 限流严格（202），bing/yandex 更宽松，bing 放首位
-WEB_SEARCH_ENGINES = ["bing", "duckduckgo", "yandex"]
-
-# 每个关键词搜索的最大页数
-# 默认 2，取值范围 1-5。
-WEB_MAX_PAGES = 5
-
-# 每页搜索结果数
-# 默认 30，取值范围 10-100。
-WEB_PER_PAGE = 50
-
-# 搜索结果页间休眠（秒）
-# 默认 3.0，取值范围 1.0-10.0。
-WEB_PAGE_SLEEP = 3.0
-
-# 搜索结果 URL 下载超时（秒）
-# 默认 (8, 15)。
-WEB_DOWNLOAD_TIMEOUT = (8, 15)
-
-# 网页 URL 黑名单文件路径
-# 存储已知无节点或广告网站的域名，每行一个。跨运行持久化。
-WEB_BLACKLIST_FILE = "web_blacklist.txt"
-
-# User-Agent 轮换池（搜索引擎爬取时随机选取，避免被反爬）
-WEB_USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
-]
 
 # ==================== 搜索关键词 ====================
 
@@ -500,7 +458,7 @@ MAX_RECURSIVE_DEPTH = 2
 
 # 批次刷盘阈值（buffer 中累积到此数量自动写入文件）
 # 默认 10000，取值范围 1000-50000。
-BATCH_FLUSH_SIZE = 10000
+BATCH_FLUSH_SIZE = 5000
 
 # 批次文件存放目录（节点边搜集边分批次持久化）
 # 默认 "batches"，在项目根目录下创建。

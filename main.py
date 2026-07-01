@@ -15,7 +15,6 @@ import glob
 from datetime import datetime, timezone, timedelta
 
 from collector import Collector
-from output import save_alive_nodes
 from utils import now_str
 from config import (
     GITHUB_TOKEN, BASE_QUERIES, SEARCH_SUFFIX, SEARCH_IN,
@@ -93,10 +92,7 @@ def main():
     collector = Collector(token=GITHUB_TOKEN, queries=queries)
     collector.run()
 
-    # 输出 alive.txt（全部搜集到的节点）
-    alive_uris = list(collector.unique_nodes)
-    save_alive_nodes(alive_uris)
-
+    # 节点已由 collector 内部自动保存到 no.txt
     total_elapsed = time.time() - start_time
     print(f"[{now_str()}] 🎉 全部完成，总耗时 {total_elapsed:.1f} 秒", flush=True)
 

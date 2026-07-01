@@ -20,6 +20,7 @@ import shutil
 import re
 import pickle
 import threading
+from queue import Queue
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
@@ -36,22 +37,19 @@ from config import (
     PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
     FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
     MAX_PARENT_TRACE_DEPTH, FORK_CHAIN_CHILD_DEPTH,
-    FORK_CHAIN_PARALLEL, FORK_CHAIN_WORKERS,
     AUTO_SEED_ENABLED, AUTO_SEED_MIN_CONSECUTIVE, AUTO_SEED_MIN_NODES,
     TOPIC_SEARCH_ENABLED, TOPIC_QUERIES, REPO_MAX_AGE_HOURS,
     README_SEARCH_ENABLED, README_QUERIES, README_MAX_PAGES,
     CODE_SEARCH_ENABLED, CODE_QUERIES, CODE_MAX_PAGES,
     MAX_PAGES_ZH_MULTIPLIER,
     USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
-    USER_REPOS_PARALLEL, USER_REPOS_WORKERS,
     VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES,
+    SHARED_POOL_WORKERS, SHARED_POOL_QUEUE_SIZE,
     SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
     GITHUB_SEARCH_ENABLED,
-    WEB_SEARCH_ENABLED, WEB_SEARCH_ENGINES, WEB_MAX_PAGES, WEB_PER_PAGE,
-    WEB_PAGE_SLEEP, WEB_DOWNLOAD_TIMEOUT, WEB_BLACKLIST_FILE, WEB_USER_AGENTS,
 )
 from http_client import HttpClient, RateLimiter
 from parsers import extract_all_strategies
@@ -116,6 +114,8 @@ class Collector:
 
         # 分渠道统计（每线程一份，_finalize 时汇总）
         self._channel_stats = {}  # channel_name → dict
+        self._channel_new_nodes = {}  # channel_name → 本渠道新增计数（线程安全）
+        self._parallel_sem = threading.BoundedSemaphore(MAX_TOTAL_PARALLEL)
 
         # 加载持久化状态
         self.load_blacklist()
@@ -392,63 +392,65 @@ class Collector:
         每个线程持有独立 HttpClient，共享去重/缓存/批次状态。
         所有共享操作通过 _state_lock 保护。
         """
-        print(f"[{now_str()}] 🚀 程序启动（并行三通道）", flush=True)
+        print(f"[{now_str()}] 🚀 程序启动", flush=True)
         self._start_time = time.time()
 
         # 加载种子文件
         repo_seeds = self._load_seed_file(SEED_REPOS_FILE)
-        self._initial_seed_keys = set(repo_seeds.keys())  # 记录初始种子，用于自动收录
+        self._initial_seed_keys = set(repo_seeds.keys())
 
-        # 清空上次运行的批次文件
+        # 清空上次批次
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
-        if os.path.exists(batch_dir):
-            shutil.rmtree(batch_dir)
+        if os.path.exists(batch_dir): shutil.rmtree(batch_dir)
         os.makedirs(batch_dir, exist_ok=True)
 
-        # ── 为每个线程创建独立 HttpClient ──
-        gh_http = HttpClient(token=self.token, rate_limiter=self.limiter,
-                             pool_connections=20, pool_maxsize=20)  # 并行下载需要更大连接池
-        web_http = HttpClient(token="", rate_limiter=None)
+        # ── 创建共用线程池（Code Search 和 GitHub 搜索共用） ──
+        task_queue = Queue(maxsize=SHARED_POOL_QUEUE_SIZE)
+        self._task_queue = task_queue  # fork 链也需要引用
+        workers = [threading.Thread(target=self._pool_worker, args=(task_queue,),
+                                    name=f"W-{i}", daemon=True)
+                   for i in range(SHARED_POOL_WORKERS)]
+        for w in workers: w.start()
 
-        # ── 启动并行线程 ──
-        threads = []
+        # ── GitHub 线程（关键词搜索） ──
         errors = {}
-
-        # GitHub 线程（按开关）
         if GITHUB_SEARCH_ENABLED:
+            gh_http = HttpClient(token=self.token, rate_limiter=self.limiter,
+                                 pool_connections=20, pool_maxsize=20)
             t_gh = threading.Thread(
                 target=self._run_github_thread,
-                args=(gh_http, repo_seeds, errors),
-                name="GitHub",
-                daemon=True)
-            threads.append(t_gh)
+                args=(gh_http, repo_seeds, task_queue, errors),
+                name="GitHub", daemon=True)
+            t_gh.start()
 
-        # Web 线程（按开关）
-        if WEB_SEARCH_ENABLED:
-            t_web = threading.Thread(
-                target=self._run_web_thread,
-                args=(web_http, errors),
-                name="Web",
-                daemon=True)
-            threads.append(t_web)
-
-        # Code 搜索线程
+        # ── Code Search（主线程串行，先占 seen_repos） ──
         if CODE_SEARCH_ENABLED:
-            code_http = HttpClient(token=self.token, rate_limiter=self.limiter)
-            t_code = threading.Thread(
-                target=self._run_code_thread,
-                args=(code_http, errors),
-                name="Code",
-                daemon=True)
-            threads.append(t_code)
+            try:
+                code_http = HttpClient(token=self.token, rate_limiter=self.limiter)
+                saved = self._main_http
+                self._main_http = code_http
+                t0 = time.time()
+                self._collect_code(task_queue)
+                self._main_http = saved
+                cn = self._channel_new_nodes.get("Code", 0)
+                self._channel_stats["Code"] = {
+                    "name": "Code", "nodes_new": cn,
+                    "elapsed": f"{time.time()-t0:.0f}s",
+                    "api_calls": code_http.stats.get("total", 0)}
+            except Exception as e:
+                errors["Code"] = str(e)
+                import traceback; traceback.print_exc()
 
-        print(f"[{now_str()}] 启动 {len(threads)} 个搜集线程", flush=True)
-        for t in threads:
-            t.start()
+        # ── 等待 GitHub 线程完成 ──
+        if GITHUB_SEARCH_ENABLED:
+            t_gh.join()
 
-        # 等待所有线程完成
-        for t in threads:
-            t.join()
+        # ── 停止共用线程池 ──
+        print(f"[{now_str()}] ⏳ 等待队列清空 (剩余 {task_queue.qsize()})...", flush=True)
+        task_queue.join()
+        for _ in workers: task_queue.put(None)
+        for w in workers: w.join()
+        self._task_queue = None
 
         # ── 淘汰无产出来源并写回种子文件 ──
         with self._state_lock:
@@ -464,30 +466,34 @@ class Collector:
 
     # ── 线程入口（异常隔离 + 调用实际搜集逻辑） ──
 
-    def _run_github_thread(self, http: HttpClient, repo_seeds: dict, errors: dict):
-        """GitHub 线程入口。种子和关键词分别统计。"""
+    def _run_github_thread(self, http: HttpClient, repo_seeds: dict,
+                           task_queue: Queue, errors: dict):
+        """GitHub 线程入口。"""
         self._main_http = http
         t0 = time.time()
-        _nodes_start = len(self.unique_nodes)
         _repos_start = self.checked_count
         _files_start = len(self.processed_file_shas)
         try:
-            self._collect_github(repo_seeds)
+            self._collect_github(repo_seeds, task_queue)
         except Exception as e:
             errors["GitHub"] = str(e)
             import traceback; traceback.print_exc()
         finally:
             elapsed = f"{time.time() - t0:.0f}s"
-            total_new = len(self.unique_nodes) - _nodes_start
-            # 种子仓库统计（取自 _collect_github 内的 _seed_stats）
-            seed_st = getattr(self, '_seed_stats', {})
-            # 汇总统计
+            gh_new = self._channel_new_nodes.get("GitHub", 0)
+            seed_new = self._channel_new_nodes.get("种子仓库", 0)
             stats = {"name": "GitHub",
                      "repos_checked": self.checked_count - _repos_start,
                      "files_downloaded": len(self.processed_file_shas) - _files_start,
-                     "elapsed": elapsed, "nodes_new": total_new,
+                     "elapsed": elapsed, "nodes_new": gh_new,
                      "api_calls": http.stats.get("total", 0),
                      "api_report": http.get_stats_report()}
+            r = getattr(self, '_seed_repos', 0)
+            f = getattr(self, '_seed_files', 0)
+            e = getattr(self, '_seed_elapsed', elapsed)
+            seed_st = {"name": "种子仓库", "nodes_new": seed_new,
+                       "repos_checked": r, "files_downloaded": f,
+                       "elapsed": e} if seed_new else {}
             with self._state_lock:
                 self._channel_stats["GitHub"] = stats
                 if seed_st:
@@ -516,271 +522,134 @@ class Collector:
 
     # ── 搜集实现 ──
 
-    def _collect_github(self, repo_seeds: dict):
-        """GitHub 搜索收集。先处理种子仓库，再搜索关键词。"""
+    def _collect_github(self, repo_seeds: dict, task_queue: Queue):
+        """种子仓库 + 关键词搜索，向共用线程池提交任务。"""
         _repos_before = self.checked_count
         _files_before = len(self.processed_file_shas)
-        _nodes_before = len(self.unique_nodes)
         _stage_start = time.time()
+        _time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
+            '%Y-%m-%dT%H:%M:%SZ')
 
-        # ── 阶段 1: 种子仓库 ──
-        seed_list = list(repo_seeds.keys())
-        if seed_list:
-            print(f"\n{'='*60}", flush=True)
-            print(f"[{now_str()}] 🔵 [阶段1] 种子仓库处理 | {len(seed_list)} 个",
-                  flush=True)
-            print(f"{'='*60}", flush=True)
-
-        for repo in seed_list:
-            if self.limiter.should_stop() or self._runtime_exceeded():
-                break
-            before = len(self.unique_nodes)
-            try:
-                repo_info = self.http.get_json(
-                    f"https://api.github.com/repos/{repo}",
-                    timeout=FILE_DOWNLOAD_TIMEOUT,
-                    operation_name=f"repo info ({repo})")
-                if not repo_info or repo_info.get('disabled', False):
-                    continue
-                branch = repo_info.get("default_branch", "main")
-                self._branch_cache[repo] = branch
-                self.process_repo(repo, branch=branch,
-                                  size=repo_info.get("size", -1),
-                                  disabled=False,
-                                  pushed_at=repo_info.get("pushed_at", ""))
-            except Exception as e:
-                print(f"[{now_str()}] ⚠️ 种子仓库 {repo}: {e}", flush=True)
-            new_nodes = len(self.unique_nodes) - before
-            self._update_seed_entry(repo_seeds, repo, new_nodes)
-            time.sleep(REPO_SLEEP_SECONDS)
-
-        # 构建完整搜索列表：关键词 + topic + README（按开关）
-        _time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        # 构建搜索列表
         all_queries = list(self.queries)
-        # Topic 搜索
         if TOPIC_SEARCH_ENABLED and TOPIC_QUERIES:
             for t in TOPIC_QUERIES:
                 q = f"topic:{t} pushed:>{_time_sfx}"
                 if SEARCH_FORK: q += " fork:true"
                 all_queries.append(q)
-        # README 搜索
         if README_SEARCH_ENABLED and README_QUERIES:
             for rq in README_QUERIES:
                 q = f"{rq} in:readme pushed:>{_time_sfx}"
                 if SEARCH_FORK: q += " fork:true"
                 all_queries.append(q)
 
-        # ── 阶段 2: 关键词 + Topic 搜索 ──
-        _seed_elapsed = time.time() - _stage_start
-        self._seed_stats = {
-            "name": "种子仓库",
-            "repos_checked": self.checked_count - _repos_before,
-            "files_downloaded": len(self.processed_file_shas) - _files_before,
-            "elapsed": f"{_seed_elapsed:.0f}s",
-            "nodes_new": len(self.unique_nodes) - _nodes_before,
-        }
-        total_queries = len(all_queries)
-        kw_count = len(self.queries)
-        topic_count = len(TOPIC_QUERIES) if TOPIC_SEARCH_ENABLED else 0
-        readme_count = len(README_QUERIES) if README_SEARCH_ENABLED else 0
-        print(f"\n{'='*60}", flush=True)
-        print(f"[{now_str()}] 🔵 [阶段2] 关键词搜索 | "
-              f"关键词={kw_count} | topic={topic_count} | "
-              f"README={readme_count} | 总计={total_queries} | "
-              f"种子耗时={_seed_elapsed:.0f}s", flush=True)
-        print(f"{'='*60}", flush=True)
+        # 阶段 1: 种子仓库进队列
+        seed_list = list(repo_seeds.keys())
+        if seed_list:
+            print(f"[{now_str()}] 🔵 种子仓库: {len(seed_list)} 个 → 队列", flush=True)
+            for repo in seed_list:
+                if self.limiter.should_stop() or self._runtime_exceeded(): break
+                try:
+                    ri = self.http.get_json(
+                        f"https://api.github.com/repos/{repo}",
+                        timeout=FILE_DOWNLOAD_TIMEOUT,
+                        operation_name=f"repo info ({repo})")
+                    if not ri or ri.get('disabled'): continue
+                    br = ri.get("default_branch", "main")
+                    self._branch_cache[repo] = br
+                    task_queue.put(("种子仓库", repo,
+                                    {"branch": br, "size": ri.get("size", -1),
+                                     "disabled": False, "pushed_at": ri.get("pushed_at", ""),
+                                     "seed_key": repo}))
+                except Exception as e:
+                    print(f"[{now_str()}] ⚠️ {repo}: {e}", flush=True)
+                self._update_seed_entry(repo_seeds, repo, 0)
+                time.sleep(REPO_SLEEP_SECONDS)
+            self._seed_repos = self.checked_count - _repos_before
+            self._seed_elapsed = f"{time.time() - _stage_start:.0f}s"
 
+        # 阶段 2: 关键词搜索 → 结果进队列
+        print(f"[{now_str()}] 🔵 关键词: {len(all_queries)} 个", flush=True)
         for idx, query in enumerate(all_queries, 1):
-            q_start = time.time()
-            _nodes_before_query = len(self.unique_nodes)
-            if self.limiter.should_stop():
-                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
-                break
-            if self._runtime_exceeded():
-                print(f"[{now_str()}] ⏰ 接近 GA 超时，停止搜索", flush=True)
-                break
-            q_start = time.time()
-            print(f"\n[{now_str()}] 🔎 搜索 {idx}/{len(self.queries)}: {query}", flush=True)
+            nb = len(self.unique_nodes)
+            qs = time.time()
+            if self.limiter.should_stop() or self._runtime_exceeded(): break
             try:
-                self.search_query(query)
+                self._search_query_to_queue(query, task_queue)
             except RuntimeError:
-                print(f"[{now_str()}] ⚠️ 限流超限", flush=True)
                 break
-            q_elapsed = time.time() - q_start
-            q_new = len(self.unique_nodes) - _nodes_before_query
-            print(f"[{now_str()}] ⏱️ [{idx}/{total_queries}] {query[:50]} | "
-                  f"耗时 {q_elapsed:.0f}s | 新增 {q_new} 节点", flush=True)
+            print(f"[{now_str()}] ⏱️ [{idx}/{len(all_queries)}] "
+                  f"{query[:60]} | {time.time()-qs:.0f}s | "
+                  f"+{len(self.unique_nodes)-nb}", flush=True)
 
-        # ── 自动收录种子仓库 ──
+        # 保存统计（队列由 run() 统一管理）
+        self._seed_files = len(self.processed_file_shas) - _files_before
+        self._channel_new_nodes["种子仓库"] = self._channel_new_nodes.get("种子仓库", 0)
+
+        # 自动收录
         if AUTO_SEED_ENABLED:
-            auto_added = 0
-            for repo_key, meta in list(repo_seeds.items()):
-                consecutive = meta.get("consecutive_runs", 0)
-                last_nodes = meta.get("total_new_nodes", 0)
-                if (consecutive >= AUTO_SEED_MIN_CONSECUTIVE
-                        and last_nodes >= AUTO_SEED_MIN_NODES):
-                    if repo_key not in self._initial_seed_keys:
-                        # 新收录到种子文件
-                        print(f"[{now_str()}] 🌱 自动收录种子: {repo_key} "
-                              f"(连续 {consecutive} 次, {last_nodes} 个节点)", flush=True)
-                        auto_added += 1
-            if auto_added:
-                # 立即写回种子文件
-                self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
+            for rk, m in list(repo_seeds.items()):
+                if (m.get("consecutive_runs", 0) >= AUTO_SEED_MIN_CONSECUTIVE
+                        and m.get("total_new_nodes", 0) >= AUTO_SEED_MIN_NODES
+                        and rk not in self._initial_seed_keys):
+                    print(f"[{now_str()}] 🌱 自动收录: {rk}", flush=True)
+            self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
 
-    def _collect_web(self, stats: dict = None):
-        """网页搜索收集。搜索关键词 → 下载结果 → 提取节点。
-        域名黑名单在获取搜索结果后、下载前生效——和仓库黑名单一致。
-        先获取列表，再检查黑名单跳过无效项，不浪费下载请求。"""
-        from parsers import extract_all_strategies
-        if stats is None:
-            stats = {}
-        print(f"[{now_str()}] 🌐 开始网页搜索 "
-              f"(引擎={WEB_SEARCH_ENGINES}, 关键词={len(self.queries)})", flush=True)
+    def _pool_worker(self, task_queue: Queue):
+        """共用线程池 Worker：从队列取任务，调用 process_repo。"""
+        while True:
+            item = task_queue.get()
+            try:
+                if item is None: break
+                source, repo, kwargs = item
+                self.http = HttpClient(token=self.token, rate_limiter=None)
+                before = len(self.unique_nodes)
+                self.process_repo(repo, **kwargs)
+                new_nodes = len(self.unique_nodes) - before
+                ch = self._channel_new_nodes
+                ch[source] = ch.get(source, 0) + new_nodes
+                # 种子仓库产出也更新对应种子条目
+                seed_key = kwargs.get("seed_key")
+                if seed_key and new_nodes > 0:
+                    pass  # _update_seed_entry already called in _collect_github
+            except Exception as e:
+                print(f"[{now_str()}] ⚠️ Worker 异常: {repo}: {e}", flush=True)
+            finally:
+                task_queue.task_done()
 
-        blacklist = set()
-        if os.path.exists(WEB_BLACKLIST_FILE):
-            with open(WEB_BLACKLIST_FILE, "r", encoding="utf-8") as f:
-                blacklist = {line.strip() for line in f if line.strip()}
+    def _search_query_to_queue(self, query: str, task_queue: Queue):
+        """搜索单个关键词，结果直接放进线程池队列。"""
+        has_cjk = bool(re.search(r'[一-鿿]', query))
+        max_p = (MAX_PAGES * MAX_PAGES_ZH_MULTIPLIER) if has_cjk else MAX_PAGES
 
-        engine_failures = {}  # engine → 连续失败次数，>=3 则跳过
-        for engine in WEB_SEARCH_ENGINES:
-            for query in self.queries[:5]:  # 每个引擎只用前 5 个关键词
-                if self.limiter.should_stop() or self._runtime_exceeded():
-                    return
-                if engine_failures.get(engine, 0) >= 3:
-                    print(f"[{now_str()}] ⚠️ [{engine}] 连续失败，切换到下一个引擎", flush=True)
-                    break
-                for page in range(1, WEB_MAX_PAGES + 1):
-                    search_url = self._build_search_url(engine, query, page)
-                    if not search_url:
-                        continue
-                    self.http.user_agent = random.choice(WEB_USER_AGENTS)
-                    print(f"[{now_str()}]   搜索: [{engine}] {query[:40]} (第{page}页)", flush=True)
-                    resp = self.http.get(search_url, timeout=WEB_DOWNLOAD_TIMEOUT,
-                                         operation_name=f"web[{engine}]")
-                    if not resp:
-                        engine_failures[engine] = engine_failures.get(engine, 0) + 1
-                        if page == 1:
-                            break
-                        else:
-                            continue
-                    engine_failures[engine] = 0  # 成功后重置
-                    result_urls = self._parse_search_results(
-                        resp.content.decode('utf-8', errors='replace'), engine)
-                    for url in result_urls:
-                        domain = url.split("/")[2] if "://" in url else url
-                        if domain in blacklist:
-                            continue
-                        content_resp = self.http.get(url, timeout=WEB_DOWNLOAD_TIMEOUT,
-                                                     operation_name=f"web dl: {url[:60]}")
-                        if not content_resp:
-                            continue
-                        before = len(self.unique_nodes)
-                        try:
-                            web_content = content_resp.content.decode('utf-8', errors='replace')
-                        except Exception:
-                            web_content = ""
-                        proxies = extract_all_strategies(web_content)
-                        for p in proxies:
-                            if not p.is_valid():
-                                continue
-                            with self._state_lock:
-                                dedup_key = p.dedup_key(DEDUP_STRATEGY)
-                                if dedup_key in self.global_dedup_keys:
-                                    continue
-                                self.global_dedup_keys.add(dedup_key)
-                                node_uri = p.to_uri()
-                                self.unique_nodes.add(node_uri)
-                                self.batch_buffer.append(node_uri)
-                                if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:
-                                    self._flush_batch()
-                        new_nodes = len(self.unique_nodes) - before
-                        if new_nodes > 0:
-                            print(f"[{now_str()}]     ✅ {url[:80]}: +{new_nodes} 个节点", flush=True)
-                        else:
-                            print(f"[{now_str()}]     ⚪ {url[:80]}: 无新节点", flush=True)
-                            blacklist.add(domain)
-                    time.sleep(WEB_PAGE_SLEEP)
-
-        with open(WEB_BLACKLIST_FILE, "w", encoding="utf-8") as f:
-            f.write("\n".join(blacklist))
-
-    # ── Code 文件搜索 ──
-
-    def _run_code_thread(self, http: HttpClient, errors: dict):
-        """Code 搜索线程。"""
-        self._main_http = http
-        t0 = time.time()
-        stats = {"name": "Code", "files_found": 0, "repos_processed": 0,
-                 "nodes_before": len(self.unique_nodes)}
-        try:
-            self._collect_code(stats)
-        except Exception as e:
-            errors["Code"] = str(e)
-            import traceback; traceback.print_exc()
-        finally:
-            stats["elapsed"] = f"{time.time() - t0:.0f}s"
-            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
-            stats["api_calls"] = http.stats.get("total", 0)
-            with self._state_lock:
-                self._channel_stats["Code"] = stats
-
-    def _collect_code(self, stats: dict):
-        """GitHub Code Search：搜索文件内容中的 URI/配置字段，提取仓库名后走 process_repo。"""
-        print(f"[{now_str()}] 📝 开始 Code 搜索 "
-              f"({len(CODE_QUERIES)} 个查询)", flush=True)
-
-        repo_set = set()
-        for q in CODE_QUERIES:
+        for page in range(1, max_p + 1):
             if self.limiter.should_stop() or self._runtime_exceeded():
                 return
-            for page in range(1, CODE_MAX_PAGES + 1):
-                url = (f"https://api.github.com/search/code"
-                       f"?q={quote(q)}&sort=indexed&order=desc"
-                       f"&per_page=100&page={page}")
-                resp = self.http.get(url, timeout=SEARCH_TIMEOUT,
-                                     operation_name=f"code[{q[:30]}]")
-                if not resp:
-                    break
-                data = resp.json()
-                items = data.get("items", [])
-                for item in items:
-                    r = item.get("repository", {})
-                    fn = r.get("full_name")
-                    if fn and fn not in self.seen_repos:
-                        repo_set.add(fn)
-                stats["files_found"] = stats.get("files_found", 0) + len(items)
-                if len(items) < 100:
-                    break  # 最后一页
-                time.sleep(PAGE_SLEEP_SECONDS)
-
-        if not repo_set:
-            return
-
-        print(f"[{now_str()}] Code 搜索: {stats['files_found']} 个文件, "
-              f"{len(repo_set)} 个唯一仓库", flush=True)
-
-        for repo in repo_set:
-            if self.limiter.should_stop() or self._runtime_exceeded():
+            url = (f"https://api.github.com/search/repositories"
+                   f"?q={query}&sort=updated&order=desc"
+                   f"&per_page={PER_PAGE}&page={page}")
+            resp = self.http.get(url, timeout=SEARCH_TIMEOUT,
+                                 operation_name=f"搜索第{page}页")
+            if not resp:
                 break
-            if repo in self.seen_repos:
-                continue
-            self.seen_repos.add(repo)
-            stats["repos_processed"] = stats.get("repos_processed", 0) + 1
-            repo_info = self.http.get_json(
-                f"https://api.github.com/repos/{repo}",
-                timeout=FILE_DOWNLOAD_TIMEOUT,
-                operation_name=f"repo info ({repo})")
-            if not repo_info or repo_info.get("disabled", False):
-                continue
-            branch = repo_info.get("default_branch", "main")
-            self._branch_cache[repo] = branch
-            self.process_repo(repo, branch=branch,
-                              size=repo_info.get("size", -1),
-                              disabled=False,
-                              pushed_at=repo_info.get("pushed_at", ""))
-            time.sleep(REPO_SLEEP_SECONDS)
+            data = resp.json()
+            items = data.get("items", [])
+            if not items:
+                break
+            for item in items:
+                repo = item.get("full_name")
+                if not repo: continue
+                github_url = f"https://github.com/{repo}"
+                if repo in self.seen_repos or github_url in self.blacklist_repos:
+                    continue
+                self.seen_repos.add(repo)
+                self.checked_count += 1
+                task_queue.put(("GitHub", repo,
+                                {"branch": item.get("default_branch", "main"),
+                                 "size": item.get("size", 0),
+                                 "disabled": item.get("disabled", False),
+                                 "pushed_at": item.get("pushed_at", "")}))
+            time.sleep(PAGE_SLEEP_SECONDS)
 
     # ── 搜索辅助 ──
 
@@ -856,10 +725,6 @@ class Collector:
             if name == "GitHub":
                 print(f"    检查仓库: {st.get('repos_checked', 0)}, "
                       f"下载文件: {st.get('files_downloaded', 0)}, "
-                      f"耗时: {elapsed}")
-            elif name == "Web":
-                print(f"    检查URL: {st.get('urls_checked', 0)}, "
-                      f"域名黑名单: {st.get('domains_blacklisted', 0)}, "
                       f"耗时: {elapsed}")
             elif name == "种子仓库":
                 print(f"    检查仓库: {st.get('repos_checked', 0)}, "
@@ -1154,9 +1019,11 @@ class Collector:
 
     def _process_fork_repo(self, fork: dict, branch: str, depth: int) -> tuple:
         """并行工作线程：处理单个 fork/用户仓库。每个线程拥有独立 HttpClient。"""
-        self.http = HttpClient(token=self.token, rate_limiter=None)
-        fork_name = fork.get("full_name")
-        before = len(self.unique_nodes)
+        self._parallel_sem.acquire()
+        try:
+            self.http = HttpClient(token=self.token, rate_limiter=None)
+            fork_name = fork.get("full_name")
+            before = len(self.unique_nodes)
         try:
             self.process_repo(fork_name,
                               branch=fork.get("default_branch", branch),
@@ -1166,8 +1033,10 @@ class Collector:
                               depth=depth + 1)
         except Exception as e:
             print(f"[{now_str()}]   ⚠️ {fork_name}: {e}", flush=True)
-        new_nodes = len(self.unique_nodes) - before
-        return (fork_name, new_nodes)
+            new_nodes = len(self.unique_nodes) - before
+            return (fork_name, new_nodes)
+        finally:
+            self._parallel_sem.release()
 
     def _trace_child_forks(self, repo: str, branch: str, depth: int):
         """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
@@ -1193,24 +1062,27 @@ class Collector:
         if qualified:
             self._run_fork_batch(qualified, branch, depth, "🍴 子仓库")
 
-    def _run_fork_batch(self, forks: list, branch: str, depth: int, label: str,
-                         workers: int = None):
-        """并行或串行处理一批 fork/用户仓库。"""
-        w = workers or FORK_CHAIN_WORKERS
-        if FORK_CHAIN_PARALLEL and len(forks) > 1:
-            print(f"[{now_str()}]   {label}: 并行 {len(forks)} 个 "
-                  f"({w} 线程)", flush=True)
-            with ThreadPoolExecutor(max_workers=w) as ex:
-                futures = {ex.submit(self._process_fork_repo, f, branch, depth): f
-                           for f in forks}
-                for future in as_completed(futures):
-                    fn, nn = future.result()
-                    if nn > 0: print(f"[{now_str()}]   {label}: {fn} +{nn}", flush=True)
-        else:
+    def _run_fork_batch(self, forks: list, branch: str, depth: int, label: str):
+        """提交 fork/用户仓库到共用线程池。"""
+        tq = getattr(self, '_task_queue', None)
+        if not tq:  # 降级：无共用池时串行
             for fork in forks:
                 fn, nn = self._process_fork_repo(fork, branch, depth)
                 if nn > 0: print(f"[{now_str()}]   {label}: {fn} +{nn}", flush=True)
                 time.sleep(REPO_SLEEP_SECONDS)
+            return
+
+        # 有共用池 → 全部提交到队列
+        for fork in forks:
+            fn = fork.get("full_name")
+            if not fn or fn in self.seen_repos: continue
+            self.seen_repos.add(fn)
+            tq.put(("GitHub", fn,
+                    {"branch": fork.get("default_branch", branch),
+                     "size": fork.get("size", -1),
+                     "disabled": fork.get("disabled", False),
+                     "pushed_at": fork.get("pushed_at", "")}))
+        print(f"[{now_str()}]   {label}: {len(forks)} 个 → 队列", flush=True)
 
     def _trace_user_repos(self, repo: str, branch: str, depth: int):
         """遍历同用户名下的所有公开仓库，查是否有节点产出。
@@ -1598,6 +1470,8 @@ class Collector:
                 self.unique_nodes.add(node_uri)
                 self.batch_buffer.append(node_uri)
                 new_count += 1
+                ch = threading.current_thread().name
+                self._channel_new_nodes[ch] = self._channel_new_nodes.get(ch, 0) + 1
 
         with self._state_lock:
             if valid_count > 0:
