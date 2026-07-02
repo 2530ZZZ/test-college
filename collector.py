@@ -43,9 +43,8 @@ from config import (
     CODE_SEARCH_ENABLED, CODE_QUERIES, CODE_MAX_PAGES,
     MAX_PAGES_ZH_MULTIPLIER,
     USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
-    VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES,
+    VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
     SHARED_POOL_WORKERS, SHARED_POOL_QUEUE_SIZE,
-    SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
@@ -381,12 +380,12 @@ class Collector:
         return time.time() - self._start_time > self._max_runtime
 
     def run(self):
-        """主入口：并行启动三个搜集线程，所有来源同时运行，互不影响。
+        """主入口：Code Search 串行先跑，GitHub 搜索线程并行。
 
         架构：
-          - GitHub 线程：搜索仓库 → Tree API → 下载 → 提取节点
-          - Web 线程：搜索引擎 → 提取 URL → 下载 → 提取节点
-          - TG 线程：Telegram 频道 → 抓取消息 → 提取节点
+          - GitHub 线程：关键词/种子仓库搜索 → 共用线程池处理
+          - Code Search：主线程串行，搜文件内容直接定位节点文件
+          → 两者共享同一个线程池（8 Workers），fork 链/用户仓库自动传播
 
         每个线程持有独立 HttpClient，共享去重/缓存/批次状态。
         所有共享操作通过 _state_lock 保护。
@@ -426,16 +425,16 @@ class Collector:
         if CODE_SEARCH_ENABLED:
             try:
                 code_http = HttpClient(token=self.token, rate_limiter=self.limiter)
-                saved = self._main_http
-                self._main_http = code_http
+                self.http = code_http  # 主线程专用，不污染 _main_http
                 t0 = time.time()
                 self._collect_code(task_queue)
-                self._main_http = saved
                 cn = self._channel_new_nodes.get("Code", 0)
                 self._channel_stats["Code"] = {
                     "name": "Code", "nodes_new": cn,
                     "elapsed": f"{time.time()-t0:.0f}s",
-                    "api_calls": code_http.stats.get("total", 0)}
+                    "api_calls": code_http.stats.get("total", 0),
+                    "files_found": getattr(self, '_code_files_found', 0),
+                    "repos_processed": getattr(self, '_code_repos_processed', 0)}
             except Exception as e:
                 errors["Code"] = str(e)
                 import traceback; traceback.print_exc()
@@ -468,7 +467,7 @@ class Collector:
     def _run_github_thread(self, http: HttpClient, repo_seeds: dict,
                            task_queue: Queue, errors: dict):
         """GitHub 线程入口。"""
-        self._main_http = http
+        self.http = http  # 线程专用，不污染 _main_http
         t0 = time.time()
         _repos_start = self.checked_count
         _files_start = len(self.processed_file_shas)
@@ -497,26 +496,6 @@ class Collector:
                 self._channel_stats["GitHub"] = stats
                 if seed_st:
                     self._channel_stats["种子仓库"] = seed_st
-
-    def _run_web_thread(self, http: HttpClient, errors: dict):
-        """Web 线程入口。"""
-        self._main_http = http
-        t0 = time.time()
-        stats = {"name": "Web", "urls_checked": 0, "domains_blacklisted": 0,
-                 "nodes_before": len(self.unique_nodes)}
-        try:
-            self._collect_web(stats)
-        except Exception as e:
-            errors["Web"] = str(e)
-            import traceback; traceback.print_exc()
-        finally:
-            stats["elapsed"] = f"{time.time() - t0:.0f}s"
-            stats["nodes_new"] = len(self.unique_nodes) - stats["nodes_before"]
-            stats["api_calls"] = http.stats.get("total", 0)
-            stats["api_report"] = http.get_stats_report()
-            with self._state_lock:
-                self._channel_stats["Web"] = stats
-            pass  # http was thread-local, cleaned up by garbage collection
 
 
     # ── 搜集实现 ──
@@ -601,7 +580,7 @@ class Collector:
             try:
                 if item is None: break
                 source, repo, kwargs = item
-                self.http = HttpClient(token=self.token, rate_limiter=None)
+                self.http = HttpClient(token=self.token, rate_limiter=self.limiter)
                 before = len(self.unique_nodes)
                 self.process_repo(repo, **kwargs)
                 new_nodes = len(self.unique_nodes) - before
@@ -650,51 +629,121 @@ class Collector:
                                  "pushed_at": item.get("pushed_at", "")}))
             time.sleep(PAGE_SLEEP_SECONDS)
 
-    # ── 搜索辅助 ──
+    def _collect_code(self, task_queue: Queue):
+        """GitHub Code Search：直接搜索文件内容中的节点 URI。
 
-    @staticmethod
-    def _build_search_url(engine: str, query: str, page: int) -> str:
-        """构建搜索引擎查询 URL。
+        与 _collect_github 的区别：
+          - API: /search/code（搜文件内容）vs /search/repositories（搜仓库名）
+          - 粒度: 直接定位到文件，不需要扫描整个仓库
+          - 策略: 主线程 raw 下载（零 API 配额）+ 发现仓库进共用池
 
-        各引擎翻页参数：
-          DuckDuckGo: s=N  (N = 结果偏移，每页约 30 条)
-          Bing:       first=N+1 (N = 偏移，1-based)
-          Google:     start=(page-1)*10 (每页固定 10 条，Google 忽略自定义 num)
-          Yandex:     p=N  (N = 页码，0-based)
+        流程：
+          1. 遍历 CODE_QUERIES，构建搜索词（加 24h 时间限定）
+          2. 翻页调用 /search/code API
+          3. 对每个结果：下载 raw 文件 → 提取节点
+          4. 对产出了节点的仓库 → task_queue.put() 触发 fork/用户遍历
         """
-        from urllib.parse import quote
-        q = quote(query)
-        if engine == "duckduckgo":
-            s = (page - 1) * WEB_PER_PAGE
-            return f"https://html.duckduckgo.com/html/?q={q}&s={s}"
-        elif engine == "bing":
-            first = (page - 1) * WEB_PER_PAGE + 1
-            return f"https://www.bing.com/search?q={q}&first={first}&count={WEB_PER_PAGE}"
-        elif engine == "google":
-            start = (page - 1) * 10
-            return f"https://www.google.com/search?q={q}&start={start}&num={WEB_PER_PAGE}"
-        elif engine == "yandex":
-            return f"https://yandex.com/search?text={q}&p={page - 1}"
-        print(f"[{now_str()}] ⚠️ 未知搜索引擎: {engine}", flush=True)
-        return ""
+        if not CODE_QUERIES:
+            return
 
-    @staticmethod
-    def _parse_search_results(html: str, engine: str) -> list:
-        """从搜索引擎结果中提取 URL 列表。"""
-        import re
-        urls = set()
-        # 通用方法：提取所有 http/https 链接
-        url_pattern = re.compile(r'https?://[^\s"\'<>]+')
-        for m in url_pattern.finditer(html):
-            url = m.group(0).rstrip('.,;:!?)"\'')
-            # 过滤搜索引擎自身的链接
-            if any(skip in url for skip in
-                   ['google.com', 'bing.com', 'duckduckgo.com',
-                    'yandex.com', 'yandex.ru', '/search', 'microsoft.com']):
-                continue
-            if len(url) > 20 and '://' in url:
-                urls.add(url)
-        return list(urls)[:WEB_PER_PAGE]
+        time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
+            '%Y-%m-%dT%H:%M:%SZ')
+
+        code_nodes_before = len(self.unique_nodes)
+        code_files = 0
+        repos_found = set()
+
+        for idx, query in enumerate(CODE_QUERIES, 1):
+            qs = time.time()
+            nb = len(self.unique_nodes)
+            full_query = f"{query} pushed:>{time_sfx}"
+
+            for page in range(1, CODE_MAX_PAGES + 1):
+                if self.limiter.should_stop() or self._runtime_exceeded():
+                    break
+
+                url = (f"https://api.github.com/search/code"
+                       f"?q={quote(full_query)}&sort=indexed&order=desc"
+                       f"&per_page=100&page={page}")
+
+                resp = self.http.get(url, timeout=SEARCH_TIMEOUT,
+                                     operation_name=f"Code搜索第{page}页")
+                if not resp:
+                    break
+
+                data = resp.json()
+                items = data.get("items", [])
+                if not items:
+                    break
+
+                for item in items:
+                    if self.limiter.should_stop():
+                        break
+
+                    repo_data = item.get("repository", {})
+                    repo_name = repo_data.get("full_name", "")
+                    file_path = item.get("path", "")
+                    file_sha = item.get("sha", "")
+
+                    if not repo_name or not file_path:
+                        continue
+
+                    github_url = f"https://github.com/{repo_name}"
+                    if github_url in self.blacklist_repos:
+                        continue
+
+                    # SHA 缓存检查：避免重复下载相同内容
+                    if file_sha and not self._is_file_updated(file_sha):
+                        continue
+
+                    ext = os.path.splitext(file_path)[1].lower()
+                    if ext not in ALLOWED_EXTENSIONS:
+                        continue
+
+                    code_files += 1
+                    repos_found.add(repo_name)
+
+                    # 获取分支：优先从搜索结果 → 缓存 → "main"
+                    default_branch = repo_data.get("default_branch", "")
+                    if not default_branch:
+                        default_branch = self._branch_cache.get(repo_name, "main")
+                    else:
+                        self._branch_cache[repo_name] = default_branch
+
+                    # 直接 raw 下载并提取节点（不计 API 配额）
+                    has_nodes_flag = [False]
+                    try:
+                        self._handle_one_file(
+                            repo_name, default_branch, file_path,
+                            file_sha, has_nodes_flag, depth=0)
+                    except RuntimeError:
+                        return  # 限流超限
+                    except Exception:
+                        pass
+
+                    if has_nodes_flag[0]:
+                        # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
+                        if repo_name not in self.seen_repos:
+                            self.seen_repos.add(repo_name)
+                            self.checked_count += 1
+                            task_queue.put(("Code", repo_name,
+                                            {"branch": default_branch,
+                                             "size": repo_data.get("size", -1),
+                                             "disabled": False,
+                                             "pushed_at": repo_data.get("pushed_at", "")}))
+
+                time.sleep(PAGE_SLEEP_SECONDS)
+
+            print(f"[{now_str()}] ⏱️ Code [{idx}/{len(CODE_QUERIES)}] "
+                  f"{query[:60]} | {time.time() - qs:.0f}s | "
+                  f"+{len(self.unique_nodes) - nb} 节点", flush=True)
+
+        # 记录统计
+        self._channel_new_nodes["Code"] = len(self.unique_nodes) - code_nodes_before
+        self._code_files_found = code_files
+        self._code_repos_processed = len(repos_found)
+
+    # ── 搜索辅助 ──
 
     def _finalize(self, elapsed_seconds: float = 0):
         """最终保存和统计。即使之前发生错误也能安全调用。"""
@@ -833,7 +882,8 @@ class Collector:
 
     def process_repo(self, repo: str, branch: str = "main",
                      size: int = -1, disabled: bool = False,
-                     pushed_at: str = "", depth: int = 0):
+                     pushed_at: str = "", depth: int = 0,
+                     seed_key: str = None):
         """处理单个仓库。
 
         使用搜索结果的字段代替 GET /repos/{repo} 调用，
@@ -995,6 +1045,7 @@ class Collector:
             print(f"[{now_str()}]   父仓库 +{new_parent} 个节点", flush=True)
 
         # 3. 遍历父仓库的 fork 列表
+        qualified = []
         for page in range(1, 3):
             forks = self.http.get_json(
                 f"https://api.github.com/repos/{parent_name}/forks"
@@ -1005,7 +1056,6 @@ class Collector:
                 break
 
             # 收集合格兄弟 fork
-            qualified = []
             for fork in forks:
                 fn = fork.get("full_name")
                 if not fn or fn in self.seen_repos: continue
@@ -1036,6 +1086,7 @@ class Collector:
     def _trace_child_forks(self, repo: str, branch: str, depth: int):
         """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
         print(f"[{now_str()}] 🔗 查子仓库: {repo}", flush=True)
+        qualified = []
         for page in range(1, 3):
             forks = self.http.get_json(
                 f"https://api.github.com/repos/{repo}/forks"
@@ -1046,7 +1097,6 @@ class Collector:
                 break
 
             # 收集合格 fork
-            qualified = []
             for fork in forks:
                 fn = fork.get("full_name")
                 if not fn or fn in self.seen_repos: continue
@@ -1658,16 +1708,10 @@ class Collector:
     def save_results(self):
         """保存所有输出文件。
 
-        包括：no.txt（全量）、no/ 分片、no_li.txt（源链接）、
+        包括：no/ 分片、no_li.txt（源链接）、
         no_w_li.txt（分片链接）、ljck.txt（黑名单）、SHA 缓存。
         """
-        if self.unique_nodes:
-            with open("no.txt", "w", encoding="utf-8", errors="replace") as f:
-                text = "\n".join(self.unique_nodes).encode("utf-8", errors="replace").decode("utf-8")
-                f.write(text)
-            print(f"[{now_str()}] 保存 no.txt ({len(self.unique_nodes)} 条)", flush=True)
-
-        # 分片文件（节点 URI 同样需要清除非法字符）
+        # 分片文件
         no_dir = "no"
         if os.path.exists(no_dir):
             shutil.rmtree(no_dir)
@@ -1680,7 +1724,7 @@ class Collector:
         for i in range(0, len(nodes_list), CHUNK_SIZE):
             chunk = nodes_list[i:i + CHUNK_SIZE]
             file_count += 1
-            filename = f"{file_count}.txt"
+            filename = f"{file_count:03d}.txt"
             filepath = os.path.join(no_dir, filename)
             chunk_text = "\n".join(chunk).encode("utf-8", errors="replace").decode("utf-8")
             with open(filepath, "w", encoding="utf-8") as f:
@@ -1694,10 +1738,7 @@ class Collector:
             f.write("\n".join(no_w_links))
         print(f"[{now_str()}] 保存 no_w_li.txt ({file_count} 分片)", flush=True)
 
-        # 源链接
-        self.all_links.append(
-            f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no.txt"
-        )
+        # 源链接（仅分片链接）
         self.all_links = list(dict.fromkeys(self.all_links))
         with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(self.all_links))
