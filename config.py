@@ -93,12 +93,14 @@ FILE_PROCESS_TIMEOUT = None
 # 存储已验证无节点或广告仓库的 GitHub URL，每行一个。跨运行持久化。
 BLACKLIST_FILE = "ljck.txt"
 
-# SHA 缓存目录（分片存储，每片 ≤ 90MB 避免 GitHub 100MB 硬限制）
+# SHA 缓存目录（分片存储，每片 ≤ 45MB，远离 GitHub 100MB 硬限制）
 # 加载时遍历目录合并到内存一个 dict。写入时分片保证每文件不超限。
 SHA_CACHE_DIR = "sha_cache"
 
-# SHA 缓存每片最大字节数（默认 90MB，GitHub 硬限制 100MB）
-SHA_CACHE_MAX_BYTES = 90_000_000
+# SHA 缓存每片最大字节数（默认 45MB）。
+# 设为 90MB 的一半：pickle 序列化有 ~10% 开销（60字节估算 vs 实际 65字节），
+# 90MB 阈值可能导致实际文件 95-100MB，太接近 GitHub 硬限制。
+SHA_CACHE_MAX_BYTES = 45_000_000
 
 # SHA 缓存最大条目数（总上限，0 表示不限制）
 SHA_CACHE_MAX_ENTRIES = 5000000
@@ -144,8 +146,8 @@ VERBOSE_LOG = False
 # ==================== 种子仓库自动维护 ====================
 
 # 是否自动收录高产出仓库到种子文件
-# 默认 False。满足所有阈值条件的仓库会被自动写入 seed_repos.json。
-AUTO_SEED_ENABLED = False
+# 默认 True。满足阈值条件的仓库自动收录到种子文件，无需手动维护。
+AUTO_SEED_ENABLED = True
 
 # 连续 N 次运行都产出新节点才收录。0 表示不限制。
 # 默认 3，取值范围 0-10。
@@ -163,11 +165,26 @@ TOPIC_SEARCH_ENABLED = True
 
 # Topic 搜索词列表（每个会被拓展为 topic:xxx pushed:>24h）
 TOPIC_QUERIES = [
+    # 协议/工具生态
     "proxypool",
     "v2ray",
+    "sing-box",
+    "hysteria2",
+    "mihomo",
+    "clash",
+    "subconverter",
+    "shadowsocks",
+    "wireguard",
+    # 代理/节点
     "free-proxy",
+    "proxy-list",
+    "v2ray-nodes",
+    "vpn",
+    # 配置/订阅
     "clash-subscribe",
     "v2ray-subscribe",
+    "v2ray-config",
+    "clash-config",
 ]
 
 # ==================== README 内容搜索 ====================
@@ -207,21 +224,33 @@ CODE_SEARCH_ENABLED = True
 
 # Code 搜索词列表
 CODE_QUERIES = [
-    # URI 前缀（最高命中率，文件里出现 vmess:// 必然是节点文件）
+    # === URI 前缀（最高命中率，文件里出现 scheme:// 必然是节点文件） ===
     "vmess:// extension:yaml",
     "vless:// extension:yaml",
     "trojan:// extension:yaml",
     "ss:// extension:yaml",
+    "hysteria2:// extension:yaml",
+    "tuic:// extension:yaml",
     "vmess:// extension:txt",
     "vless:// extension:txt",
     "trojan:// extension:txt",
     "ss:// extension:txt",
+    "hysteria2:// extension:txt",
+    "tuic:// extension:txt",
     "vmess:// extension:json",
     "vless:// extension:json",
-    # Clash / Sing-box 配置字段
+    "hysteria2:// extension:json",
+    "tuic:// extension:json",
+    # === Clash / Sing-box 配置结构（比 URI 扫描更精准匹配配置块） ===
+    '"type: vmess" extension:yaml',
+    '"type: vless" extension:yaml',
+    '"type: trojan" extension:yaml',
+    '"type: hysteria2" extension:json',
     "proxy-groups extension:yaml",
     "outbounds extension:json",
-    # 搜其他搜集器代码（找到后遍历作者仓库）
+    # === 订阅编码文件 ===
+    "subscription-userinfo extension:txt",
+    # === 搜其他搜集器代码（找到后遍历作者仓库 + 用户的全部仓库） ===
     "v2ray aggregator extension:py",
     "proxy collector extension:py",
     "vmess:// raw.githubusercontent extension:py",

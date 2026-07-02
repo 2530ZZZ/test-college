@@ -2,7 +2,6 @@
   "repos": {
     "mahdibland/V2RayAggregator": {},
     "gfpcom/free-proxy-list": {},
-    "soroushmirzaei/telegram-configs-collector": {},
     "ninjastrikers/nexus-nodes": {},
     "ermaozi/get_subscribe": {},
     "pawdroid/Free-servers": {},
@@ -29,6 +28,15 @@
     "mohamadfg-dev/telegram-v2ray-configs-collector": {},
     "free18/v2ray": {},
     "Epodonios/v2ray-configs": {},
-    "acymz/AutoVPN": {}
+    "acymz/AutoVPN": {},
+    "snakem982/proxypool": {},
+    "Leon406/SubCrawler": {},
+    "603711936/SmartSub": {},
+    "Triton-ix/v2ray-Finder": {},
+    "alanbobs999/TopFreeProxies": {},
+    "wrfree/free": {},
+    "barry-far/V2ray-Config": {},
+    "Ruk1ng001/freeSub": {},
+    "learnhard-cn/free_proxy_ss": {}
   }
 }
