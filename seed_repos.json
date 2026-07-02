@@ -1,42 +1,118 @@
 {
   "repos": {
-    "mahdibland/V2RayAggregator": {},
-    "gfpcom/free-proxy-list": {},
-    "ninjastrikers/nexus-nodes": {},
-    "ermaozi/get_subscribe": {},
-    "pawdroid/Free-servers": {},
-    "sevcator/5ubscrpt10n": {},
-    "roosterkid/openproxylist": {},
-    "V2RayRoot/V2RayConfig": {},
-    "Farid-Karimi/Config-Collector": {},
-    "ehsanghaffar/config-sub-platform": {},
-    "Airuop/config-fetcher": {},
-    "free-nodes/v2rayfree": {},
-    "crashgfw/free-airport-nodes": {},
-    "lza6/free-VPN": {},
-    "guying23/AutoMergePublicNodes": {},
-    "rtwo2/FastNodes": {},
-    "wzdnzd/aggregator": {},
-    "aiboboxx/v2rayfree": {},
-    "awesome-vpn/awesome-vpn": {},
-    "bruceblink/free-v2ray": {},
-    "Mr-Meshky/vify": {},
-    "pog7x/vpn-configs": {},
-    "mheidari98/.proxy": {},
-    "yitong2333/proxy-minging": {},
-    "MhdiTaheri/V2rayCollector_Py": {},
-    "mohamadfg-dev/telegram-v2ray-configs-collector": {},
-    "free18/v2ray": {},
-    "Epodonios/v2ray-configs": {},
-    "acymz/AutoVPN": {},
-    "snakem982/proxypool": {},
-    "Leon406/SubCrawler": {},
-    "603711936/SmartSub": {},
-    "Triton-ix/v2ray-Finder": {},
+    "mahdibland/V2RayAggregator": {
+      "consecutive_runs": 0
+    },
+    "gfpcom/free-proxy-list": {
+      "consecutive_runs": 0
+    },
+    "ninjastrikers/nexus-nodes": {
+      "consecutive_runs": 0
+    },
+    "ermaozi/get_subscribe": {
+      "consecutive_runs": 0
+    },
+    "pawdroid/Free-servers": {
+      "consecutive_runs": 0
+    },
+    "sevcator/5ubscrpt10n": {
+      "consecutive_runs": 0
+    },
+    "roosterkid/openproxylist": {
+      "consecutive_runs": 0
+    },
+    "V2RayRoot/V2RayConfig": {
+      "consecutive_runs": 0
+    },
+    "Farid-Karimi/Config-Collector": {
+      "consecutive_runs": 0
+    },
+    "ehsanghaffar/config-sub-platform": {
+      "consecutive_runs": 0
+    },
+    "Airuop/config-fetcher": {
+      "consecutive_runs": 0
+    },
+    "free-nodes/v2rayfree": {
+      "consecutive_runs": 0
+    },
+    "crashgfw/free-airport-nodes": {
+      "consecutive_runs": 0
+    },
+    "lza6/free-VPN": {
+      "consecutive_runs": 0
+    },
+    "guying23/AutoMergePublicNodes": {
+      "consecutive_runs": 0
+    },
+    "rtwo2/FastNodes": {
+      "consecutive_runs": 0
+    },
+    "wzdnzd/aggregator": {
+      "consecutive_runs": 0
+    },
+    "aiboboxx/v2rayfree": {
+      "consecutive_runs": 0
+    },
+    "awesome-vpn/awesome-vpn": {
+      "consecutive_runs": 0
+    },
+    "bruceblink/free-v2ray": {
+      "consecutive_runs": 0
+    },
+    "Mr-Meshky/vify": {
+      "consecutive_runs": 0
+    },
+    "pog7x/vpn-configs": {
+      "consecutive_runs": 0
+    },
+    "mheidari98/.proxy": {
+      "consecutive_runs": 0
+    },
+    "yitong2333/proxy-minging": {
+      "consecutive_runs": 0
+    },
+    "MhdiTaheri/V2rayCollector_Py": {
+      "consecutive_runs": 0
+    },
+    "mohamadfg-dev/telegram-v2ray-configs-collector": {
+      "consecutive_runs": 0
+    },
+    "free18/v2ray": {
+      "consecutive_runs": 0
+    },
+    "Epodonios/v2ray-configs": {
+      "consecutive_runs": 0
+    },
+    "acymz/AutoVPN": {
+      "consecutive_runs": 0
+    },
+    "snakem982/proxypool": {
+      "consecutive_runs": 0
+    },
+    "Leon406/SubCrawler": {
+      "consecutive_runs": 0
+    },
+    "603711936/SmartSub": {
+      "consecutive_runs": 0
+    },
+    "Triton-ix/v2ray-Finder": {
+      "consecutive_runs": 0
+    },
     "alanbobs999/TopFreeProxies": {},
-    "wrfree/free": {},
-    "barry-far/V2ray-Config": {},
-    "Ruk1ng001/freeSub": {},
-    "learnhard-cn/free_proxy_ss": {}
-  }
+    "wrfree/free": {
+      "consecutive_runs": 0
+    },
+    "barry-far/V2ray-Config": {
+      "consecutive_runs": 0
+    },
+    "Ruk1ng001/freeSub": {
+      "consecutive_runs": 0
+    },
+    "learnhard-cn/free_proxy_ss": {
+      "consecutive_runs": 0
+    }
+  },
+  "updated_at": "2026-07-02T12:51:09.569947+00:00",
+  "pruning_days": 1
 }
