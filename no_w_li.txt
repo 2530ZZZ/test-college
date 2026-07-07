@@ -75,3 +75,4 @@ https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/074.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/075.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/076.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/077.txt
+https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/078.txt
