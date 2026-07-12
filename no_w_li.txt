@@ -34,3 +34,4 @@ https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/033.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/034.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/035.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/036.txt
+https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/037.txt
