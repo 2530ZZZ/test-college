@@ -48,11 +48,12 @@ from config import (
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
-    GITHUB_SEARCH_ENABLED,
+    GITHUB_SEARCH_ENABLED, QUOTA_MAX_PER_HOUR,
 )
 from http_client import HttpClient, RateLimiter
 from parsers import extract_all_strategies
 from utils import now_str, timeout_decorator
+from quota_manager import QuotaManager
 
 
 class Collector:
@@ -80,8 +81,11 @@ class Collector:
         self.token = token
         self.queries = queries or []
 
+        # 全局配额管理器（所有 HttpClient 共享，消除统计盲区）
+        self.quota_mgr = QuotaManager(max_per_hour=QUOTA_MAX_PER_HOUR)
+
         # 主 HTTP 客户端 + 线程局部存储（并行 fork/用户仓库用）
-        self._main_http = HttpClient(token=token)
+        self._main_http = HttpClient(token=token, quota_manager=self.quota_mgr)
         self._http_local = threading.local()
 
         # ── 共享状态（线程安全保护） ──
@@ -211,24 +215,26 @@ class Collector:
         except Exception as e:
             print(f"[{now_str()}] SHA 分片写入失败: {e}", flush=True)
 
-    def _is_file_updated(self, sha: str) -> bool:
-        """检查文件 SHA 是否从未处理过。
+    def _sha_in_cache(self, sha: str) -> bool:
+        """检查文件 SHA 是否已在持久化缓存中（只读，不写入）。
 
         SHA 是 Git 内容哈希 — 相同 SHA 永远意味着相同内容。
-        命中时将时间戳更新为当前时间（LRU），保证高频 SHA 不会被淘汰。
+        命中时更新 LRU 时间戳，保证高频 SHA 不会被淘汰。
+
+        注意：此方法只检查不写入。SHA 的写入在 _handle_one_file 下载成功后进行，
+        确保限流导致下载失败的文件不会被误标记为"已处理"。
 
         Args:
             sha: Git blob SHA
 
         Returns:
-            True 表示需要处理（新内容），False 表示已处理过可跳过
+            True 表示已在缓存中可跳过，False 表示需要处理
         """
         with self._state_lock:
             if sha in self.sha_cache:
                 self.sha_cache[sha] = datetime.now(timezone.utc)  # LRU: 更新时间戳
-                return False  # 已处理，跳过
-            self.sha_cache[sha] = datetime.now(timezone.utc)
-            return True  # 新内容，需要处理
+                return True  # 已处理，跳过
+            return False  # 新内容，需要处理
 
     # ==================== 批次持久化（线程安全） ====================
 
@@ -414,6 +420,7 @@ class Collector:
         errors = {}
         if GITHUB_SEARCH_ENABLED:
             gh_http = HttpClient(token=self.token, rate_limiter=self.limiter,
+                                 quota_manager=self.quota_mgr,
                                  pool_connections=20, pool_maxsize=20)
             t_gh = threading.Thread(
                 target=self._run_github_thread,
@@ -424,7 +431,8 @@ class Collector:
         # ── Code Search（主线程串行，先占 seen_repos） ──
         if CODE_SEARCH_ENABLED:
             try:
-                code_http = HttpClient(token=self.token, rate_limiter=self.limiter)
+                code_http = HttpClient(token=self.token, rate_limiter=self.limiter,
+                                       quota_manager=self.quota_mgr)
                 self.http = code_http  # 主线程专用，不污染 _main_http
                 t0 = time.time()
                 self._collect_code(task_queue)
@@ -432,7 +440,7 @@ class Collector:
                 self._channel_stats["Code"] = {
                     "name": "Code", "nodes_new": cn,
                     "elapsed": f"{time.time()-t0:.0f}s",
-                    "api_calls": code_http.stats.get("total", 0),
+                    "api_calls": self.quota_mgr.total_calls,
                     "files_found": getattr(self, '_code_files_found', 0),
                     "repos_processed": getattr(self, '_code_repos_processed', 0)}
             except Exception as e:
@@ -484,8 +492,8 @@ class Collector:
                      "repos_checked": self.checked_count - _repos_start,
                      "files_downloaded": len(self.processed_file_shas) - _files_start,
                      "elapsed": elapsed, "nodes_new": gh_new,
-                     "api_calls": http.stats.get("total", 0),
-                     "api_report": http.get_stats_report()}
+                     "api_calls": self.quota_mgr.total_calls,
+                     "api_report": self.quota_mgr.get_stats_report()}
             r = getattr(self, '_seed_repos', 0)
             f = getattr(self, '_seed_files', 0)
             e = getattr(self, '_seed_elapsed', elapsed)
@@ -574,13 +582,25 @@ class Collector:
             self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
 
     def _pool_worker(self, task_queue: Queue):
-        """共用线程池 Worker：从队列取任务，调用 process_repo。"""
+        """共用线程池 Worker：从队列取任务，调用 process_repo。
+
+        每个 Worker 持有独立 RateLimiter（独立管理限流等待），
+        但通过 QuotaManager 和主 limiter 共享停止信号。
+        """
         while True:
-            item = task_queue.get()
             try:
-                if item is None: break
+                item = task_queue.get(timeout=30)
+            except Exception:
+                continue  # 超时或无任务，继续等待
+            try:
+                if item is None:
+                    break
+                # 停止信号检查
+                if self.limiter.should_stop() or self.quota_mgr.exceeded:
+                    continue  # 跳过不崩溃，任务自然丢弃
                 source, repo, kwargs = item
-                self.http = HttpClient(token=self.token, rate_limiter=self.limiter)
+                self.http = HttpClient(token=self.token, rate_limiter=None,
+                                       quota_manager=self.quota_mgr)
                 before = len(self.unique_nodes)
                 self.process_repo(repo, **kwargs)
                 new_nodes = len(self.unique_nodes) - before
@@ -688,20 +708,20 @@ class Collector:
                     if not repo_name or not file_path:
                         continue
 
+                    code_files += 1  # 统计搜索命中数（在过滤之前）
+                    repos_found.add(repo_name)
+
                     github_url = f"https://github.com/{repo_name}"
                     if github_url in self.blacklist_repos:
                         continue
 
                     # SHA 缓存检查：避免重复下载相同内容
-                    if file_sha and not self._is_file_updated(file_sha):
+                    if file_sha and self._sha_in_cache(file_sha):
                         continue
 
                     ext = os.path.splitext(file_path)[1].lower()
                     if ext not in ALLOWED_EXTENSIONS:
                         continue
-
-                    code_files += 1
-                    repos_found.add(repo_name)
 
                     # 获取分支：优先从搜索结果 → 缓存 → "main"
                     default_branch = repo_data.get("default_branch", "")
@@ -789,13 +809,16 @@ class Collector:
 
         # ── 汇总 ──
         total_new = sum(s.get("nodes_new", 0) for s in self._channel_stats.values())
-        total_api = sum(s.get("api_calls", 0) for s in self._channel_stats.values())
+        qs = self.quota_mgr.get_stats()
         print(f"  ─────────────────────────")
         print(f"  节点总数: {len(self.unique_nodes)}, "
               f"批次: {len(self.batch_file_paths)}, "
               f"源链接: {len(self.all_links)}")
-        print(f"  新增节点: {total_new}, 总API: {total_api}")
-        print(f"  限流等待: {self.limiter.total_wait:.0f}s")
+        print(f"  新增节点: {total_new}, 总API: {qs['total']}")
+        print(f"  配额剩余: {qs['remaining']}/{QUOTA_MAX_PER_HOUR}"
+              f"{' ⚠️已耗尽' if qs['exceeded'] else ''}")
+        print(f"  主动限速: {qs['throttled']} 次, "
+              f"失败请求: {qs['failed']}")
         print(f"{'='*60}", flush=True)
 
     def search_query(self, query: str):
@@ -981,14 +1004,18 @@ class Collector:
 
         # 未提取到节点 → 检查 README 广告（有广告才加黑名单）
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
-            is_spam = self._check_readme_spam(repo, branch)
-            if is_spam:
-                print(f"[{now_str()}] 仓库 {github_url} README 含广告词，加入黑名单", flush=True)
+            # 配额耗尽或限流期间 → 不确定是否真的无节点 → 不拉黑
+            if self.quota_mgr.exceeded or self.limiter.should_stop():
+                print(f"[{now_str()}] ⚠️ 配额/限流期间跳过黑名单: {github_url}", flush=True)
             else:
-                print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
-            self.blacklist_repos.add(github_url)
-            with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
-                f.write(github_url + "\n")
+                is_spam = self._check_readme_spam(repo, branch)
+                if is_spam:
+                    print(f"[{now_str()}] 仓库 {github_url} README 含广告词，加入黑名单", flush=True)
+                else:
+                    print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
+                self.blacklist_repos.add(github_url)
+                with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
+                    f.write(github_url + "\n")
 
         # Fork 链追踪：有节点产出的仓库 → 查子仓库 + 回溯父仓库 + 查兄弟仓库
         if FORK_CHAIN_ENABLED and has_nodes_flag[0] and depth < MAX_PARENT_TRACE_DEPTH:
@@ -1068,7 +1095,8 @@ class Collector:
 
     def _process_fork_repo(self, fork: dict, branch: str, depth: int) -> tuple:
         """处理单个 fork/用户仓库（串行降级路径）。"""
-        self.http = HttpClient(token=self.token, rate_limiter=None)
+        self.http = HttpClient(token=self.token, rate_limiter=None,
+                               quota_manager=self.quota_mgr)
         fork_name = fork.get("full_name")
         before = len(self.unique_nodes)
         try:
@@ -1122,11 +1150,15 @@ class Collector:
             fn = fork.get("full_name")
             if not fn or fn in self.seen_repos: continue
             self.seen_repos.add(fn)
-            tq.put(("GitHub", fn,
-                    {"branch": fork.get("default_branch", branch),
-                     "size": fork.get("size", -1),
-                     "disabled": fork.get("disabled", False),
-                     "pushed_at": fork.get("pushed_at", "")}))
+            try:
+                tq.put(("GitHub", fn,
+                        {"branch": fork.get("default_branch", branch),
+                         "size": fork.get("size", -1),
+                         "disabled": fork.get("disabled", False),
+                         "pushed_at": fork.get("pushed_at", "")}),
+                       timeout=10)
+            except Exception:
+                pass  # 队列满，丢弃此 fork（下次运行可能再发现）
         print(f"[{now_str()}]   {label}: {len(forks)} 个 → 队列", flush=True)
 
     def _trace_user_repos(self, repo: str, branch: str, depth: int):
@@ -1235,7 +1267,7 @@ class Collector:
                 skipped_by_processed += 1
                 continue
             # SHA 缓存检查
-            if not self._is_file_updated(sha):
+            if self._sha_in_cache(sha):
                 skipped_by_cache += 1
                 continue
             files_to_check.append((path, sha))
@@ -1432,8 +1464,7 @@ class Collector:
         file_resp = self.http.get(raw_url, timeout=FILE_DOWNLOAD_TIMEOUT,
                                   operation_name=f"下载 {file_path}")
         if not file_resp:
-            self.processed_file_shas.add(sha)
-            return
+            return  # 下载失败 → 不标记（下次重试）
 
         # 读取内容（surrogate 字符兼容）
         content = None
@@ -1446,15 +1477,13 @@ class Collector:
                 pass
 
         if content is None:
-            self.processed_file_shas.add(sha)
-            return
+            return  # 解码失败 → 不标记（下次重试）
 
         content_size_mb = len(content) / 1024 / 1024
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
             print(f"[{now_str()}] 📄 {raw_url} ⚠️ 文件过大 "
                   f"({content_size_mb:.1f}MB)，跳过", flush=True)
-            self.processed_file_shas.add(sha)
-            return
+            return  # 跳过但可能是间歇性问题 → 不标记
 
         # 提取节点（使用新的协议解析层）
         def extract():
@@ -1469,10 +1498,8 @@ class Collector:
                 proxies = extract()
         except FutureTimeoutError:
             print(f"[{now_str()}] ⚠️ 文件处理超时，跳过 {raw_url}", flush=True)
-            self.processed_file_shas.add(sha)
             return
         except Exception:
-            self.processed_file_shas.add(sha)
             return
 
         # ---- 过滤 + 去重 + 入 buffer（线程安全） ----
@@ -1504,6 +1531,7 @@ class Collector:
                 self.all_links.append(raw_url)
                 has_nodes[0] = True
             self.processed_file_shas.add(sha)
+            self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
 
         if VERBOSE_LOG or new_count > 0:
             if valid_count == 0:
@@ -1674,7 +1702,7 @@ class Collector:
                     continue
                 if item_sha in self.processed_file_shas:
                     continue
-                if not self._is_file_updated(item_sha):
+                if self._sha_in_cache(item_sha):
                     continue
 
                 # 文件时间检查（Contents API 回退路径）

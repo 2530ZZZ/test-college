@@ -2,13 +2,12 @@
 HTTP 请求客户端。
 
 封装 requests 库，集成:
+  - 配额管理（QuotaManager.check/record）
   - 限流入口拦截（RateLimiter.should_stop()）
   - GitHub API 认证头
-  - 智能 403 限流处理（解析 X-RateLimit-Reset + RateLimiter 协调）
+  - 智能 403 限流处理
   - 重试策略（自动退避）
   - 连接池管理
-
-替代 utils.py 中的 safe_get，消除全局变量依赖。
 """
 
 import time
@@ -18,43 +17,48 @@ from urllib3.util.retry import Retry
 from typing import Optional, Dict, Tuple
 
 from rate_limiter import RateLimiter
+from quota_manager import QuotaManager
 from config import GITHUB_TOKEN
 
 
 class HttpClient:
-    """带限流保护的 HTTP 客户端。
+    """带限流保护和配额管理的 HTTP 客户端。
 
-    核心设计：入口即检查 limiter.should_stop()，
-    避免在限流超限后仍发出无意义请求（浪费 API 配额）。
+    核心设计：
+      - 入口检查 QuotaManager.check()（配额耗尽直接拒绝）
+      - 入口检查 limiter.should_stop()（限流超限直接拒绝）
+      - 所有 API 调用统一汇报给 QuotaManager（消除统计盲区）
 
     Args:
         token: GitHub Personal Access Token。空字符串表示未认证请求。
-        rate_limiter: RateLimiter 实例（可多客户端共享同一个）。
+        rate_limiter: RateLimiter 实例（Pool Worker 用独立实例管理自己的等待）。
+        quota_manager: QuotaManager 实例（全局共享，追踪所有配额消耗）。
         pool_connections: 连接池大小（默认 10）
         pool_maxsize: 连接池最大连接数（默认 10）
         user_agent: 自定义 User-Agent
 
     使用示例：
+        qm = QuotaManager(max_per_hour=4800)
         limiter = RateLimiter()
-        client = HttpClient(token="ghp_xxx", rate_limiter=limiter)
+        client = HttpClient(token="ghp_xxx", rate_limiter=limiter, quota_manager=qm)
         resp = client.get("https://api.github.com/search/repositories?q=...")
-        if resp is None:
-            return  # 限流超限或网络错误
     """
 
     def __init__(
         self,
         token: str = "",
         rate_limiter: RateLimiter = None,
+        quota_manager: QuotaManager = None,
         pool_connections: int = 10,
         pool_maxsize: int = 10,
         user_agent: str = "Mozilla/5.0 (compatible; FreeNodesCollector/5.0)",
     ):
         self.token = token or GITHUB_TOKEN
         self.limiter = rate_limiter or RateLimiter()
+        self.quota = quota_manager or QuotaManager()
         self.user_agent = user_agent
 
-        # API 调用统计
+        # API 调用统计（当前实例）
         self.stats = {"total": 0, "by_endpoint": {}, "by_status": {}}
 
         # 构建带重试策略的 Session
@@ -196,22 +200,30 @@ class HttpClient:
             成功时返回 Response 对象，失败时返回 None。
             返回 None 后调用者应检查 limiter.should_stop() 决定是否继续。
         """
+        is_api_call = "api.github.com" in url
+
         for attempt in range(1, max_retries + 1):
             # ---- 入口拦截：限流超限则直接放弃 ----
             if self.limiter.should_stop():
                 self._record_call(url, 0)
                 return None
 
+            # ---- 配额检查：主动限速 + 配额耗尽检测 ----
+            if is_api_call and not self.quota.check():
+                self._record_call(url, 0)
+                return None
+
             try:
                 resp = self.session.get(url, headers=self.headers, timeout=timeout)
 
-                # 记录调用和配额。只对 api.github.com 追踪剩余配额，
-                # raw.githubusercontent.com 走的 CDN，不计核心 API 配额。
+                # 记录调用：仅 API 调用消耗配额
                 remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
                 remaining = None
-                if remaining_hdr and "api.github.com" in url:
+                if remaining_hdr and is_api_call:
                     remaining = int(remaining_hdr)
                 self._record_call(url, resp.status_code, remaining)
+                if is_api_call:
+                    self.quota.record()
 
                 # 成功
                 if resp.status_code == 200:
