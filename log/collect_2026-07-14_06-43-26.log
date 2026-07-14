@@ -1,0 +1,78 @@
+[2026-07-14 14:43:26] 🚀 程序启动
+[2026-07-14 14:43:26] 关键词: 90 个
+[2026-07-14 14:43:26] 已加载黑名单: 32982 个
+[2026-07-14 14:43:27] 加载 SHA 缓存 1215597 条 (2 分片)
+[2026-07-14 14:43:27] 🚀 程序启动
+[2026-07-14 14:43:27] 🔵 种子仓库: 38 个 → 队列
+[2026-07-14 14:43:27] 仓库 https://github.com/mahdibland/V2RayAggregator (分支: master, size: 4475983KB, pushed: 2026-07-14T03:59:21Z)
+[2026-07-14 14:43:28] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件 23 个
+[2026-07-14 14:43:28] ⏱️ Code [1/26] vmess:// extension:yaml | 1s | +0 节点[2026-07-14 14:43:28] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/list/41.txt ✅ 解析 29 候选 → 29 个有效节点 → 去重后新增 29 个[2026-07-14 14:43:28] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/list/17.txt ✅ 解析 15 候选 → 15 个有效节点 → 去重后新增 14 个[2026-07-14 14:43:28] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/list/24.txt ✅ 解析 3 候选 → 3 个有效节点 → 去重后新增 3 个
+[2026-07-14 14:43:28] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/splitted/ssr.txt ✅ 解析 43 候选 → 43 个有效节点 → 去重后新增 43 个
+
+
+
+[2026-07-14 14:43:28] 仓库 https://github.com/gfpcom/free-proxy-list (分支: main, size: 37033KB, pushed: 2026-07-14T04:37:55Z)[2026-07-14 14:43:28] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/list/00.txt ✅ 解析 95 候选 → 95 个有效节点 → 去重后新增 93 个
+
+[2026-07-14 14:43:29] 🔗 递归发现仓库 mianfeifq/share (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-14 14:43:29] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/Eternity ✅ 解析 189 候选 → 189 个有效节点 → 去重后新增 181 个
+[2026-07-14 14:43:29] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/list/32.txt ✅ 解析 137 候选 → 137 个有效节点 → 去重后新增 121 个
+[2026-07-14 14:43:30] 仓库 https://github.com/ninjastrikers/nexus-nodes (分支: main, size: 839243KB, pushed: 2026-07-14T06:24:47Z)
+[2026-07-14 14:43:30] ⏱️ Code [2/26] vless:// extension:yaml | 2s | +205 节点
+[2026-07-14 14:43:31] repo info (mianfeifq/share) 404，跳过
+[2026-07-14 14:43:31] 🔗 递归发现仓库 vpei/Free-Node-Merge (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-14 14:43:33] ⏱️ Code [3/26] trojan:// extension:yaml | 2s | +20 节点
+[2026-07-14 14:43:34] 仓库 https://github.com/ermaozi/get_subscribe (分支: main, size: 76KB, pushed: 2026-07-14T00:39:29Z)
+[2026-07-14 14:43:34] repo info (vpei/Free-Node-Merge) 返回 403 (尝试 1/2)
+[2026-07-14 14:43:34] repo info (vpei/Free-Node-Merge) 403（访问被拒，配额剩余 4913），跳过
+[2026-07-14 14:43:34] 🔗 递归发现仓库 ssrsub/ssr (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-14 14:43:34] ⏱️ Code [4/26] ss:// extension:yaml | 2s | +11 节点
+[2026-07-14 14:43:36] 仓库 https://github.com/ssrsub/ssr (分支: master, size: 22669KB, pushed: 2026-07-13T14:35:51Z)[2026-07-14 14:43:37] ⏱️ Code [5/26] hysteria2:// extension:yaml | 2s | +16 节点
+
+[2026-07-14 14:43:38] ⏱️ Code [6/26] tuic:// extension:yaml | 1s | +4 节点
+[2026-07-14 14:43:41] ⏱️ Code [7/26] vmess:// extension:txt | 2s | +13 节点
+[2026-07-14 14:43:41] ⏱️ Code [8/26] vless:// extension:txt | 0s | +2 节点
+[2026-07-14 14:43:41] 仓库 https://github.com/ermaozi/get_subscribe 候选文件 2 个
+[2026-07-14 14:43:41] 仓库 https://github.com/ssrsub/ssr 无候选文件 (总计 6 blob, 扩展名过滤 1, processed_shas 跳过 0, SHA 缓存跳过 5)
+[2026-07-14 14:43:41] 👤 遍历用户仓库: ssrsub
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/list/12.txt ✅ 解析 189 候选 → 189 个有效节点 → 去重后新增 18 个
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/clash.yml ✅ 解析 22 候选 → 22 个有效节点 → 去重后新增 7 个
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/list/68.txt ✅ 解析 178 候选 → 178 个有效节点 → 去重后新增 57 个
+[2026-07-14 14:43:41] 仓库 https://github.com/gfpcom/free-proxy-list 候选文件 1 个
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md ✅ 解析 375 候选 → 375 个有效节点 → 去重后新增 170 个
+[2026-07-14 14:43:41] 🔗 递归发现仓库 mahdibland/ShadowsocksAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/splitted/trojan.txt ✅ 解析 724 候选 → 724 个有效节点 → 去重后新增 641 个
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt ✅ 解析 24 候选 → 24 个有效节点 → 去重后新增 2 个
+[2026-07-14 14:43:41] 🔗 查子仓库: ermaozi/get_subscribe
+[2026-07-14 14:43:41] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件较多 (388 个)，先通过 commits API 过滤
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/README.md ✅ 解析 2 候选 → 2 个有效节点 → 去重后新增 2 个
+[2026-07-14 14:43:41] 🔗 递归发现仓库 wiki/gfpcom (来源 https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/README.md)
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/splitted/ss.txt ✅ 解析 1849 候选 → 1849 个有效节点 → 去重后新增 1618 个
+[2026-07-14 14:43:41] 📄 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/splitted/vmess.txt ✅ 解析 2359 候选 → 2359 个有效节点 → 去重后新增 2270 个
+[2026-07-14 14:43:41] 📦 批次 0001 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0001.txt (5269 个节点, 累计 5269 个)
+[2026-07-14 14:43:43] repo info (wiki/gfpcom) 404，跳过
+[2026-07-14 14:43:43] 🔗 查子仓库: gfpcom/free-proxy-list
+[2026-07-14 14:43:43] ⏱️ Code [9/26] trojan:// extension:txt | 2s | +4673 节点
+[2026-07-14 14:43:44] SHA 缓存已保存: 1215617 条, 2 分片
+[2026-07-14 14:43:45]   👤 用户仓库: 2 个 → 队列
+[2026-07-14 14:43:45]   用户 ssrsub 共查 2 个仓库
+[2026-07-14 14:43:45] 仓库 https://github.com/mahdibland/ShadowsocksAggregator (分支: master, size: 4475983KB, pushed: 2026-07-14T03:59:21Z)[2026-07-14 14:43:45] 🔗 递归发现仓库 Leon406/SubCrawler (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+
+[2026-07-14 14:43:49] ⏱️ Code [10/26] ss:// extension:txt | 6s | +0 节点
+[2026-07-14 14:43:49]   Compare API 返回 300 个变更文件 (3 次 API 调用)
+[2026-07-14 14:43:49]   commits 过滤: 388 → 289 (变更文件 300 个)
+[2026-07-14 14:43:49] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件 289 个
+[2026-07-14 14:43:49] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-14 14:43:49] 触发限流，等待 43s ...
+[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/ae/shadowsocks.txt ✅ 解析 11 候选 → 11 个有效节点 → 去重后新增 4 个
+[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/al/light.txt ✅ 解析 4 候选 → 4 个有效节点 → 去重后新增 2 个
+[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/ae/trojan.txt ✅ 解析 2 候选 → 2 个有效节点 → 去重后新增 1 个
+[2026-07-14 14:43:49] 仓库 https://github.com/Leon406/SubCrawler (分支: main, size: 2046976KB, pushed: 2026-07-14T01:58:26Z)[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/ae/all.txt ✅ 解析 26 候选 → 26 个有效节点 → 去重后新增 10 个
+
+[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/at/light.txt ✅ 解析 11 候选 → 11 个有效节点 → 去重后新增 5 个[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/am/all.txt ✅ 解析 3 候选 → 3 个有效节点 → 去重后新增 2 个
+
+[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/au/shadowsocks.txt ✅ 解析 12 候选 → 12 个有效节点 → 去重后新增 7 个
+[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/au/all.txt ✅ 解析 58 候选 → 58 个有效节点 → 去重后新增 8 个[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/ba/all.txt ✅ 解析 5 候选 → 5 个有效节点 → 去重后新增 4 个
+
+[2026-07-14 14:43:49] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/az/light.txt ✅ 解析 12 候选 → 12 个有效节点 → 去重后新增 10 个
+[2026-07-14 14:43:50] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/be/shadowsocks.txt ✅ 解析 14 候选 → 14 个有效节点 → 去重后新增 13 个
+[2026-07-14 14:43:50] 📄 https://raw.githubusercontent.com/ninjastrikers/nexus-nodes/main/configs/countries/bg/vless.txt ✅ 解析 3 候选 → 3 个有效节点 → 去重后新增 3 个
