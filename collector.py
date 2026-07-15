@@ -145,7 +145,7 @@ class Collector:
 
     def _check_blacklist(self, github_url: str) -> bool:
         """检查 URL 是否在黑名单中，命中时标记为"热"条目。"""
-        if self._check_blacklist(github_url):
+        if github_url in self.blacklist_repos:
             self._blacklist_touched.add(github_url)
             return True
         return False
@@ -672,6 +672,8 @@ class Collector:
                 if seed_key and new_nodes > 0:
                     pass  # _update_seed_entry already called in _collect_github
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"[{now_str()}] ⚠️ Worker 异常: {repo}: {e}", flush=True)
             finally:
                 task_queue.task_done()
