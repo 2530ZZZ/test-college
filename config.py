@@ -86,8 +86,8 @@ ALLOWED_EXTENSIONS = {
 MAX_FILE_SIZE = None
 
 # 单个文件内容正则提取超时（秒），None 表示不限制
-# 默认 None。对大文件可设为 10-30 避免正则回溯爆炸。
-FILE_PROCESS_TIMEOUT = None
+# 默认 120。对大文件可设为 60-300 避免单文件卡死 Worker。
+FILE_PROCESS_TIMEOUT = 120
 
 # 黑名单文件路径
 # 存储已验证无节点或广告仓库的 GitHub URL，每行一个。跨运行持久化。
@@ -250,6 +250,10 @@ CODE_QUERIES = [
     "outbounds extension:json",
     # === 订阅编码文件 ===
     "subscription-userinfo extension:txt",
+    # === 搜聚合链接文件（raw 引用密集 → 发现大量相关仓库） ===
+    "raw.githubusercontent.com extension:yaml",
+    "raw.githubusercontent.com extension:json",
+    "raw.githubusercontent.com extension:txt",
     # === 搜其他搜集器代码（找到后遍历作者仓库 + 用户的全部仓库） ===
     "v2ray aggregator extension:py",
     "proxy collector extension:py",
@@ -482,12 +486,12 @@ README_SPAM_KEYWORDS = [
 ENABLE_RAW_RECURSIVE = True
 
 # 最多递归发现的仓库数量
-# 默认 5，取值范围 0-20。
-MAX_RECURSIVE_REPOS = 20
+# 默认 50。raw 下载不消耗 API 配额，设大扩大覆盖面。
+MAX_RECURSIVE_REPOS = 50
 
 # 最大递归深度
-# 默认 2，取值范围 1-3。过深可能导致链式爬取失控。
-MAX_RECURSIVE_DEPTH = 2
+# 默认 3。多一层可发现"链接的链接"引用的仓库。
+MAX_RECURSIVE_DEPTH = 3
 
 # ==================== 输出配置 ====================
 

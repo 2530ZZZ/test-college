@@ -95,6 +95,9 @@ class Collector:
         self.global_dedup_keys: Set[tuple] = set()     # (server, port, protocol) 去重
         self.seen_repos: Set[str] = set()
         self.blacklist_repos: Set[str] = set()
+        self._blacklist_order: List[str] = []      # 保留加载顺序（LRU 排序用）
+        self._blacklist_touched: Set[str] = set()  # 本次运行命中过的条目
+        self._blacklist_loaded: Set[str] = set()   # 启动时从文件加载的条目（vs 本次新加）
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
         self.processed_file_shas: Set[str] = set()
@@ -137,14 +140,25 @@ class Collector:
 
     # ==================== 持久化 IO ====================
 
+    def _check_blacklist(self, github_url: str) -> bool:
+        """检查 URL 是否在黑名单中，命中时标记为"热"条目。"""
+        if self._check_blacklist(github_url):
+            self._blacklist_touched.add(github_url)
+            return True
+        return False
+
     def load_blacklist(self):
-        """加载仓库黑名单文件。"""
+        """加载仓库黑名单文件（保留顺序用于 LRU 淘汰）。"""
+        self._blacklist_order.clear()
+        self._blacklist_loaded.clear()
         if os.path.exists(BLACKLIST_FILE):
             with open(BLACKLIST_FILE, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line.startswith("https://github.com/"):
                         self.blacklist_repos.add(line)
+                        self._blacklist_order.append(line)
+                        self._blacklist_loaded.add(line)
             print(f"[{now_str()}] 已加载黑名单: {len(self.blacklist_repos)} 个", flush=True)
 
     def load_sha_cache(self):
@@ -267,6 +281,22 @@ class Collector:
               f"累计 {len(self.unique_nodes)} 个)", flush=True)
         # 批次刷盘时顺带保存 SHA 缓存，防止中途崩溃丢失
         self.save_sha_cache()
+
+        # 同步写入 no/ 分片和 no_w_li.txt（边搜集边持久化）
+        no_dir = os.path.join(os.getcwd(), "no")
+        os.makedirs(no_dir, exist_ok=True)
+        no_filename = f"{seq:03d}.txt"
+        no_filepath = os.path.join(no_dir, no_filename)
+        with open(no_filepath, "w", encoding="utf-8") as f:
+            f.write(text)
+        repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
+        branch_name = os.getenv("GITHUB_REF_NAME", "main")
+        no_link = f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{no_filename}"
+        with open("no_w_li.txt", "a", encoding="utf-8") as f:
+            f.write(no_link + "\n")
+        # 覆写 no_li.txt（源链接去重）
+        with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
+            f.write("\n".join(dict.fromkeys(self.all_links)))
 
         # 通知测速编排器
         if self.on_batch_flush:
@@ -396,17 +426,24 @@ class Collector:
         每个线程持有独立 HttpClient，共享去重/缓存/批次状态。
         所有共享操作通过 _state_lock 保护。
         """
-        print(f"[{now_str()}] 🚀 程序启动", flush=True)
+        print(f"[{now_str()}] 🚀 程序启动 | 配额上限 {QUOTA_MAX_PER_HOUR}/小时", flush=True)
         self._start_time = time.time()
 
         # 加载种子文件
         repo_seeds = self._load_seed_file(SEED_REPOS_FILE)
         self._initial_seed_keys = set(repo_seeds.keys())
 
-        # 清空上次批次
+        # 清空上次运行的文件
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
         if os.path.exists(batch_dir): shutil.rmtree(batch_dir)
         os.makedirs(batch_dir, exist_ok=True)
+        no_dir = os.path.join(os.getcwd(), "no")
+        if os.path.exists(no_dir): shutil.rmtree(no_dir)
+        os.makedirs(no_dir, exist_ok=True)
+        # 清空链接文件（从零开始增量写入）
+        for _fname in ("no_w_li.txt", "no_li.txt", "failed_candidates.txt"):
+            with open(_fname, "w", encoding="utf-8") as _f:
+                pass
 
         # ── 创建共用线程池（Code Search 和 GitHub 搜索共用） ──
         task_queue = Queue(maxsize=SHARED_POOL_QUEUE_SIZE)
@@ -451,9 +488,29 @@ class Collector:
         if GITHUB_SEARCH_ENABLED:
             t_gh.join()
 
-        # ── 停止共用线程池 ──
+        # ── 等待队列清空（限流期间可能很慢，加超时保护） ──
         print(f"[{now_str()}] ⏳ 等待队列清空 (剩余 {task_queue.qsize()})...", flush=True)
-        task_queue.join()
+        queue_start = time.time()
+        QUEUE_DRAIN_TIMEOUT = 900  # 15 分钟
+        wait_logged = 0
+        while task_queue.qsize() > 0:
+            if self.quota_mgr.exceeded or self.limiter.should_stop():
+                print(f"[{now_str()}] ⚠️ 配额/限流耗尽，放弃剩余 "
+                      f"{task_queue.qsize()} 个任务", flush=True)
+                break
+            if self._runtime_exceeded():
+                print(f"[{now_str()}] ⚠️ 运行时间已到，放弃剩余 "
+                      f"{task_queue.qsize()} 个任务", flush=True)
+                break
+            if time.time() - queue_start > QUEUE_DRAIN_TIMEOUT:
+                print(f"[{now_str()}] ⚠️ 队列清空超时({QUEUE_DRAIN_TIMEOUT}s)，"
+                      f"放弃剩余 {task_queue.qsize()} 个任务", flush=True)
+                break
+            if time.time() - queue_start > wait_logged + 120:
+                print(f"[{now_str()}]   ... 队列剩余 {task_queue.qsize()} 个任务", flush=True)
+                wait_logged = time.time()
+            time.sleep(3)
+        print(f"[{now_str()}] 队列处理完毕", flush=True)
         for _ in workers: task_queue.put(None)
         for w in workers: w.join()
         self._task_queue = None
@@ -566,7 +623,8 @@ class Collector:
                 break
             print(f"[{now_str()}] ⏱️ [{idx}/{len(all_queries)}] "
                   f"{query[:60]} | {time.time()-qs:.0f}s | "
-                  f"+{len(self.unique_nodes)-nb}", flush=True)
+                  f"+{len(self.unique_nodes)-nb} | "
+                  f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
 
         # 保存统计（队列由 run() 统一管理）
         self._seed_files = len(self.processed_file_shas) - _files_before
@@ -595,9 +653,9 @@ class Collector:
             try:
                 if item is None:
                     break
-                # 停止信号检查
+                # 停止信号：配额耗尽或主限流超限 → Worker 退出
                 if self.limiter.should_stop() or self.quota_mgr.exceeded:
-                    continue  # 跳过不崩溃，任务自然丢弃
+                    break
                 source, repo, kwargs = item
                 self.http = HttpClient(token=self.token, rate_limiter=None,
                                        quota_manager=self.quota_mgr)
@@ -638,7 +696,7 @@ class Collector:
                 repo = item.get("full_name")
                 if not repo: continue
                 github_url = f"https://github.com/{repo}"
-                if repo in self.seen_repos or github_url in self.blacklist_repos:
+                if repo in self.seen_repos or self._check_blacklist(github_url):
                     continue
                 self.seen_repos.add(repo)
                 self.checked_count += 1
@@ -712,7 +770,7 @@ class Collector:
                     repos_found.add(repo_name)
 
                     github_url = f"https://github.com/{repo_name}"
-                    if github_url in self.blacklist_repos:
+                    if self._check_blacklist(github_url):
                         continue
 
                     # SHA 缓存检查：避免重复下载相同内容
@@ -756,7 +814,8 @@ class Collector:
 
             print(f"[{now_str()}] ⏱️ Code [{idx}/{len(CODE_QUERIES)}] "
                   f"{query[:60]} | {time.time() - qs:.0f}s | "
-                  f"+{len(self.unique_nodes) - nb} 节点", flush=True)
+                  f"+{len(self.unique_nodes) - nb} 节点 | "
+                  f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
 
         # 记录统计
         self._channel_new_nodes["Code"] = len(self.unique_nodes) - code_nodes_before
@@ -821,6 +880,43 @@ class Collector:
               f"失败请求: {qs['failed']}")
         print(f"{'='*60}", flush=True)
 
+        # ── 黑名单 LRU 排序 + 自动淘汰 ──
+        self._save_blacklist_lru()
+
+    def _save_blacklist_lru(self):
+        """黑名单 LRU 重排 + 淘汰末尾 1/30 的冷门条目。
+
+        热条目（本次命中过的）排最前，冷条目排最后。
+        本次新加入的条目不被淘汰。
+        每次运行淘汰末尾 1/30 的旧冷条目，约 30 次运行后自然消失。
+        """
+        if not self._blacklist_order:
+            return
+        # 区分本次新加 vs 旧条目
+        new_entries = [u for u in self._blacklist_order
+                       if u not in self._blacklist_loaded]
+        old_touched = [u for u in self._blacklist_order
+                       if u in self._blacklist_touched and u in self._blacklist_loaded]
+        old_untouched = [u for u in self._blacklist_order
+                         if u not in self._blacklist_touched and u in self._blacklist_loaded]
+        # 新条目视为热（排在前面），旧条目 touched → untouched
+        current_order = new_entries + old_touched + old_untouched
+        # 仅淘汰旧冷条目：保留前 29/30
+        evictable = len(old_untouched)
+        evict = max(0, evictable // 30) if evictable > 30 else 0
+        if evict > 0:
+            keep = len(current_order) - evict
+        else:
+            keep = len(current_order)
+        current_order = current_order[:keep]
+        # 覆写 ljck.txt
+        with open(BLACKLIST_FILE, "w", encoding="utf-8") as f:
+            for url in current_order:
+                f.write(url + "\n")
+        if evict > 0:
+            print(f"[{now_str()}] 黑名单淘汰 {evict} 条（保留 {len(current_order)} 条）",
+                  flush=True)
+
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
 
@@ -869,7 +965,7 @@ class Collector:
                 if repo in self.seen_repos:
                     print(f"[{now_str()}] ⏭️ 跳过已处理仓库 {github_url}", flush=True)
                     continue
-                if github_url in self.blacklist_repos:
+                if self._check_blacklist(github_url):
                     print(f"[{now_str()}] ⏭️ 跳过黑名单仓库 {github_url}", flush=True)
                     continue
 
@@ -923,7 +1019,7 @@ class Collector:
         github_url = f"https://github.com/{repo}"
 
         # 黑名单检查
-        if github_url in self.blacklist_repos:
+        if self._check_blacklist(github_url):
             print(f"[{now_str()}] 仓库在黑名单中: {github_url}", flush=True)
             return
 
@@ -945,6 +1041,7 @@ class Collector:
                     print(f"[{now_str()}] ⚠️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，废弃 → 加入黑名单", flush=True)
                     self.blacklist_repos.add(github_url)
+                    self._blacklist_order.append(github_url)
                     with open(BLACKLIST_FILE, "a", encoding="utf-8") as bf:
                         bf.write(github_url + "\n")
                     return
@@ -991,14 +1088,17 @@ class Collector:
                     raise
         else:
             # 回退路径：Contents API 逐层遍历
+            # 用 ThreadPoolExecutor 超时替代 signal(SIGALRM)，后者在 Worker 线程中不可用
             try:
                 if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
-                    @timeout_decorator(REPO_TIMEOUT_SECONDS)
-                    def _process():
-                        self.process_file_tree(repo, "", branch, has_nodes_flag)
-                    _process()
+                    with ThreadPoolExecutor(max_workers=1) as _exec:
+                        _future = _exec.submit(
+                            self.process_file_tree, repo, "", branch, has_nodes_flag)
+                        _future.result(timeout=REPO_TIMEOUT_SECONDS)
                 else:
                     self.process_file_tree(repo, "", branch, has_nodes_flag)
+            except FutureTimeoutError:
+                print(f"[{now_str()}] ⚠️ Contents API 处理超时，跳过", flush=True)
             except RuntimeError:
                 raise
 
@@ -1014,6 +1114,7 @@ class Collector:
                 else:
                     print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
                 self.blacklist_repos.add(github_url)
+                self._blacklist_order.append(github_url)
                 with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                     f.write(github_url + "\n")
 
@@ -1191,7 +1292,7 @@ class Collector:
             for r in repos_data:
                 fn = r.get("full_name")
                 if (not fn or fn in self.seen_repos
-                        or f"https://github.com/{fn}" in self.blacklist_repos):
+                        or self._check_blacklist(f"https://github.com/{fn}")):
                     continue
                 if fn in found: continue
                 found.add(fn)
@@ -1270,7 +1371,7 @@ class Collector:
             if self._sha_in_cache(sha):
                 skipped_by_cache += 1
                 continue
-            files_to_check.append((path, sha))
+            files_to_check.append((path, sha, e.get('size', 0)))
 
         if not files_to_check:
             print(f"[{now_str()}] 仓库 https://github.com/{repo} 无候选文件 "
@@ -1294,7 +1395,7 @@ class Collector:
             changed = self._get_recently_changed_file_set(repo, branch)
             if changed is not None:
                 before = len(files_to_check)
-                files_to_check = [(p, s) for p, s in files_to_check if p in changed]
+                files_to_check = [(p, s, sz) for p, s, sz in files_to_check if p in changed]
                 print(f"[{now_str()}]   commits 过滤: {before} → {len(files_to_check)} "
                       f"(变更文件 {len(changed)} 个)", flush=True)
             else:
@@ -1319,15 +1420,24 @@ class Collector:
         # ---- 并行下载处理 ----
         # 小量文件串行（省线程开销），大量文件用线程池并发下载
         if len(files_to_check) <= PARALLEL_DOWNLOAD_THRESHOLD:
-            for file_path, sha in files_to_check:
+            for file_path, sha, _size in files_to_check:
                 if self.limiter.should_stop():
                     raise RuntimeError("限流超限")
                 self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
         else:
-            with ThreadPoolExecutor(max_workers=PARALLEL_DOWNLOAD_WORKERS) as executor:
+            # 按文件大小升序 → 小文件先跑完释放内存
+            files_to_check.sort(key=lambda x: x[2])
+            total_mb = sum(x[2] for x in files_to_check) / 1024 / 1024
+            if total_mb > 500:
+                workers = 4
+            elif total_mb > 200:
+                workers = 8
+            else:
+                workers = PARALLEL_DOWNLOAD_WORKERS
+            with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {executor.submit(
                     self._handle_one_file, repo, branch, fp, s, has_nodes, depth
-                ): fp for fp, s in files_to_check}
+                ): fp for fp, s, _sz in files_to_check}
                 for future in as_completed(futures):
                     if self.limiter.should_stop():
                         executor.shutdown(wait=False, cancel_futures=True)
@@ -1479,6 +1589,9 @@ class Collector:
         if content is None:
             return  # 解码失败 → 不标记（下次重试）
 
+        # 清洗 surrogate 字符：urllib.parse.quote() 无法处理 \ud800-\udfff
+        content = content.encode('utf-8', errors='replace').decode('utf-8')
+
         content_size_mb = len(content) / 1024 / 1024
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
             print(f"[{now_str()}] 📄 {raw_url} ⚠️ 文件过大 "
@@ -1533,6 +1646,34 @@ class Collector:
             self.processed_file_shas.add(sha)
             self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
 
+        # 解析失败记录：有候选但全验证失败 → 可能是新格式/变体，值得复盘
+        if raw_count > 0 and valid_count == 0:
+            # 快速排查是哪些策略产出的候选
+            from parsers import (
+                extract_embedded_uris, extract_clash_yaml, extract_singbox_json,
+                extract_surge_format
+            )
+            strategies_hit = []
+            for _name, _func in [
+                ("uri", extract_embedded_uris),
+                ("clash", extract_clash_yaml),
+                ("singbox", extract_singbox_json),
+                ("surge", extract_surge_format),
+            ]:
+                try:
+                    _r = _func(content)
+                    if _r:
+                        strategies_hit.append(f"{_name}({len(_r)})")
+                except Exception:
+                    pass
+            # 样本：取第一个候选的字符串表示（截断 300 字符）
+            sample = str(proxies[0])[:300] if proxies else ""
+            with open("failed_candidates.txt", "a", encoding="utf-8") as _fc:
+                _fc.write(
+                    f"{raw_url}|{repo}|{raw_count}|"
+                    f"{','.join(strategies_hit) if strategies_hit else '?'}|"
+                    f"{sample}\n")
+
         if VERBOSE_LOG or new_count > 0:
             if valid_count == 0:
                 print(f"[{now_str()}] 📄 {raw_url} ❌ 未提取出节点 "
@@ -1581,7 +1722,7 @@ class Collector:
             if ext not in ALLOWED_EXTENSIONS:
                 continue
             if full_name in self.seen_repos or \
-               f"https://github.com/{full_name}" in self.blacklist_repos:
+               self._check_blacklist(f"https://github.com/{full_name}"):
                 continue
             if full_name in found:
                 continue
@@ -1615,7 +1756,7 @@ class Collector:
             if full_name in found or full_name in self.seen_repos:
                 continue
             github_url = f"https://github.com/{full_name}"
-            if github_url in self.blacklist_repos:
+            if self._check_blacklist(github_url):
                 continue
             found.add(full_name)
             if self.recursive_count >= MAX_RECURSIVE_REPOS:
@@ -1734,39 +1875,13 @@ class Collector:
     # ==================== 最终输出 ====================
 
     def save_results(self):
-        """保存所有输出文件。
+        """保存输出文件：no_li.txt（源链接）。
 
-        包括：no/ 分片、no_li.txt（源链接）、
-        no_w_li.txt（分片链接）、ljck.txt（黑名单）、SHA 缓存。
+        no/ 分片和 no_w_li.txt 已在 _flush_batch 中增量持久化，
+        无需在此重建。
         """
-        # 分片文件
-        no_dir = "no"
-        if os.path.exists(no_dir):
-            shutil.rmtree(no_dir)
-        os.makedirs(no_dir, exist_ok=True)
-        nodes_list = list(self.unique_nodes)
-        file_count = 0
-        no_w_links = []
-        repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
-        branch_name = os.getenv("GITHUB_REF_NAME", "main")
-        for i in range(0, len(nodes_list), CHUNK_SIZE):
-            chunk = nodes_list[i:i + CHUNK_SIZE]
-            file_count += 1
-            filename = f"{file_count:03d}.txt"
-            filepath = os.path.join(no_dir, filename)
-            chunk_text = "\n".join(chunk).encode("utf-8", errors="replace").decode("utf-8")
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(chunk_text)
-            no_w_links.append(
-                f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{filename}"
-            )
-
-        # no_w_li.txt 中的链接不含非法字符，直接写入
-        with open("no_w_li.txt", "w", encoding="utf-8") as f:
-            f.write("\n".join(no_w_links))
-        print(f"[{now_str()}] 保存 no_w_li.txt ({file_count} 分片)", flush=True)
-
         # 源链接（仅分片链接）
         self.all_links = list(dict.fromkeys(self.all_links))
         with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(self.all_links))
+        print(f"[{now_str()}] 保存 no_li.txt ({len(self.all_links)} 条)", flush=True)
