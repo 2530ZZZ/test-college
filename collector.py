@@ -51,7 +51,10 @@ from config import (
     GITHUB_SEARCH_ENABLED, QUOTA_MAX_PER_HOUR,
 )
 from http_client import HttpClient, RateLimiter
-from parsers import extract_all_strategies
+from parsers import (
+    extract_all_strategies, extract_embedded_uris, extract_clash_yaml,
+    extract_singbox_json, extract_surge_format,
+)
 from utils import now_str, timeout_decorator
 from quota_manager import QuotaManager
 
@@ -1648,11 +1651,6 @@ class Collector:
 
         # 解析失败记录：有候选但全验证失败 → 可能是新格式/变体，值得复盘
         if raw_count > 0 and valid_count == 0:
-            # 快速排查是哪些策略产出的候选
-            from parsers import (
-                extract_embedded_uris, extract_clash_yaml, extract_singbox_json,
-                extract_surge_format
-            )
             strategies_hit = []
             for _name, _func in [
                 ("uri", extract_embedded_uris),
