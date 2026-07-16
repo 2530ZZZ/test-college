@@ -3102,3 +3102,6 @@ https://github.com/nihaoya9527/WorkerVless2sub
 https://github.com/w-897/WorkerVless2sub
 https://github.com/a22124497/WorkerVless2sub
 https://github.com/ATTAHALO/WorkerVless2sub
+https://github.com/dszp/netsapiens-lib
+https://github.com/dszp/ringotel-lib
+https://github.com/Codster7SH/Marginal-Writing-assistant
