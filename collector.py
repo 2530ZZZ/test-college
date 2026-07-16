@@ -221,35 +221,38 @@ class Collector:
           1. 清理 30 天前的条目
           2. 按时间排序，保留最近的 SHA_CACHE_MAX_ENTRIES 条（若设了上限）
           3. 分片写入，每片不超过 GitHub 100MB 限制
+
+        整个方法加锁：并行下载线程同时写 sha_cache，遍历时不能有并发写入。
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-        self.sha_cache = {sha: ts for sha, ts in self.sha_cache.items() if ts > cutoff}
-        if SHA_CACHE_MAX_ENTRIES > 0 and len(self.sha_cache) > SHA_CACHE_MAX_ENTRIES:
-            sorted_items = sorted(self.sha_cache.items(), key=lambda x: x[1], reverse=True)
-            self.sha_cache = dict(sorted_items[:SHA_CACHE_MAX_ENTRIES])
+        with self._state_lock:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+            self.sha_cache = {sha: ts for sha, ts in self.sha_cache.items() if ts > cutoff}
+            if SHA_CACHE_MAX_ENTRIES > 0 and len(self.sha_cache) > SHA_CACHE_MAX_ENTRIES:
+                sorted_items = sorted(self.sha_cache.items(), key=lambda x: x[1], reverse=True)
+                self.sha_cache = dict(sorted_items[:SHA_CACHE_MAX_ENTRIES])
 
-        os.makedirs(SHA_CACHE_DIR, exist_ok=True)
-        # 清除旧分片
-        for old in os.listdir(SHA_CACHE_DIR):
-            if old.endswith('.pkl'):
-                os.remove(os.path.join(SHA_CACHE_DIR, old))
+            os.makedirs(SHA_CACHE_DIR, exist_ok=True)
+            # 清除旧分片
+            for old in os.listdir(SHA_CACHE_DIR):
+                if old.endswith('.pkl'):
+                    os.remove(os.path.join(SHA_CACHE_DIR, old))
 
-        # 按时间戳排序，分片写入
-        sorted_items = sorted(self.sha_cache.items(), key=lambda x: x[1])
-        chunk = {}
-        seq = 0
-        for sha, ts in sorted_items:
-            chunk[sha] = ts
-            # 估算：每个条目约 60 字节（sha40 + datetime20）
-            if len(chunk) * 60 >= SHA_CACHE_MAX_BYTES:
+            # 按时间戳排序，分片写入
+            sorted_items = sorted(self.sha_cache.items(), key=lambda x: x[1])
+            chunk = {}
+            seq = 0
+            for sha, ts in sorted_items:
+                chunk[sha] = ts
+                # 估算：每个条目约 60 字节（sha40 + datetime20）
+                if len(chunk) * 60 >= SHA_CACHE_MAX_BYTES:
+                    self._write_sha_chunk(seq, chunk)
+                    chunk.clear()
+                    seq += 1
+            if chunk:
                 self._write_sha_chunk(seq, chunk)
-                chunk.clear()
-                seq += 1
-        if chunk:
-            self._write_sha_chunk(seq, chunk)
 
-        total_files = seq + (1 if chunk else 0)
-        print(f"[{now_str()}] SHA 缓存已保存: {len(self.sha_cache)} 条, {total_files} 分片", flush=True)
+            total_files = seq + (1 if chunk else 0)
+            print(f"[{now_str()}] SHA 缓存已保存: {len(self.sha_cache)} 条, {total_files} 分片", flush=True)
 
     @staticmethod
     def _write_sha_chunk(seq: int, chunk: dict):
