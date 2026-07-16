@@ -20,3 +20,5 @@ https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/019.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/020.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/021.txt
 https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/022.txt
+https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/023.txt
+https://raw.githubusercontent.com/2530ZZZ/test-college/main/no/024.txt
