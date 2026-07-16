@@ -157,9 +157,9 @@ class StandardProxy:
         # trojan, vless, hysteria2, tuic: URL 格式
         params = []
         if self.sni and self.sni != self.server:
-            params.append(f"sni={quote(self.sni, safe='')}")
+            params.append(f"sni={quote(str(self.sni), safe='')}")
         if self.transport != "tcp":
-            params.append(f"type={quote(self.transport, safe='')}")
+            params.append(f"type={quote(str(self.transport), safe='')}")
         if self.security and p in ("ss",):
             pass  # handled above
         query = "&".join(params)
