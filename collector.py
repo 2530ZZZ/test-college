@@ -49,13 +49,18 @@ from config import (
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
     GITHUB_SEARCH_ENABLED, QUOTA_MAX_PER_HOUR,
+    SKIP_PROCESSING_AGE_HOURS,
+    QUEUE_DRAIN_TIMEOUT_SECONDS, QUEUE_PUT_TIMEOUT_SECONDS,
+    BLACKLIST_EVICTION_ENABLED, BLACKLIST_EVICTION_RATIO,
+    LOG_FAILED_CANDIDATES,
+    PARALLEL_DOWNLOAD_MB_HIGH, PARALLEL_DOWNLOAD_MB_MED,
 )
 from http_client import HttpClient, RateLimiter
 from parsers import (
     extract_all_strategies, extract_embedded_uris, extract_clash_yaml,
     extract_singbox_json, extract_surge_format,
 )
-from utils import now_str, timeout_decorator
+from utils import now_str
 from quota_manager import QuotaManager
 
 
@@ -111,6 +116,7 @@ class Collector:
         self.batch_buffer: List[str] = []
         self.batch_id: int = 0
         self.batch_file_paths: List[str] = []
+        self.failed_candidates_buffer: List[str] = []  # 解析失败记录
         self.on_batch_flush = on_batch_flush
 
         # 递归发现计数
@@ -300,6 +306,10 @@ class Collector:
         # 覆写 no_li.txt（源链接去重）
         with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(dict.fromkeys(self.all_links)))
+        # 覆写 failed_candidates.txt（解析失败记录）
+        if self.failed_candidates_buffer:
+            with open("failed_candidates.txt", "w", encoding="utf-8") as f:
+                f.write("\n".join(self.failed_candidates_buffer))
 
         # 通知测速编排器
         if self.on_batch_flush:
@@ -494,7 +504,7 @@ class Collector:
         # ── 等待队列清空（限流期间可能很慢，加超时保护） ──
         print(f"[{now_str()}] ⏳ 等待队列清空 (剩余 {task_queue.qsize()})...", flush=True)
         queue_start = time.time()
-        QUEUE_DRAIN_TIMEOUT = 900  # 15 分钟
+        QUEUE_DRAIN_TIMEOUT = QUEUE_DRAIN_TIMEOUT_SECONDS
         wait_logged = 0
         while task_queue.qsize() > 0:
             if self.quota_mgr.exceeded or self.limiter.should_stop():
@@ -606,7 +616,8 @@ class Collector:
                     task_queue.put(("种子仓库", repo,
                                     {"branch": br, "size": ri.get("size", -1),
                                      "disabled": False, "pushed_at": ri.get("pushed_at", ""),
-                                     "seed_key": repo}))
+                                     "seed_key": repo}),
+                                   timeout=QUEUE_PUT_TIMEOUT_SECONDS)
                 except Exception as e:
                     print(f"[{now_str()}] ⚠️ {repo}: {e}", flush=True)
                 self._update_seed_entry(repo_seeds, repo, 0)
@@ -705,11 +716,15 @@ class Collector:
                     continue
                 self.seen_repos.add(repo)
                 self.checked_count += 1
-                task_queue.put(("GitHub", repo,
-                                {"branch": item.get("default_branch", "main"),
-                                 "size": item.get("size", 0),
-                                 "disabled": item.get("disabled", False),
-                                 "pushed_at": item.get("pushed_at", "")}))
+                try:
+                    task_queue.put(("GitHub", repo,
+                                    {"branch": item.get("default_branch", "main"),
+                                     "size": item.get("size", 0),
+                                     "disabled": item.get("disabled", False),
+                                     "pushed_at": item.get("pushed_at", "")}),
+                                   timeout=QUEUE_PUT_TIMEOUT_SECONDS)
+                except Exception:
+                    pass  # 队列满→丢弃（下次运行还能搜到）
             time.sleep(PAGE_SLEEP_SECONDS)
 
     def _collect_code(self, task_queue: Queue):
@@ -809,11 +824,15 @@ class Collector:
                         if repo_name not in self.seen_repos:
                             self.seen_repos.add(repo_name)
                             self.checked_count += 1
-                            task_queue.put(("Code", repo_name,
-                                            {"branch": default_branch,
-                                             "size": repo_data.get("size", -1),
-                                             "disabled": False,
-                                             "pushed_at": repo_data.get("pushed_at", "")}))
+                            try:
+                                task_queue.put(("Code", repo_name,
+                                                {"branch": default_branch,
+                                                 "size": repo_data.get("size", -1),
+                                                 "disabled": False,
+                                                 "pushed_at": repo_data.get("pushed_at", "")}),
+                                               timeout=QUEUE_PUT_TIMEOUT_SECONDS)
+                            except Exception:
+                                pass  # 队列满→丢弃（下次运行还能搜到）
 
                 time.sleep(PAGE_SLEEP_SECONDS)
 
@@ -883,6 +902,9 @@ class Collector:
               f"{' ⚠️已耗尽' if qs['exceeded'] else ''}")
         print(f"  主动限速: {qs['throttled']} 次, "
               f"失败请求: {qs['failed']}")
+        fc = len(self.failed_candidates_buffer)
+        if fc > 0:
+            print(f"  解析失败文件: {fc} 个 → 详见 failed_candidates.txt")
         print(f"{'='*60}", flush=True)
 
         # ── 黑名单 LRU 排序 + 自动淘汰 ──
@@ -895,7 +917,7 @@ class Collector:
         本次新加入的条目不被淘汰。
         每次运行淘汰末尾 1/30 的旧冷条目，约 30 次运行后自然消失。
         """
-        if not self._blacklist_order:
+        if not BLACKLIST_EVICTION_ENABLED or not self._blacklist_order:
             return
         # 区分本次新加 vs 旧条目
         new_entries = [u for u in self._blacklist_order
@@ -908,7 +930,8 @@ class Collector:
         current_order = new_entries + old_touched + old_untouched
         # 仅淘汰旧冷条目：保留前 29/30
         evictable = len(old_untouched)
-        evict = max(0, evictable // 30) if evictable > 30 else 0
+        ratio = max(5, BLACKLIST_EVICTION_RATIO)
+        evict = max(0, evictable // ratio) if evictable > ratio else 0
         if evict > 0:
             keep = len(current_order) - evict
         else:
@@ -1036,13 +1059,15 @@ class Collector:
             print(f"[{now_str()}] ⚠️ 仓库 {github_url} 已禁用，跳过", flush=True)
             return
 
-        # 非搜索来源的时间筛选
-        if REPO_MAX_AGE_HOURS > 0 and pushed_at:
+        # 仓库年龄过滤（统一入口：搜索结果、fork链、用户仓库、raw递归）
+        if pushed_at:
             try:
                 pushed_time = datetime.fromisoformat(
                     pushed_at.replace("Z", "+00:00"))
                 age_hours = (datetime.now(timezone.utc) - pushed_time).total_seconds() / 3600
-                if age_hours > REPO_MAX_AGE_HOURS:
+
+                # 废弃仓库 → 永久黑名单
+                if REPO_MAX_AGE_HOURS > 0 and age_hours > REPO_MAX_AGE_HOURS:
                     print(f"[{now_str()}] ⚠️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，废弃 → 加入黑名单", flush=True)
                     self.blacklist_repos.add(github_url)
@@ -1050,9 +1075,18 @@ class Collector:
                     with open(BLACKLIST_FILE, "a", encoding="utf-8") as bf:
                         bf.write(github_url + "\n")
                     return
-                elif age_hours > 24:
+
+                # 超过跳过阈值 → 不解析文件，但仍追踪 fork 链（fork 可能活跃）
+                if SKIP_PROCESSING_AGE_HOURS > 0 and age_hours > SKIP_PROCESSING_AGE_HOURS:
                     print(f"[{now_str()}] ⏭️ 仓库 {github_url} "
-                          f"{age_hours:.0f}h 未更新，跳过", flush=True)
+                          f"{age_hours:.0f}h 未更新，跳过解析（追踪 fork 链）", flush=True)
+                    # 追踪 fork/用户仓库，但不解析本仓库文件
+                    if FORK_CHAIN_ENABLED and depth < MAX_PARENT_TRACE_DEPTH:
+                        if FORK_CHAIN_CHILD_DEPTH > 0:
+                            self._trace_child_forks(repo, branch, depth)
+                        self._trace_fork_chain(repo, branch, pushed_at, depth)
+                    if USER_REPOS_ENABLED:
+                        self._trace_user_repos(repo, branch, depth)
                     return
             except Exception:
                 pass  # 时间解析失败，放行
@@ -1083,12 +1117,14 @@ class Collector:
                 print(f"[{now_str()}] 树 API 失败，回退到 Contents API", flush=True)
                 try:
                     if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
-                        @timeout_decorator(REPO_TIMEOUT_SECONDS)
-                        def _process():
-                            self.process_file_tree(repo, "", branch, has_nodes_flag)
-                        _process()
+                        with ThreadPoolExecutor(max_workers=1) as _exec2:
+                            _future2 = _exec2.submit(
+                                self.process_file_tree, repo, "", branch, has_nodes_flag)
+                            _future2.result(timeout=REPO_TIMEOUT_SECONDS)
                     else:
                         self.process_file_tree(repo, "", branch, has_nodes_flag)
+                except FutureTimeoutError:
+                    print(f"[{now_str()}] ⚠️ Contents API 处理超时，跳过", flush=True)
                 except RuntimeError:
                     raise
         else:
@@ -1262,7 +1298,7 @@ class Collector:
                          "size": fork.get("size", -1),
                          "disabled": fork.get("disabled", False),
                          "pushed_at": fork.get("pushed_at", "")}),
-                       timeout=10)
+                       timeout=QUEUE_PUT_TIMEOUT_SECONDS)
             except Exception:
                 pass  # 队列满，丢弃此 fork（下次运行可能再发现）
         print(f"[{now_str()}]   {label}: {len(forks)} 个 → 队列", flush=True)
@@ -1433,9 +1469,9 @@ class Collector:
             # 按文件大小升序 → 小文件先跑完释放内存
             files_to_check.sort(key=lambda x: x[2])
             total_mb = sum(x[2] for x in files_to_check) / 1024 / 1024
-            if total_mb > 500:
+            if PARALLEL_DOWNLOAD_MB_HIGH > 0 and total_mb > PARALLEL_DOWNLOAD_MB_HIGH:
                 workers = 4
-            elif total_mb > 200:
+            elif PARALLEL_DOWNLOAD_MB_MED > 0 and total_mb > PARALLEL_DOWNLOAD_MB_MED:
                 workers = 8
             else:
                 workers = PARALLEL_DOWNLOAD_WORKERS
@@ -1652,7 +1688,7 @@ class Collector:
             self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
 
         # 解析失败记录：有候选但全验证失败 → 可能是新格式/变体，值得复盘
-        if raw_count > 0 and valid_count == 0:
+        if LOG_FAILED_CANDIDATES and raw_count > 0 and valid_count == 0:
             strategies_hit = []
             for _name, _func in [
                 ("uri", extract_embedded_uris),
@@ -1668,13 +1704,12 @@ class Collector:
                     pass
             # 样本：取第一个候选的字符串表示（截断 300 字符）
             sample = str(proxies[0])[:300] if proxies else ""
-            with open("failed_candidates.txt", "a", encoding="utf-8") as _fc:
-                _fc.write(
-                    f"{raw_url}|{repo}|{raw_count}|"
-                    f"{','.join(strategies_hit) if strategies_hit else '?'}|"
-                    f"{sample}\n")
+            self.failed_candidates_buffer.append(
+                f"{raw_url}|{repo}|{raw_count}|"
+                f"{','.join(strategies_hit) if strategies_hit else '?'}|"
+                f"{sample}")
 
-        if VERBOSE_LOG or new_count > 0:
+        if VERBOSE_LOG:
             if valid_count == 0:
                 print(f"[{now_str()}] 📄 {raw_url} ❌ 未提取出节点 "
                       f"(原始 {raw_count} 个候选全部验证失败)", flush=True)
