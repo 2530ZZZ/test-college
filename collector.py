@@ -101,7 +101,7 @@ class Collector:
         self.all_links: List[str] = []
         self.unique_nodes: Set[str] = set()            # 全局已收集节点 URI
         self.global_dedup_keys: Set[tuple] = set()     # (server, port, protocol) 去重
-        self.seen_repos: Set[str] = set()
+        self.seen_repos: Set[str] = set()  # 存储小写，大小写不敏感
         self.blacklist_repos: Set[str] = set()
         self._blacklist_order: List[str] = []      # 保留加载顺序（LRU 排序用）
         self._blacklist_touched: Set[str] = set()  # 本次运行命中过的条目
@@ -111,6 +111,8 @@ class Collector:
         self.processed_file_shas: Set[str] = set()
         self.sha_cache: Dict[str, datetime] = {}
         self._branch_cache: Dict[str, str] = {}        # repo → 真实分支名
+        self._repo_not_found: Set[str] = set()         # 404 仓库（本次运行）
+        self._repo_forbidden: Set[str] = set()         # 403 访问拒绝（本次运行）
 
         # 批次持久化（共享）
         self.batch_buffer: List[str] = []
@@ -148,6 +150,27 @@ class Collector:
         self._http_local.http = val
 
     # ==================== 持久化 IO ====================
+
+    def _add_seen(self, repo: str):
+        """标记仓库为已处理（大小写不敏感）。"""
+        self.seen_repos.add(repo.lower())
+
+    def _is_seen(self, repo: str) -> bool:
+        """检查仓库是否已处理（大小写不敏感）。"""
+        return repo.lower() in self.seen_repos
+
+    def _is_repo_dead(self, repo: str) -> bool:
+        """检查仓库是否已知不可达（404/403，大小写不敏感）。"""
+        r = repo.lower()
+        return r in self._repo_not_found or r in self._repo_forbidden
+
+    def _mark_repo_not_found(self, repo: str):
+        """标记仓库为 404（不存在/已删除），本次运行内不再重试。"""
+        self._repo_not_found.add(repo.lower())
+
+    def _mark_repo_forbidden(self, repo: str):
+        """标记仓库为 403 访问拒绝（私有/被封），本次运行内不再重试。"""
+        self._repo_forbidden.add(repo.lower())
 
     def _check_blacklist(self, github_url: str) -> bool:
         """检查 URL 是否在黑名单中，命中时标记为"热"条目。"""
@@ -642,7 +665,8 @@ class Collector:
 
         # 保存统计（队列由 run() 统一管理）
         self._seed_files = len(self.processed_file_shas) - _files_before
-        self._channel_new_nodes["种子仓库"] = self._channel_new_nodes.get("种子仓库", 0)
+        with self._state_lock:
+            self._channel_new_nodes["种子仓库"] = self._channel_new_nodes.get("种子仓库", 0)
 
         # 自动收录
         if AUTO_SEED_ENABLED:
@@ -712,9 +736,9 @@ class Collector:
                 repo = item.get("full_name")
                 if not repo: continue
                 github_url = f"https://github.com/{repo}"
-                if repo in self.seen_repos or self._check_blacklist(github_url):
+                if self._is_seen(repo) or self._check_blacklist(github_url):
                     continue
-                self.seen_repos.add(repo)
+                self._add_seen(repo)
                 self.checked_count += 1
                 try:
                     task_queue.put(("GitHub", repo,
@@ -821,8 +845,8 @@ class Collector:
 
                     if has_nodes_flag[0]:
                         # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
-                        if repo_name not in self.seen_repos:
-                            self.seen_repos.add(repo_name)
+                        if not self._is_seen(repo_name):
+                            self._add_seen(repo_name)
                             self.checked_count += 1
                             try:
                                 task_queue.put(("Code", repo_name,
@@ -842,7 +866,8 @@ class Collector:
                   f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
 
         # 记录统计
-        self._channel_new_nodes["Code"] = len(self.unique_nodes) - code_nodes_before
+        with self._state_lock:
+            self._channel_new_nodes["Code"] = len(self.unique_nodes) - code_nodes_before
         self._code_files_found = code_files
         self._code_repos_processed = len(repos_found)
 
@@ -990,14 +1015,14 @@ class Collector:
                 print(f"[{now_str()}] 检查仓库 #{idx}: {github_url}", flush=True)
 
                 # 去重检查
-                if repo in self.seen_repos:
+                if self._is_seen(repo):
                     print(f"[{now_str()}] ⏭️ 跳过已处理仓库 {github_url}", flush=True)
                     continue
                 if self._check_blacklist(github_url):
                     print(f"[{now_str()}] ⏭️ 跳过黑名单仓库 {github_url}", flush=True)
                     continue
 
-                self.seen_repos.add(repo)
+                self._add_seen(repo)
                 self.checked_count += 1
                 print(f"[{now_str()}] 开始处理仓库 {github_url}", flush=True)
 
@@ -1199,7 +1224,7 @@ class Collector:
         print(f"[{now_str()}]   父仓库: {parent_name}", flush=True)
 
         # 2. 如果父仓库还没处理过，先处理父仓库
-        if parent_name not in self.seen_repos:
+        if not self._is_seen(parent_name):
             before_parent = len(self.unique_nodes)
             try:
                 self.process_repo(parent_name,
@@ -1227,9 +1252,9 @@ class Collector:
             # 收集合格兄弟 fork
             for fork in forks:
                 fn = fork.get("full_name")
-                if not fn or fn in self.seen_repos: continue
+                if not fn or self._is_seen(fn): continue
                 if len(qualified) >= FORK_CHAIN_MAX_FORKS: break
-                self.seen_repos.add(fn)
+                self._add_seen(fn)
                 qualified.append(fork)
 
         if qualified:
@@ -1269,9 +1294,9 @@ class Collector:
             # 收集合格 fork
             for fork in forks:
                 fn = fork.get("full_name")
-                if not fn or fn in self.seen_repos: continue
+                if not fn or self._is_seen(fn): continue
                 if len(qualified) >= FORK_CHAIN_MAX_FORKS: break
-                self.seen_repos.add(fn)
+                self._add_seen(fn)
                 qualified.append(fork)
 
         if qualified:
@@ -1290,8 +1315,8 @@ class Collector:
         # 有共用池 → 全部提交到队列
         for fork in forks:
             fn = fork.get("full_name")
-            if not fn or fn in self.seen_repos: continue
-            self.seen_repos.add(fn)
+            if not fn or self._is_seen(fn): continue
+            self._add_seen(fn)
             try:
                 tq.put(("GitHub", fn,
                         {"branch": fork.get("default_branch", branch),
@@ -1332,14 +1357,14 @@ class Collector:
                 break
             for r in repos_data:
                 fn = r.get("full_name")
-                if (not fn or fn in self.seen_repos
+                if (not fn or self._is_seen(fn)
                         or self._check_blacklist(f"https://github.com/{fn}")):
                     continue
                 if fn in found: continue
                 found.add(fn)
                 if USER_REPOS_MAX_PER_USER and len(qualified) >= USER_REPOS_MAX_PER_USER:
                     break
-                self.seen_repos.add(fn)
+                self._add_seen(fn)
                 qualified.append(r)
 
         if qualified:
@@ -1508,6 +1533,9 @@ class Collector:
         # 缓存命中 → 不用调 API
         if repo in self._branch_cache:
             return self._branch_cache[repo]
+        # 已知死仓库 → 不调 API
+        if self._is_repo_dead(repo):
+            return None
 
         repo_data = self.http.get_json(
             f"https://api.github.com/repos/{repo}",
@@ -1515,6 +1543,7 @@ class Collector:
             operation_name=f"repo info ({repo})")
         if not repo_data:
             self._branch_cache[repo] = ""  # 缓存失败，避免重复调 API
+            self._mark_repo_not_found(repo)
             return None
         branch = repo_data.get("default_branch", "main")
         self._branch_cache[repo] = branch
@@ -1756,8 +1785,9 @@ class Collector:
 
             if ext not in ALLOWED_EXTENSIONS:
                 continue
-            if full_name in self.seen_repos or \
-               self._check_blacklist(f"https://github.com/{full_name}"):
+            if self._is_seen(full_name) or \
+               self._check_blacklist(f"https://github.com/{full_name}") or \
+               self._is_repo_dead(full_name):
                 continue
             if full_name in found:
                 continue
@@ -1776,6 +1806,8 @@ class Collector:
                 timeout=FILE_DOWNLOAD_TIMEOUT,
                 operation_name=f"repo info ({full_name})")
             if not repo_info or repo_info.get('disabled', False):
+                if not repo_info:
+                    self._mark_repo_not_found(full_name)
                 continue
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
@@ -1788,10 +1820,10 @@ class Collector:
         # ── 处理仓库链接 ──
         for match in repo_pattern.finditer(content):
             full_name = match.group(1)
-            if full_name in found or full_name in self.seen_repos:
+            if full_name in found or self._is_seen(full_name):
                 continue
             github_url = f"https://github.com/{full_name}"
-            if self._check_blacklist(github_url):
+            if self._check_blacklist(github_url) or self._is_repo_dead(full_name):
                 continue
             found.add(full_name)
             if self.recursive_count >= MAX_RECURSIVE_REPOS:
@@ -1806,6 +1838,8 @@ class Collector:
                 timeout=FILE_DOWNLOAD_TIMEOUT,
                 operation_name=f"repo info ({full_name})")
             if not repo_info or repo_info.get('disabled', False):
+                if not repo_info:
+                    self._mark_repo_not_found(full_name)
                 continue
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
