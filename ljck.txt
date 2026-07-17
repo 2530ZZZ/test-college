@@ -3418,3 +3418,6 @@ https://github.com/jackiwhi/Jpl-sub-processor
 https://github.com/newemperor221/sub-worker
 https://github.com/fengcen-qq/WorkerVless2sub
 https://github.com/qiubei000/WorkerVless2sub
+https://github.com/amateurmenace/Speak
+https://github.com/anktiwari053/idurar-erp-crm
+https://github.com/vivaejs/server

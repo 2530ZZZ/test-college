@@ -1,0 +1,629 @@
+[2026-07-17 11:22:20] 🚀 程序启动
+[2026-07-17 11:22:20] 关键词: 90 个
+[2026-07-17 11:22:20] 已加载黑名单: 3419 个
+[2026-07-17 11:22:20] 加载 SHA 缓存 59751 条 (1 分片)
+[2026-07-17 11:22:20] 🚀 程序启动 | 配额上限 4800/小时
+[2026-07-17 11:22:20] 🔵 种子仓库: 38 个 → 队列
+[2026-07-17 11:22:21] 仓库 https://github.com/mahdibland/V2RayAggregator (分支: master, size: 4486822KB, pushed: 2026-07-16T14:50:06Z)
+[2026-07-17 11:22:21] ⏱️ Code [1/29] vmess:// extension:yaml | 1s | +0 节点 | 配额 4798/4800
+[2026-07-17 11:22:22] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件较多 (1509 个)，先通过 commits API 过滤
+[2026-07-17 11:22:23] 仓库 https://github.com/gfpcom/free-proxy-list (分支: main, size: 37052KB, pushed: 2026-07-17T01:01:46Z)[2026-07-17 11:22:23] ⏱️ Code [2/29] vless:// extension:yaml | 2s | +0 节点 | 配额 4795/4800
+
+[2026-07-17 11:22:24] ⏱️ Code [3/29] trojan:// extension:yaml | 2s | +0 节点 | 配额 4793/4800
+[2026-07-17 11:22:26] 仓库 https://github.com/ninjastrikers/nexus-nodes (分支: main, size: 874801KB, pushed: 2026-07-16T21:16:01Z)
+[2026-07-17 11:22:26] 仓库 https://github.com/gfpcom/free-proxy-list 候选文件 1 个
+[2026-07-17 11:22:26] 🔗 递归发现仓库 wiki/gfpcom (来源 https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/README.md)
+[2026-07-17 11:22:28] ⏱️ Code [4/29] ss:// extension:yaml | 3s | +2 节点 | 配额 4789/4800
+[2026-07-17 11:22:28] repo info (wiki/gfpcom) 404，跳过
+[2026-07-17 11:22:28] 🔗 查子仓库: gfpcom/free-proxy-list
+[2026-07-17 11:22:29] 仓库 https://github.com/ermaozi/get_subscribe (分支: main, size: 185KB, pushed: 2026-07-17T00:43:06Z)[2026-07-17 11:22:29] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件较多 (534 个)，先通过 commits API 过滤
+[2026-07-17 11:22:29]   Compare API 返回 25 个变更文件 (3 次 API 调用)[2026-07-17 11:22:29] ⏱️ Code [5/29] hysteria2:// extension:yaml | 2s | +0 节点 | 配额 4784/4800
+
+
+[2026-07-17 11:22:29]   commits 过滤: 1509 → 0 (变更文件 25 个)
+[2026-07-17 11:22:29] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件经时间过滤后为空
+[2026-07-17 11:22:29] 🔗 查子仓库: mahdibland/V2RayAggregator
+[2026-07-17 11:22:34] 仓库 https://github.com/ermaozi/get_subscribe 候选文件 2 个
+[2026-07-17 11:22:34]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:22:34] 🔗 开始 Fork 链追踪 (gfpcom/free-proxy-list)
+[2026-07-17 11:22:34] ⏱️ Code [6/29] tuic:// extension:yaml | 4s | +0 节点 | 配额 4777/4800
+[2026-07-17 11:22:34] 🔗 查子仓库: ermaozi/get_subscribe
+[2026-07-17 11:22:36] 👤 遍历用户仓库: gfpcom
+[2026-07-17 11:22:38]   🍴 子仓库: 30 个 → 队列[2026-07-17 11:22:38]   Compare API 返回 300 个变更文件 (3 次 API 调用)
+[2026-07-17 11:22:38] ⏱️ Code [7/29] vmess:// extension:txt | 4s | +26 节点 | 配额 4770/4800
+
+[2026-07-17 11:22:38]   commits 过滤: 534 → 285 (变更文件 300 个)
+[2026-07-17 11:22:38] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件 285 个
+[2026-07-17 11:22:38] 🔗 开始 Fork 链追踪 (mahdibland/V2RayAggregator)
+[2026-07-17 11:22:40]   👤 用户仓库: 5 个 → 队列
+[2026-07-17 11:22:40]   用户 gfpcom 共查 5 个仓库
+[2026-07-17 11:22:40] 仓库 https://github.com/pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)
+[2026-07-17 11:22:42] 👤 遍历用户仓库: mahdibland[2026-07-17 11:22:42]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:22:42] ⏱️ Code [8/29] vless:// extension:txt | 4s | +1563 节点 | 配额 4764/4800
+
+[2026-07-17 11:22:42] 🔗 开始 Fork 链追踪 (ermaozi/get_subscribe)
+[2026-07-17 11:22:44] 仓库 https://github.com/pawdroid/Free-servers 候选文件 32 个[2026-07-17 11:22:45] ⏱️ Code [9/29] trojan:// extension:txt | 2s | +1851 节点 | 配额 4762/4800
+
+[2026-07-17 11:22:45] 👤 遍历用户仓库: ermaozi
+[2026-07-17 11:22:47] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-en.md)[2026-07-17 11:22:47] ⏱️ Code [10/29] ss:// extension:txt | 2s | +1323 节点 | 配额 4758/4800
+
+[2026-07-17 11:22:47] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pt-BR.md)[2026-07-17 11:22:47]   👤 用户仓库: 20 个 → 队列[2026-07-17 11:22:47] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-id.md)
+
+
+[2026-07-17 11:22:48]   用户 mahdibland 共查 20 个仓库[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-es.md)
+
+[2026-07-17 11:22:48] Code搜索第1页 返回 403 (尝试 1/2)[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-de.md)[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ko-KR.md)[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-vi.md)
+
+[2026-07-17 11:22:48] 仓库 https://github.com/sevcator/5ubscrpt10n (分支: main, size: 66602982KB, pushed: 2026-07-17T00:11:50Z)
+[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pl.md)[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ar.md)
+
+[2026-07-17 11:22:48] 触发限流，等待 37s ...[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/README.md)
+[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-fr.md)[2026-07-17 11:22:48] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ur-PK.md)
+
+
+[2026-07-17 11:22:49] 📦 批次 0001 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0001.txt (5290 个节点, 累计 5292 个)
+[2026-07-17 11:22:49] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ja.md)[2026-07-17 11:22:49] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-bn.md)[2026-07-17 11:22:49] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-hi.md)[2026-07-17 11:22:49] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ru.md)
+
+
+
+
+
+[2026-07-17 11:22:50]   👤 用户仓库: 22 个 → 队列
+[2026-07-17 11:22:50]   用户 ermaozi 共查 22 个仓库
+[2026-07-17 11:22:50] 仓库 https://github.com/roosterkid/openproxylist (分支: main, size: 1070244KB, pushed: 2026-07-17T03:00:27Z)
+[2026-07-17 11:22:50] SHA 缓存已保存: 60005 条, 1 分片[2026-07-17 11:22:50] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)
+
+[2026-07-17 11:22:52] 🔗 查子仓库: ninjastrikers/nexus-nodes
+[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)
+
+[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)
+[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)
+[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)
+
+[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/roosterkid/openproxylist 候选文件 9 个
+[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)
+[2026-07-17 11:22:53] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 85KB, pushed: 2026-07-17T03:00:50Z)[2026-07-17 11:22:53] 仓库 https://github.com/sevcator/5ubscrpt10n 候选文件较多 (118 个)，先通过 commits API 过滤
+
+
+
+
+
+
+
+
+[2026-07-17 11:22:54] 🔗 查子仓库: roosterkid/openproxylist
+[2026-07-17 11:23:03] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+[2026-07-17 11:23:03] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:03] 👤 遍历用户仓库: Pawdroid
+[2026-07-17 11:23:03] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+
+[2026-07-17 11:23:03] 👤 遍历用户仓库: Pawdroid
+[2026-07-17 11:23:03] 👤 遍历用户仓库: Pawdroid
+[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+
+
+[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+[2026-07-17 11:23:07] 仓库 https://github.com/Pawdroid/Free-servers 无候选文件 (总计 49 blob, 扩展名过滤 17, processed_shas 跳过 32, SHA 缓存跳过 0)
+
+
+
+
+[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid
+[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid
+[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid
+
+[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid
+
+[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid
+
+[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid
+
+
+[2026-07-17 11:23:07] 👤 遍历用户仓库: Pawdroid
+
+
+[2026-07-17 11:23:09]   🍴 子仓库: 6 个 → 队列
+[2026-07-17 11:23:09] 🔗 开始 Fork 链追踪 (ninjastrikers/nexus-nodes)
+[2026-07-17 11:23:23] 👤 遍历用户仓库: ninjastrikers
+[2026-07-17 11:23:25]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:23:25] 🔗 开始 Fork 链追踪 (roosterkid/openproxylist)
+[2026-07-17 11:23:25]   👤 用户仓库: 17 个 → 队列
+[2026-07-17 11:23:25]   用户 Pawdroid 共查 17 个仓库
+[2026-07-17 11:23:25] 🔗 发现仓库链接 2dust/v2ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-en.md)
+[2026-07-17 11:23:29]   用户 Pawdroid 共查 0 个仓库
+[2026-07-17 11:23:29]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:29]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:29]   用户 Pawdroid 共查 0 个仓库
+
+
+[2026-07-17 11:23:29] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-de.md)
+[2026-07-17 11:23:29] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-es.md)[2026-07-17 11:23:29] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-bn.md)
+
+[2026-07-17 11:23:29] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ur-PK.md)
+[2026-07-17 11:23:31]   用户 Pawdroid 共查 0 个仓库
+[2026-07-17 11:23:31] 🔗 发现仓库链接 2dust/v2ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/README.md)
+[2026-07-17 11:23:33]   Compare API 返回 137 个变更文件 (3 次 API 调用)
+[2026-07-17 11:23:33]   commits 过滤: 118 → 118 (变更文件 137 个)
+[2026-07-17 11:23:33] 仓库 https://github.com/sevcator/5ubscrpt10n 候选文件 118 个
+[2026-07-17 11:23:33]   用户 Pawdroid 共查 0 个仓库
+[2026-07-17 11:23:33] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ko-KR.md)
+[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库
+[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:35] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ru.md)
+
+[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库
+[2026-07-17 11:23:35] 🔗 发现仓库链接 2dust/v2ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-hi.md)[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:35]   用户 Pawdroid 共查 0 个仓库
+
+
+[2026-07-17 11:23:35] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-vi.md)[2026-07-17 11:23:35] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-id.md)
+
+
+
+
+[2026-07-17 11:23:35] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ar.md)[2026-07-17 11:23:35] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pt-BR.md)[2026-07-17 11:23:35] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ja.md)[2026-07-17 11:23:35] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pl.md)
+
+
+
+[2026-07-17 11:23:37] 📦 批次 0002 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0002.txt (5243 个节点, 累计 10533 个)
+[2026-07-17 11:23:37] repo info (2dust/v2ray) 404，跳过
+[2026-07-17 11:23:37] 👤 遍历用户仓库: roosterkid[2026-07-17 11:23:37] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-en.md)
+
+[2026-07-17 11:23:38] SHA 缓存已保存: 60080 条, 1 分片
+[2026-07-17 11:23:40] 📦 批次 0003 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0003.txt (5827 个节点, 累计 16412 个)
+[2026-07-17 11:23:40] SHA 缓存已保存: 60086 条, 1 分片
+[2026-07-17 11:23:41]   用户 Pawdroid 共查 0 个仓库[2026-07-17 11:23:41] repo info (Cenmrev/V2Ray) 404，跳过[2026-07-17 11:23:41] repo info (Cenmrev/V2Ray) 404，跳过[2026-07-17 11:23:41] repo info (Cenmrev/V2Ray) 404，跳过[2026-07-17 11:23:41] repo info (Cenmrev/V2Ray) 404，跳过
+
+
+
+
+[2026-07-17 11:23:42] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-fr.md)[2026-07-17 11:23:42] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-bn.md)[2026-07-17 11:23:42] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ur-PK.md)[2026-07-17 11:23:42] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-es.md)
+
+
+
+[2026-07-17 11:23:42] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-de.md)
+[2026-07-17 11:23:44] 📦 批次 0004 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0004.txt (7224 个节点, 累计 23584 个)
+[2026-07-17 11:23:37] ⏱️ Code [11/29] hysteria2:// extension:txt | 49s | +5665 节点 | 配额 4667/4800
+[2026-07-17 11:23:46] repo info (2dust/v2ray) 404，跳过
+[2026-07-17 11:23:46] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/README.md)[2026-07-17 11:23:46] repo info (Cenmrev/V2Ray) 404，跳过
+
+[2026-07-17 11:23:46] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ko-KR.md)[2026-07-17 11:23:47] repo info (Cenmrev/V2Ray) 404，跳过[2026-07-17 11:23:47] repo info (2dust/v2ray) 404，跳过
+
+[2026-07-17 11:23:47]   👤 用户仓库: 30 个 → 队列
+
+[2026-07-17 11:23:47] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ru.md)[2026-07-17 11:23:47] repo info (Cenmrev/V2Ray) 404，跳过
+[2026-07-17 11:23:47] repo info (Cenmrev/V2Ray) 404，跳过
+[2026-07-17 11:23:47] repo info (Cenmrev/V2Ray) 404，跳过[2026-07-17 11:23:47] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-hi.md)[2026-07-17 11:23:47] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-vi.md)[2026-07-17 11:23:48] SHA 缓存已保存: 60090 条, 1 分片
+
+
+[2026-07-17 11:23:48]   用户 ninjastrikers 共查 30 个仓库
+
+
+[2026-07-17 11:23:49] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pt-BR.md)[2026-07-17 11:23:49] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-id.md)
+[2026-07-17 11:23:49] 仓库 https://github.com/V2RayRoot/V2RayConfig (分支: main, size: 508202KB, pushed: 2026-07-17T01:00:17Z)
+
+[2026-07-17 11:23:49] repo info (Cenmrev/V2Ray) 404，跳过
+[2026-07-17 11:23:49] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ar.md)
+[2026-07-17 11:23:49] repo info (Cenmrev/V2Ray) 404，跳过
+[2026-07-17 11:23:49] repo info (Cenmrev/V2Ray) 404，跳过[2026-07-17 11:23:49] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-17 11:23:49] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ja.md)
+
+
+[2026-07-17 11:23:49] 🔗 发现仓库链接 Shinlor/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-es.md)[2026-07-17 11:23:49] 🔗 发现仓库链接 Shinlor/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pl.md)
+
+[2026-07-17 11:23:51] repo info (Cenmrev/V2Ray) 404，跳过[2026-07-17 11:23:51] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+
+[2026-07-17 11:23:51] 🔗 发现仓库链接 Shinlor/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-en.md)[2026-07-17 11:23:51] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-17 11:23:51] 🔗 发现仓库链接 Shinlor/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ur-PK.md)
+
+
+[2026-07-17 11:23:51] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-17 11:23:51] repo info (Cenmrev/V2Ray) 404，跳过
+
+[2026-07-17 11:23:53] 📦 批次 0005 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0005.txt (12347 个节点, 累计 35962 个)
+[2026-07-17 11:23:53] SHA 缓存已保存: 60092 条, 1 分片
+[2026-07-17 11:23:55] 📦 批次 0006 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0006.txt (5676 个节点, 累计 41619 个)
+[2026-07-17 11:23:55] SHA 缓存已保存: 60094 条, 1 分片
+[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-17 11:23:55] ⏱️ Code [12/29] tuic:// extension:txt | 9s | +21805 节点 | 配额 4645/4800
+[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+
+[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+
+[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+[2026-07-17 11:23:58] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+
+[2026-07-17 11:23:58] repo info (Shinlor/V2Ray) 404，跳过
+[2026-07-17 11:23:58] 仓库 https://github.com/V2RayRoot/V2RayConfig 无候选文件 (总计 19 blob, 扩展名过滤 2, processed_shas 跳过 0, SHA 缓存跳过 17)
+[2026-07-17 11:23:58] 🔗 查子仓库: V2RayRoot/V2RayConfig
+[2026-07-17 11:23:58] 📦 批次 0007 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0007.txt (6216 个节点, 累计 47841 个)
+[2026-07-17 11:23:58] SHA 缓存已保存: 60096 条, 1 分片
+[2026-07-17 11:23:58] 📦 批次 0008 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0008.txt (5186 个节点, 累计 53031 个)
+[2026-07-17 11:23:58] SHA 缓存已保存: 60097 条, 1 分片
+[2026-07-17 11:24:00] repo info (Shinlor/V2Ray) 404，跳过[2026-07-17 11:24:00] repo info (Shinlor/V2Ray) 404，跳过
+
+[2026-07-17 11:24:00] repo info (Shinlor/V2Ray) 404，跳过[2026-07-17 11:24:00]   👤 用户仓库: 12 个 → 队列
+
+[2026-07-17 11:24:00]   用户 roosterkid 共查 12 个仓库
+[2026-07-17 11:24:00] 仓库 https://github.com/Farid-Karimi/Config-Collector (分支: main, size: 327061KB, pushed: 2026-07-17T02:28:08Z)
+[2026-07-17 11:24:00] 🔗 查子仓库: pawdroid/Free-servers
+[2026-07-17 11:24:00] 📦 批次 0009 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0009.txt (6355 个节点, 累计 59388 个)
+[2026-07-17 11:24:00] SHA 缓存已保存: 60099 条, 1 分片
+[2026-07-17 11:24:00] 📦 批次 0010 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0010.txt (5232 个节点, 累计 64617 个)
+[2026-07-17 11:24:00] SHA 缓存已保存: 60101 条, 1 分片
+[2026-07-17 11:24:05] 📦 批次 0011 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0011.txt (6941 个节点, 累计 71552 个)
+[2026-07-17 11:24:05] SHA 缓存已保存: 60103 条, 1 分片
+[2026-07-17 11:24:08] ⏱️ Code [13/29] vmess:// extension:json | 10s | +34776 节点 | 配额 4628/4800
+[2026-07-17 11:24:09] 仓库 https://github.com/Farid-Karimi/Config-Collector 候选文件 4 个
+[2026-07-17 11:24:10]   🍴 子仓库: 19 个 → 队列
+[2026-07-17 11:24:10] 🔗 开始 Fork 链追踪 (V2RayRoot/V2RayConfig)
+[2026-07-17 11:24:10] ⏱️ Code [14/29] vless:// extension:json | 2s | +456 节点 | 配额 4623/4800
+[2026-07-17 11:24:11] 📦 批次 0012 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0012.txt (10572 个节点, 累计 82137 个)
+[2026-07-17 11:24:11] SHA 缓存已保存: 60106 条, 1 分片
+[2026-07-17 11:24:11] 📦 批次 0013 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0013.txt (5696 个节点, 累计 87817 个)
+[2026-07-17 11:24:11] SHA 缓存已保存: 60110 条, 1 分片
+[2026-07-17 11:24:12] 👤 遍历用户仓库: V2RayRoot[2026-07-17 11:24:12]   🍴 子仓库: 30 个 → 队列
+
+[2026-07-17 11:24:12] 🔗 开始 Fork 链追踪 (pawdroid/Free-servers)
+[2026-07-17 11:24:13] ⏱️ Code [15/29] hysteria2:// extension:json | 2s | +7571 节点 | 配额 4620/4800
+[2026-07-17 11:24:15] 👤 遍历用户仓库: pawdroid
+[2026-07-17 11:24:15]   👤 用户仓库: 8 个 → 队列
+[2026-07-17 11:24:15]   用户 V2RayRoot 共查 8 个仓库
+[2026-07-17 11:24:15] 仓库在黑名单中: https://github.com/ehsanghaffar/config-sub-platform
+[2026-07-17 11:24:15] 仓库在黑名单中: https://github.com/Airuop/config-fetcher
+[2026-07-17 11:24:15] 仓库 https://github.com/free-nodes/v2rayfree (分支: main, size: 18828KB, pushed: 2026-07-17T02:55:59Z)
+[2026-07-17 11:24:15] ⏱️ Code [16/29] tuic:// extension:json | 2s | +119 节点 | 配额 4615/4800
+[2026-07-17 11:24:17] 📦 批次 0014 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0014.txt (6759 个节点, 累计 94577 个)
+[2026-07-17 11:24:17] SHA 缓存已保存: 60113 条, 1 分片
+[2026-07-17 11:24:17]   用户 pawdroid 共查 0 个仓库
+[2026-07-17 11:24:17] 仓库在黑名单中: https://github.com/crashgfw/free-airport-nodes
+[2026-07-17 11:24:17] 仓库在黑名单中: https://github.com/lza6/free-VPN
+[2026-07-17 11:24:17] 仓库在黑名单中: https://github.com/guying23/AutoMergePublicNodes
+[2026-07-17 11:24:17] 仓库 https://github.com/rtwo2/FastNodes (分支: main, size: 1639328KB, pushed: 2026-07-17T02:32:55Z)
+[2026-07-17 11:24:19] ⏱️ Code [17/29] "type: vmess" extension:yaml | 4s | +6772 节点 | 配额 4610/4800
+[2026-07-17 11:24:19] ⏱️ Code [18/29] "type: vless" extension:yaml | 0s | +21 节点 | 配额 4609/4800
+[2026-07-17 11:24:20] 仓库 https://github.com/free-nodes/v2rayfree 候选文件 3 个
+[2026-07-17 11:24:22] ⏱️ Code [19/29] "type: trojan" extension:yaml | 3s | +211 节点 | 配额 4606/4800
+[2026-07-17 11:24:23] ⏱️ Code [20/29] "type: hysteria2" extension:json | 0s | +19 节点 | 配额 4604/4800
+[2026-07-17 11:24:24] 仓库 https://github.com/rtwo2/FastNodes 候选文件较多 (181 个)，先通过 commits API 过滤
+[2026-07-17 11:24:24] 📦 批次 0015 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0015.txt (6149 个节点, 累计 100745 个)
+[2026-07-17 11:24:25] SHA 缓存已保存: 60118 条, 1 分片
+[2026-07-17 11:24:25] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-17 11:24:25] 触发限流，等待 13s ...
+[2026-07-17 11:24:25] 🔗 查子仓库: Farid-Karimi/Config-Collector
+[2026-07-17 11:24:27]   🍴 子仓库: 2 个 → 队列
+[2026-07-17 11:24:27] 🔗 开始 Fork 链追踪 (Farid-Karimi/Config-Collector)
+[2026-07-17 11:24:28]   父仓库: mrvcoder/V2rayCollector
+[2026-07-17 11:24:28] 仓库在黑名单中: https://github.com/mrvcoder/V2rayCollector
+[2026-07-17 11:24:28]   父仓库 +0 个节点
+[2026-07-17 11:24:32]   🍴 兄弟仓库: 30 个 → 队列
+[2026-07-17 11:24:32] 👤 遍历用户仓库: Farid-Karimi
+[2026-07-17 11:24:32]   Compare API 返回 185 个变更文件 (3 次 API 调用)
+[2026-07-17 11:24:32]   commits 过滤: 181 → 181 (变更文件 185 个)
+[2026-07-17 11:24:32] 仓库 https://github.com/rtwo2/FastNodes 候选文件 181 个
+[2026-07-17 11:24:35]   👤 用户仓库: 29 个 → 队列
+[2026-07-17 11:24:35]   用户 Farid-Karimi 共查 29 个仓库
+[2026-07-17 11:24:35] 仓库 https://github.com/wzdnzd/aggregator (分支: main, size: 1055057KB, pushed: 2026-07-16T13:06:55Z)
+[2026-07-17 11:24:38] ⏱️ Code [21/29] proxy-groups extension:yaml | 15s | +8960 节点 | 配额 4582/4800
+[2026-07-17 11:24:40] ⏱️ Code [22/29] outbounds extension:json | 1s | +0 节点 | 配额 4580/4800
+[2026-07-17 11:24:42] repo info (alanbobs999/TopFreeProxies) 返回 403 (尝试 1/2)
+[2026-07-17 11:24:42] ⏱️ Code [23/29] subscription-userinfo extension:txt | 2s | +28 节点 | 配额 4576/4800[2026-07-17 11:24:42] repo info (alanbobs999/TopFreeProxies) 403（访问被拒，配额剩余 4806），跳过
+
+[2026-07-17 11:24:42] 🔗 查子仓库: free-nodes/v2rayfree
+[2026-07-17 11:24:42] 📦 批次 0016 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0016.txt (5074 个节点, 累计 105793 个)
+[2026-07-17 11:24:42] ⏱️ Code [24/29] raw.githubusercontent.com extension:yaml | 0s | +1152 节点 | 配额 4575/4800
+[2026-07-17 11:24:43] ⏱️ Code [25/29] raw.githubusercontent.com extension:json | 0s | +0 节点 | 配额 4573/4800
+[2026-07-17 11:24:43] SHA 缓存已保存: 60207 条, 1 分片
+[2026-07-17 11:24:43] ⏱️ Code [26/29] raw.githubusercontent.com extension:txt | 0s | +157 节点 | 配额 4571/4800
+[2026-07-17 11:24:45]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:24:45] 🔗 开始 Fork 链追踪 (free-nodes/v2rayfree)
+[2026-07-17 11:24:45] ⏱️ Code [27/29] v2ray aggregator extension:py | 2s | +58 节点 | 配额 4569/4800
+[2026-07-17 11:24:45] 👤 遍历用户仓库: free-nodes
+[2026-07-17 11:24:47] 仓库 https://github.com/wzdnzd/aggregator 候选文件较多 (384 个)，先通过 commits API 过滤
+[2026-07-17 11:24:48] ⏱️ Code [28/29] proxy collector extension:py | 2s | +1733 节点 | 配额 4566/4800
+[2026-07-17 11:24:49] ⏱️ Code [29/29] vmess:// raw.githubusercontent extension:py | 1s | +4 节点 | 配额 4563/4800
+[2026-07-17 11:24:49]   👤 用户仓库: 12 个 → 队列
+[2026-07-17 11:24:49]   用户 free-nodes 共查 12 个仓库
+[2026-07-17 11:24:49] 仓库 https://github.com/aiboboxx/v2rayfree (分支: main, size: 18828KB, pushed: 2026-07-17T02:55:59Z)
+[2026-07-17 11:24:53] 🔵 关键词: 122 个
+[2026-07-17 11:24:55]   Compare API 返回 10 个变更文件 (3 次 API 调用)
+[2026-07-17 11:24:55]   commits 过滤: 384 → 0 (变更文件 10 个)
+[2026-07-17 11:24:55] 仓库 https://github.com/wzdnzd/aggregator 候选文件经时间过滤后为空
+[2026-07-17 11:24:55] 🔗 查子仓库: wzdnzd/aggregator
+[2026-07-17 11:24:55] 仓库 https://github.com/aiboboxx/v2rayfree 无候选文件 (总计 11 blob, 扩展名过滤 0, processed_shas 跳过 3, SHA 缓存跳过 8)
+[2026-07-17 11:24:55] 🔗 查子仓库: aiboboxx/v2rayfree
+[2026-07-17 11:24:57]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:24:57] 🔗 开始 Fork 链追踪 (wzdnzd/aggregator)
+[2026-07-17 11:24:58] 👤 遍历用户仓库: wzdnzd
+[2026-07-17 11:24:59]   🍴 子仓库: 17 个 → 队列
+[2026-07-17 11:24:59] 🔗 开始 Fork 链追踪 (aiboboxx/v2rayfree)
+[2026-07-17 11:25:00] 👤 遍历用户仓库: aiboboxx
+[2026-07-17 11:25:00]   用户 aiboboxx 共查 0 个仓库
+[2026-07-17 11:25:00] 仓库 https://github.com/awesome-vpn/awesome-vpn (分支: master, size: 3009KB, pushed: 2026-07-17T01:59:56Z)
+[2026-07-17 11:25:01]   👤 用户仓库: 30 个 → 队列
+[2026-07-17 11:25:01]   用户 wzdnzd 共查 30 个仓库
+[2026-07-17 11:25:01] 仓库在黑名单中: https://github.com/bruceblink/free-v2ray
+[2026-07-17 11:25:01] 仓库 https://github.com/Mr-Meshky/vify (分支: main, size: 162437KB, pushed: 2026-07-17T02:09:32Z)
+[2026-07-17 11:25:02] 仓库 https://github.com/awesome-vpn/awesome-vpn 候选文件 3 个
+[2026-07-17 11:25:08] 📦 批次 0017 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0017.txt (5019 个节点, 累计 110806 个)
+[2026-07-17 11:25:08] SHA 缓存已保存: 60263 条, 1 分片
+[2026-07-17 11:25:08] 仓库 https://github.com/Mr-Meshky/vify 候选文件 61 个
+[2026-07-17 11:25:09] ⏱️ [1/122] free nodes pushed:>2026-07-16T03:22:20Z fork:true -language: | 17s | +3052 | 配额 4543/4800
+[2026-07-17 11:25:13] ⏱️ [2/122] free proxy nodes pushed:>2026-07-16T03:22:20Z fork:true -lan | 4s | +26 | 配额 4541/4800
+[2026-07-17 11:25:18] ⏱️ [3/122] free v2ray nodes pushed:>2026-07-16T03:22:20Z fork:true -lan | 5s | +18 | 配额 4539/4800
+[2026-07-17 11:25:32] ⏱️ [4/122] free clash nodes pushed:>2026-07-16T03:22:20Z fork:true -lan | 13s | +574 | 配额 4537/4800
+[2026-07-17 11:25:33] 🔗 查子仓库: awesome-vpn/awesome-vpn
+[2026-07-17 11:25:36] ⏱️ [5/122] free trojan nodes pushed:>2026-07-16T03:22:20Z fork:true -la | 4s | +395 | 配额 4534/4800
+[2026-07-17 11:25:38]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:25:38] 🔗 开始 Fork 链追踪 (awesome-vpn/awesome-vpn)
+[2026-07-17 11:25:39] 👤 遍历用户仓库: awesome-vpn
+[2026-07-17 11:25:39]   👤 用户仓库: 2 个 → 队列
+[2026-07-17 11:25:39]   用户 awesome-vpn 共查 2 个仓库
+[2026-07-17 11:25:39] 仓库 https://github.com/pog7x/vpn-configs (分支: master, size: 683515KB, pushed: 2026-07-17T00:05:51Z)
+[2026-07-17 11:25:40] ⏱️ [6/122] free hysteria nodes pushed:>2026-07-16T03:22:20Z fork:true - | 3s | +117 | 配额 4527/4800
+[2026-07-17 11:25:44] ⏱️ [7/122] free vless nodes pushed:>2026-07-16T03:22:20Z fork:true -lan | 4s | +47 | 配额 4525/4800
+[2026-07-17 11:25:47] ⏱️ [8/122] free hysteria2 nodes pushed:>2026-07-16T03:22:20Z fork:true  | 3s | +30 | 配额 4523/4800
+[2026-07-17 11:25:47] ⏱️ [9/122] free tuic nodes pushed:>2026-07-16T03:22:20Z fork:true -lang | 0s | +2 | 配额 4522/4800
+[2026-07-17 11:25:47] 仓库 https://github.com/pog7x/vpn-configs 候选文件 21 个
+[2026-07-17 11:25:50] ⏱️ [10/122] free reality nodes pushed:>2026-07-16T03:22:20Z fork:true -l | 3s | +10 | 配额 4520/4800
+[2026-07-17 11:25:52] ⏱️ [11/122] free singbox nodes pushed:>2026-07-16T03:22:20Z fork:true -l | 3s | +22 | 配额 4518/4800
+[2026-07-17 11:25:58] ⏱️ [12/122] free shadowsocks nodes pushed:>2026-07-16T03:22:20Z fork:tru | 5s | +15 | 配额 4516/4800
+[2026-07-17 11:25:58] ⏱️ [13/122] free wireguard nodes pushed:>2026-07-16T03:22:20Z fork:true  | 0s | +2 | 配额 4515/4800
+[2026-07-17 11:26:07] ⏱️ [14/122] free proxy list pushed:>2026-07-16T03:22:20Z fork:true -lang | 9s | +33 | 配额 4512/4800
+[2026-07-17 11:26:11] ⏱️ [15/122] free proxy subscription pushed:>2026-07-16T03:22:20Z fork:tr | 3s | +6 | 配额 4510/4800
+[2026-07-17 11:26:14] ⏱️ [16/122] free proxy config pushed:>2026-07-16T03:22:20Z fork:true -la | 4s | +27 | 配额 4508/4800
+[2026-07-17 11:26:17] ⏱️ [17/122] free proxy yaml pushed:>2026-07-16T03:22:20Z fork:true -lang | 3s | +51 | 配额 4506/4800
+[2026-07-17 11:26:20] ⏱️ [18/122] free proxy json pushed:>2026-07-16T03:22:20Z fork:true -lang | 3s | +17 | 配额 4504/4800
+[2026-07-17 11:26:21] ⏱️ [19/122] free proxy base64 pushed:>2026-07-16T03:22:20Z fork:true -la | 0s | +2 | 配额 4503/4800
+[2026-07-17 11:26:24] ⏱️ [20/122] ACL4SSR pushed:>2026-07-16T03:22:20Z fork:true -language:HTM | 4s | +21 | 配额 4501/4800
+[2026-07-17 11:26:29] ⏱️ [21/122] subconverter pushed:>2026-07-16T03:22:20Z fork:true -languag | 5s | +11 | 配额 4499/4800
+[2026-07-17 11:26:30] 🔗 查子仓库: Mr-Meshky/vify
+[2026-07-17 11:26:31]   🍴 子仓库: 2 个 → 队列
+[2026-07-17 11:26:31] 🔗 开始 Fork 链追踪 (Mr-Meshky/vify)
+[2026-07-17 11:26:31] 👤 遍历用户仓库: Mr-Meshky
+[2026-07-17 11:26:32]   👤 用户仓库: 19 个 → 队列
+[2026-07-17 11:26:32]   用户 Mr-Meshky 共查 19 个仓库
+[2026-07-17 11:26:32] 仓库 https://github.com/mheidari98/.proxy (分支: main, size: 1109KB, pushed: 2026-07-17T02:04:02Z)
+[2026-07-17 11:26:33] 仓库 https://github.com/mheidari98/.proxy 候选文件 6 个
+[2026-07-17 11:27:12] 🔗 查子仓库: pog7x/vpn-configs
+[2026-07-17 11:27:13]   🍴 子仓库: 6 个 → 队列
+[2026-07-17 11:27:13] 🔗 开始 Fork 链追踪 (pog7x/vpn-configs)
+[2026-07-17 11:27:13] 👤 遍历用户仓库: pog7x
+[2026-07-17 11:27:14]   👤 用户仓库: 14 个 → 队列
+[2026-07-17 11:27:14]   用户 pog7x 共查 14 个仓库
+[2026-07-17 11:27:14] 仓库 https://github.com/yitong2333/proxy-minging (分支: main, size: 1748102KB, pushed: 2026-07-17T02:18:14Z)
+[2026-07-17 11:27:14] 仓库 https://github.com/yitong2333/proxy-minging 候选文件 3 个
+[2026-07-17 11:27:14] 🔗 查子仓库: rtwo2/FastNodes
+[2026-07-17 11:27:15]   🍴 子仓库: 4 个 → 队列
+[2026-07-17 11:27:15] 🔗 开始 Fork 链追踪 (rtwo2/FastNodes)
+[2026-07-17 11:27:15] 👤 遍历用户仓库: rtwo2
+[2026-07-17 11:27:15] 🔗 查子仓库: sevcator/5ubscrpt10n
+[2026-07-17 11:27:16]   用户 rtwo2 共查 0 个仓库
+[2026-07-17 11:27:16] 仓库 https://github.com/MhdiTaheri/V2rayCollector_Py (分支: main, size: 31341KB, pushed: 2026-07-17T03:19:44Z)
+[2026-07-17 11:27:17] 仓库 https://github.com/MhdiTaheri/V2rayCollector_Py 候选文件 2 个
+[2026-07-17 11:27:22] 🔗 查子仓库: yitong2333/proxy-minging[2026-07-17 11:27:22]   🍴 子仓库: 20 个 → 队列
+
+[2026-07-17 11:27:22] 🔗 开始 Fork 链追踪 (sevcator/5ubscrpt10n)
+[2026-07-17 11:27:23] 👤 遍历用户仓库: sevcator
+[2026-07-17 11:27:23]   🍴 子仓库: 7 个 → 队列
+[2026-07-17 11:27:23] 🔗 开始 Fork 链追踪 (yitong2333/proxy-minging)
+[2026-07-17 11:27:23] 🔗 查子仓库: MhdiTaheri/V2rayCollector_Py
+[2026-07-17 11:27:23]   父仓库: anaer/proxy-minging
+[2026-07-17 11:27:23] 仓库在黑名单中: https://github.com/anaer/proxy-minging
+[2026-07-17 11:27:23]   父仓库 +0 个节点
+[2026-07-17 11:27:23]   👤 用户仓库: 30 个 → 队列
+[2026-07-17 11:27:23]   用户 sevcator 共查 30 个仓库
+[2026-07-17 11:27:23] 仓库 https://github.com/mohamadfg-dev/telegram-v2ray-configs-collector (分支: main, size: 53246KB, pushed: 2026-07-16T22:37:47Z)
+[2026-07-17 11:27:24]   🍴 兄弟仓库: 5 个 → 队列
+[2026-07-17 11:27:24] 👤 遍历用户仓库: yitong2333
+[2026-07-17 11:27:24] 仓库 https://github.com/mohamadfg-dev/telegram-v2ray-configs-collector 候选文件 27 个
+[2026-07-17 11:27:24]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:27:24] 🔗 开始 Fork 链追踪 (MhdiTaheri/V2rayCollector_Py)
+[2026-07-17 11:27:25] 👤 遍历用户仓库: MhdiTaheri
+[2026-07-17 11:27:25]   👤 用户仓库: 30 个 → 队列
+[2026-07-17 11:27:25]   用户 yitong2333 共查 30 个仓库
+[2026-07-17 11:27:25] 🔗 查子仓库: mohamadfg-dev/telegram-v2ray-configs-collector[2026-07-17 11:27:25] 仓库 https://github.com/free18/v2ray (分支: main, size: 17826KB, pushed: 2026-07-16T04:41:36Z)
+
+[2026-07-17 11:27:25]   👤 用户仓库: 13 个 → 队列
+[2026-07-17 11:27:25]   用户 MhdiTaheri 共查 13 个仓库
+[2026-07-17 11:27:25] 仓库 https://github.com/Epodonios/v2ray-configs (分支: main, size: 25207001KB, pushed: 2026-07-17T01:30:01Z)
+[2026-07-17 11:27:26] 仓库 https://github.com/free18/v2ray 无候选文件 (总计 6 blob, 扩展名过滤 1, processed_shas 跳过 0, SHA 缓存跳过 5)
+[2026-07-17 11:27:26] 🔗 查子仓库: free18/v2ray
+[2026-07-17 11:27:26]   🍴 子仓库: 8 个 → 队列
+[2026-07-17 11:27:26] 🔗 开始 Fork 链追踪 (mohamadfg-dev/telegram-v2ray-configs-collector)
+[2026-07-17 11:27:26] 仓库 https://github.com/Epodonios/v2ray-configs 候选文件较多 (992 个)，先通过 commits API 过滤
+[2026-07-17 11:27:26] 👤 遍历用户仓库: mohamadfg-dev
+[2026-07-17 11:27:27]   👤 用户仓库: 1 个 → 队列
+[2026-07-17 11:27:27]   用户 mohamadfg-dev 共查 1 个仓库
+[2026-07-17 11:27:27] 仓库 https://github.com/acymz/AutoVPN (分支: main, size: 153660KB, pushed: 2026-07-17T00:02:45Z)
+[2026-07-17 11:27:27]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:27:27] 🔗 开始 Fork 链追踪 (free18/v2ray)
+[2026-07-17 11:27:27] 👤 遍历用户仓库: free18
+[2026-07-17 11:27:27]   Compare API 返回 20 个变更文件 (3 次 API 调用)
+[2026-07-17 11:27:27]   commits 过滤: 992 → 20 (变更文件 20 个)
+[2026-07-17 11:27:27] 仓库 https://github.com/Epodonios/v2ray-configs 候选文件 20 个
+[2026-07-17 11:27:28] 🔗 查子仓库: mheidari98/.proxy
+[2026-07-17 11:27:28]   👤 用户仓库: 3 个 → 队列
+[2026-07-17 11:27:28]   用户 free18 共查 3 个仓库
+[2026-07-17 11:27:28] 仓库 https://github.com/snakem982/proxypool (分支: main, size: 48867KB, pushed: 2026-07-16T19:35:05Z)
+[2026-07-17 11:27:28] 仓库 https://github.com/snakem982/proxypool 候选文件 1 个
+[2026-07-17 11:27:29]   🍴 子仓库: 24 个 → 队列
+[2026-07-17 11:27:29] 🔗 开始 Fork 链追踪 (mheidari98/.proxy)
+[2026-07-17 11:27:30] 👤 遍历用户仓库: mheidari98
+[2026-07-17 11:27:30] 🔗 查子仓库: snakem982/proxypool
+[2026-07-17 11:27:31]   👤 用户仓库: 30 个 → 队列
+[2026-07-17 11:27:31]   用户 mheidari98 共查 30 个仓库
+[2026-07-17 11:27:31] 仓库在黑名单中: https://github.com/Leon406/SubCrawler
+[2026-07-17 11:27:31] 仓库 https://github.com/603711936/SmartSub (分支: main, size: 206745KB, pushed: 2026-07-16T20:53:42Z)
+[2026-07-17 11:27:32]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:27:32] 🔗 开始 Fork 链追踪 (snakem982/proxypool)
+[2026-07-17 11:27:32] 👤 遍历用户仓库: snakem982
+[2026-07-17 11:27:32] 仓库 https://github.com/603711936/SmartSub 候选文件较多 (192 个)，先通过 commits API 过滤
+[2026-07-17 11:27:34]   👤 用户仓库: 7 个 → 队列
+[2026-07-17 11:27:34]   用户 snakem982 共查 7 个仓库
+[2026-07-17 11:27:34] 仓库 https://github.com/Triton-ix/v2ray-Finder (分支: main, size: 529828KB, pushed: 2026-07-17T01:36:46Z)
+[2026-07-17 11:27:34] 仓库 https://github.com/Triton-ix/v2ray-Finder 候选文件 1 个
+[2026-07-17 11:27:35]   Compare API 返回 11 个变更文件 (3 次 API 调用)
+[2026-07-17 11:27:35]   commits 过滤: 192 → 10 (变更文件 11 个)
+[2026-07-17 11:27:35] 仓库 https://github.com/603711936/SmartSub 候选文件 10 个
+[2026-07-17 11:27:35] 🔗 查子仓库: Epodonios/v2ray-configs
+[2026-07-17 11:27:35] 仓库 https://github.com/acymz/AutoVPN 候选文件较多 (14901 个)，先通过 commits API 过滤
+[2026-07-17 11:27:37]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:27:37] 🔗 开始 Fork 链追踪 (Epodonios/v2ray-configs)
+[2026-07-17 11:27:37] 👤 遍历用户仓库: Epodonios
+[2026-07-17 11:27:38]   Compare API 返回 10 个变更文件 (3 次 API 调用)
+[2026-07-17 11:27:38]   commits 过滤: 14901 → 4 (变更文件 10 个)
+[2026-07-17 11:27:38] 仓库 https://github.com/acymz/AutoVPN 候选文件 4 个
+[2026-07-17 11:27:38]   👤 用户仓库: 7 个 → 队列
+[2026-07-17 11:27:38]   用户 Epodonios 共查 7 个仓库
+[2026-07-17 11:27:38] 仓库在黑名单中: https://github.com/wrfree/free
+[2026-07-17 11:27:38] 仓库 https://github.com/barry-far/V2ray-Config (分支: main, size: 9645396KB, pushed: 2026-07-17T01:06:47Z)
+[2026-07-17 11:27:40] 仓库 https://github.com/barry-far/V2ray-Config 候选文件 34 个
+[2026-07-17 11:27:43] 🔗 查子仓库: acymz/AutoVPN
+[2026-07-17 11:27:45]   🍴 子仓库: 19 个 → 队列
+[2026-07-17 11:27:45] 🔗 开始 Fork 链追踪 (acymz/AutoVPN)
+[2026-07-17 11:27:45] 📦 批次 0018 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0018.txt (5094 个节点, 累计 115900 个)
+[2026-07-17 11:27:45] 👤 遍历用户仓库: acymz
+[2026-07-17 11:27:46]   👤 用户仓库: 5 个 → 队列
+[2026-07-17 11:27:46]   用户 acymz 共查 5 个仓库
+[2026-07-17 11:27:46] 仓库 https://github.com/Ruk1ng001/freeSub (分支: main, size: 525KB, pushed: 2026-07-17T02:00:06Z)
+[2026-07-17 11:27:46] SHA 缓存已保存: 60504 条, 1 分片
+[2026-07-17 11:27:46] 仓库 https://github.com/Ruk1ng001/freeSub 候选文件 4 个
+[2026-07-17 11:27:49] 🔗 查子仓库: Ruk1ng001/freeSub
+[2026-07-17 11:27:51]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:27:51] 🔗 开始 Fork 链追踪 (Ruk1ng001/freeSub)
+[2026-07-17 11:27:51] 👤 遍历用户仓库: Ruk1ng001
+[2026-07-17 11:27:51] 🔗 查子仓库: Triton-ix/v2ray-Finder
+[2026-07-17 11:27:51] 🔗 开始 Fork 链追踪 (Triton-ix/v2ray-Finder)
+[2026-07-17 11:27:52] 🔗 查子仓库: barry-far/V2ray-Config
+[2026-07-17 11:27:52]   👤 用户仓库: 17 个 → 队列
+[2026-07-17 11:27:52] 👤 遍历用户仓库: Triton-ix
+[2026-07-17 11:27:52]   用户 Ruk1ng001 共查 17 个仓库
+[2026-07-17 11:27:52] 仓库在黑名单中: https://github.com/learnhard-cn/free_proxy_ss
+[2026-07-17 11:27:52] 仓库 https://github.com/PENZA84/free-node (分支: main, size: 25378KB, pushed: 2026-07-17T03:23:26Z)
+[2026-07-17 11:27:53] 仓库 https://github.com/PENZA84/free-node 候选文件 1 个
+[2026-07-17 11:27:53]   👤 用户仓库: 5 个 → 队列
+[2026-07-17 11:27:53]   用户 Triton-ix 共查 5 个仓库
+[2026-07-17 11:27:53] 仓库 https://github.com/FreeFolksOn/abc-configs-free-vpn-proxy-list (分支: main, size: 4597KB, pushed: 2026-07-17T03:17:06Z)
+[2026-07-17 11:27:53] 🔗 查子仓库: PENZA84/free-node
+[2026-07-17 11:27:53]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:27:53] 🔗 开始 Fork 链追踪 (barry-far/V2ray-Config)
+[2026-07-17 11:27:53] 🔗 开始 Fork 链追踪 (PENZA84/free-node)
+[2026-07-17 11:27:53] 仓库 https://github.com/FreeFolksOn/abc-configs-free-vpn-proxy-list 候选文件 1 个
+[2026-07-17 11:27:53] 👤 遍历用户仓库: barry-far
+[2026-07-17 11:27:54]   父仓库: HakurouKen/free-node
+[2026-07-17 11:27:54] 🔗 查子仓库: FreeFolksOn/abc-configs-free-vpn-proxy-list
+[2026-07-17 11:27:54]   👤 用户仓库: 6 个 → 队列
+[2026-07-17 11:27:54]   用户 barry-far 共查 6 个仓库
+[2026-07-17 11:27:54] 仓库 https://github.com/amateurmenace/Speak (分支: main, size: 309KB, pushed: 2026-07-17T03:15:20Z)
+[2026-07-17 11:27:54]   🍴 子仓库: 2 个 → 队列
+[2026-07-17 11:27:54] 🔗 开始 Fork 链追踪 (FreeFolksOn/abc-configs-free-vpn-proxy-list)
+[2026-07-17 11:27:54] 仓库 https://github.com/amateurmenace/Speak 候选文件 11 个[2026-07-17 11:27:54]   🍴 兄弟仓库: 17 个 → 队列
+[2026-07-17 11:27:54] 👤 遍历用户仓库: FreeFolksOn
+
+[2026-07-17 11:27:54] 👤 遍历用户仓库: PENZA84
+[2026-07-17 11:27:55]   用户 FreeFolksOn 共查 0 个仓库
+[2026-07-17 11:27:55] 仓库 https://github.com/muxd93/awesome-vpn (分支: master, size: 2978KB, pushed: 2026-07-17T03:09:34Z)
+[2026-07-17 11:27:55] 仓库 https://github.com/amateurmenace/Speak 未提取到节点，加入黑名单
+[2026-07-17 11:27:55] 仓库 https://github.com/anktiwari053/idurar-erp-crm (分支: master, size: 23362KB, pushed: 2026-07-17T03:07:44Z)
+[2026-07-17 11:27:55] 仓库 https://github.com/muxd93/awesome-vpn 无候选文件 (总计 44 blob, 扩展名过滤 27, processed_shas 跳过 3, SHA 缓存跳过 14)
+[2026-07-17 11:27:55] 🔗 查子仓库: muxd93/awesome-vpn
+[2026-07-17 11:27:56] 🔗 开始 Fork 链追踪 (muxd93/awesome-vpn)
+[2026-07-17 11:27:56] 仓库 https://github.com/anktiwari053/idurar-erp-crm 候选文件 1 个
+[2026-07-17 11:27:56]   父仓库: awesome-vpn/awesome-vpn
+[2026-07-17 11:27:56] 仓库 https://github.com/anktiwari053/idurar-erp-crm 未提取到节点，加入黑名单
+[2026-07-17 11:27:56] 仓库 https://github.com/junjun266/FreeProxyGo (分支: main, size: 1522KB, pushed: 2026-07-17T03:00:02Z)
+[2026-07-17 11:27:57]   👤 用户仓库: 30 个 → 队列
+[2026-07-17 11:27:57]   用户 PENZA84 共查 30 个仓库
+[2026-07-17 11:27:57] 仓库 https://github.com/Matrixstar2000/FastNodes (分支: main, size: 1666618KB, pushed: 2026-07-17T02:50:30Z)
+[2026-07-17 11:27:57] 仓库 https://github.com/junjun266/FreeProxyGo 候选文件 1 个
+[2026-07-17 11:27:57] 仓库 https://github.com/Matrixstar2000/FastNodes 候选文件较多 (141 个)，先通过 commits API 过滤
+[2026-07-17 11:27:58] 🔗 查子仓库: junjun266/FreeProxyGo
+[2026-07-17 11:27:58]   🍴 兄弟仓库: 28 个 → 队列
+[2026-07-17 11:27:58] 👤 遍历用户仓库: muxd93
+[2026-07-17 11:27:58]   🍴 子仓库: 3 个 → 队列
+[2026-07-17 11:27:58] 🔗 开始 Fork 链追踪 (junjun266/FreeProxyGo)
+[2026-07-17 11:27:58] 👤 遍历用户仓库: junjun266
+[2026-07-17 11:27:58]   👤 用户仓库: 20 个 → 队列
+[2026-07-17 11:27:58]   用户 muxd93 共查 20 个仓库
+[2026-07-17 11:27:58] 仓库 https://github.com/HakurouKen/free-node (分支: main, size: 25372KB, pushed: 2026-07-17T02:47:47Z)
+[2026-07-17 11:27:59] 仓库 https://github.com/HakurouKen/free-node 候选文件 1 个
+[2026-07-17 11:27:59]   用户 junjun266 共查 0 个仓库
+[2026-07-17 11:27:59] 仓库 https://github.com/rtwo2/FastNodes (分支: main, size: 1639328KB, pushed: 2026-07-17T02:32:55Z)
+[2026-07-17 11:27:59] 🔗 查子仓库: HakurouKen/free-node
+[2026-07-17 11:27:59] 仓库 https://github.com/rtwo2/FastNodes 无候选文件 (总计 247 blob, 扩展名过滤 14, processed_shas 跳过 181, SHA 缓存跳过 52)
+[2026-07-17 11:27:59] 🔗 查子仓库: rtwo2/FastNodes
+[2026-07-17 11:28:00] 🔗 开始 Fork 链追踪 (HakurouKen/free-node)
+[2026-07-17 11:28:00] 🔗 开始 Fork 链追踪 (rtwo2/FastNodes)
+[2026-07-17 11:28:00] 👤 遍历用户仓库: HakurouKen
+[2026-07-17 11:28:00]   Compare API 返回 168 个变更文件 (3 次 API 调用)[2026-07-17 11:28:00] 👤 遍历用户仓库: rtwo2
+
+[2026-07-17 11:28:00]   commits 过滤: 141 → 135 (变更文件 168 个)
+[2026-07-17 11:28:00] 仓库 https://github.com/Matrixstar2000/FastNodes 候选文件 135 个
+[2026-07-17 11:28:01]   用户 rtwo2 共查 0 个仓库
+[2026-07-17 11:28:01] 仓库 https://github.com/Au1rxx/free-vpn-subscriptions (分支: main, size: 67400KB, pushed: 2026-07-17T02:15:39Z)
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/BY.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/HR.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/MX.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/TH.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/ID.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/DK.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/IL.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/HU.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/GR.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed[2026-07-17 11:28:01] 仓库 https://github.com/Au1rxx/free-vpn-subscriptions 候选文件 23 个
+
+[2026-07-17 11:28:01] ⚠️ 并行下载异常: sub/countries/BE.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:02] ⚠️ 并行下载异常: sub/countries/ZA.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:02] ⚠️ 并行下载异常: sub/countries/VN.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:02] ⚠️ 并行下载异常: sub/Best-Results/top100.json: 'utf-8' codec can't encode characters in position 0-1: surrogates not allowed
+[2026-07-17 11:28:02] ⚠️ 并行下载异常: sub/countries/LU.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:02] ⚠️ 并行下载异常: sub/countries/IN.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:02] ⚠️ 并行下载异常: sub/countries/ES.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:02] ⚠️ 并行下载异常: sub/countries/AU.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:03] ⚠️ 并行下载异常: sub/Best-Results/top150.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:03] ⚠️ 并行下载异常: sub/countries/KZ.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:04] ⚠️ 并行下载异常: sub/Best-Results/top200.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:04] ⚠️ 并行下载异常: sub/countries/BG.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:04] ⚠️ 并行下载异常: sub/countries/CZ.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:05]   👤 用户仓库: 30 个 → 队列
+[2026-07-17 11:28:05]   用户 HakurouKen 共查 30 个仓库
+[2026-07-17 11:28:05] 仓库 https://github.com/wenxig/free-nodes-sub (分支: main, size: 12322KB, pushed: 2026-07-17T02:14:12Z)
+[2026-07-17 11:28:06] ⚠️ 并行下载异常: sub/countries/IT.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:06] 仓库 https://github.com/wenxig/free-nodes-sub 候选文件 3 个
+[2026-07-17 11:28:06] ⚠️ 并行下载异常: sub/countries/AE.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:07] ⚠️ 并行下载异常: sub/countries/RO.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:08] ⚠️ 并行下载异常: sub/protocols/vmess.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:08] ⚠️ 并行下载异常: sub/countries/CY.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:08] ⚠️ 并行下载异常: sub/countries/IE.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:08] ⚠️ 并行下载异常: sub/countries/CN.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:08] 🔗 查子仓库: Au1rxx/free-vpn-subscriptions[2026-07-17 11:28:08] ⚠️ 并行下载异常: sub/countries/TR.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+
+[2026-07-17 11:28:09] ⚠️ 并行下载异常: sub/countries/CH.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:10] ⚠️ 并行下载异常: sub/countries/PL.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:10] ⚠️ 并行下载异常: sub/countries/MD.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:11]   🍴 子仓库: 30 个 → 队列
+[2026-07-17 11:28:11] 🔗 开始 Fork 链追踪 (Au1rxx/free-vpn-subscriptions)
+[2026-07-17 11:28:11] 👤 遍历用户仓库: Au1rxx
+[2026-07-17 11:28:12] ⚠️ 并行下载异常: sub/countries/LT.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:13] ⚠️ 并行下载异常: sub/countries/CA.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:13] ⚠️ 并行下载异常: sub/countries/LV.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:15]   👤 用户仓库: 25 个 → 队列
+[2026-07-17 11:28:15]   用户 Au1rxx 共查 25 个仓库
+[2026-07-17 11:28:15] 仓库 https://github.com/vivaejs/server (分支: main, size: 131KB, pushed: 2026-07-17T02:06:45Z)
+[2026-07-17 11:28:18] 仓库 https://github.com/vivaejs/server 候选文件 8 个
+[2026-07-17 11:28:19] ⚠️ 并行下载异常: sub/countries/SG.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:19] ⚠️ 并行下载异常: sub/countries/FI.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:19] ⚠️ 并行下载异常: sub/countries/HK.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:20] ⚠️ 并行下载异常: sub/countries/SC.json: 'utf-8' codec can't encode characters in position 0-3: surrogates not allowed
+[2026-07-17 11:28:26] 仓库 https://github.com/vivaejs/server 未提取到节点，加入黑名单
+[2026-07-17 11:28:27] 🔗 查子仓库: wenxig/free-nodes-sub[2026-07-17 11:28:27] 仓库 https://github.com/awesome-vpn/awesome-vpn (分支: master, size: 3009KB, pushed: 2026-07-17T01:59:56Z)
+
+[2026-07-17 11:28:29]   🍴 子仓库: 9 个 → 队列
+[2026-07-17 11:28:29] 🔗 开始 Fork 链追踪 (wenxig/free-nodes-sub)
+[2026-07-17 11:28:30] 👤 遍历用户仓库: wenxig
+[2026-07-17 11:28:31]   👤 用户仓库: 14 个 → 队列
+[2026-07-17 11:28:31]   用户 wenxig 共查 14 个仓库
+[2026-07-17 11:28:31] 仓库 https://github.com/Hei33enberg/RAK-OS (分支: main, size: 154KB, pushed: 2026-07-17T01:58:12Z)
+[2026-07-17 11:28:36] 仓库 https://github.com/awesome-vpn/awesome-vpn 无候选文件 (总计 44 blob, 扩展名过滤 27, processed_shas 跳过 3, SHA 缓存跳过 14)
+[2026-07-17 11:28:36] 🔗 查子仓库: awesome-vpn/awesome-vpn
+[2026-07-17 11:28:40] 🔗 开始 Fork 链追踪 (awesome-vpn/awesome-vpn)
+[2026-07-17 11:28:41] 👤 遍历用户仓库: awesome-vpn
+[2026-07-17 11:28:42]   用户 awesome-vpn 共查 0 个仓库
+[2026-07-17 11:28:42] 仓库 https://github.com/way-fu/free-nodes-auto (分支: main, size: 473KB, pushed: 2026-07-17T01:45:56Z)
+[2026-07-17 11:28:53] 仓库 https://github.com/way-fu/free-nodes-auto 候选文件 3 个
