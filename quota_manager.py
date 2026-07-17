@@ -134,6 +134,34 @@ class QuotaManager:
         ]
         return "\n".join(lines)
 
+    def wait_for_reset(self, should_stop: callable = None) -> bool:
+        """配额耗尽时暂停等待下个窗口恢复。
+
+        分段 sleep（每 30s），每段检查时间和 should_stop 回调。
+
+        Args:
+            should_stop: 返回 True 表示应提前终止（如运行超时）。
+
+        Returns:
+            True: 配额已恢复，可以继续
+            False: 提前终止（should_stop 返回了 True）
+        """
+        while True:
+            with self._lock:
+                now = time.time()
+                if now - self.window_start >= 3600:
+                    self.calls = 0
+                    self.window_start = now
+                    self.exceeded = False
+                    return True
+                # 还剩多久到下个整点窗口
+                remaining = 3600 - (now - self.window_start) + 5
+            sleep_sec = min(30, remaining)
+            if sleep_sec > 0:
+                time.sleep(sleep_sec)
+            if should_stop and should_stop():
+                return False
+
     def reset_window(self):
         """手动重置配额窗口（仅用于测试）。"""
         with self._lock:

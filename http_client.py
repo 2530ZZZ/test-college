@@ -208,10 +208,11 @@ class HttpClient:
                 self._record_call(url, 0)
                 return None
 
-            # ---- 配额检查：主动限速 + 配额耗尽检测 ----
+            # ---- 配额检查：主动限速 + 配额耗尽等待恢复 ----
             if is_api_call and not self.quota.check():
                 self._record_call(url, 0)
-                return None
+                self.quota.wait_for_reset()
+                continue  # 配额恢复，重试本次请求
 
             try:
                 resp = self.session.get(url, headers=self.headers, timeout=timeout)

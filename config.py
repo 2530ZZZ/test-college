@@ -26,7 +26,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 # GitHub API 限流每小时重置一次，实际等待时间可能在 1-60 分钟。
 # GA 超时 6h，设 3600（1 小时）足够等到下个小时的配额刷新。
 # 取值范围 600 - 7200（1 小时为推荐值）。
-MAX_TOTAL_RATE_LIMIT_WAIT = 3600
+MAX_TOTAL_RATE_LIMIT_WAIT = 7200
 
 # 程序最大运行时间（秒），超出后停止搜集、开始保存。
 # GA 默认超时 6 小时（21600s），提前 1 小时收尾留足保存和提交时间。

@@ -445,6 +445,16 @@ class Collector:
 
     # ==================== 主流程 ====================
 
+    def _should_stop(self) -> bool:
+        """综合停止检查：限流超限/运行超时→立即停，配额耗尽→等待恢复。"""
+        if self.limiter.should_stop():
+            return True
+        if self._runtime_exceeded():
+            return True
+        if self.quota_mgr.exceeded:
+            return not self.quota_mgr.wait_for_reset(self._runtime_exceeded)
+        return False
+
     def _runtime_exceeded(self) -> bool:
         """检查是否超出最大运行时间。GA 6 小时超时前 30 分钟触发。
 
@@ -533,14 +543,18 @@ class Collector:
         QUEUE_DRAIN_TIMEOUT = QUEUE_DRAIN_TIMEOUT_SECONDS
         wait_logged = 0
         while task_queue.qsize() > 0:
-            if self.quota_mgr.exceeded or self.limiter.should_stop():
-                print(f"[{now_str()}] ⚠️ 配额/限流耗尽，放弃剩余 "
+            if self.limiter.should_stop() or self._runtime_exceeded():
+                print(f"[{now_str()}] ⚠️ 停止信号，放弃剩余 "
                       f"{task_queue.qsize()} 个任务", flush=True)
                 break
-            if self._runtime_exceeded():
-                print(f"[{now_str()}] ⚠️ 运行时间已到，放弃剩余 "
-                      f"{task_queue.qsize()} 个任务", flush=True)
-                break
+            if self.quota_mgr.exceeded:
+                print(f"[{now_str()}] ⏳ 配额耗尽，等待重置（队列剩余 "
+                      f"{task_queue.qsize()} 个任务）...", flush=True)
+                if not self.quota_mgr.wait_for_reset(self._runtime_exceeded):
+                    print(f"[{now_str()}] ⚠️ 运行超时，放弃剩余任务", flush=True)
+                    break
+                print(f"[{now_str()}] 🔄 配额恢复，继续处理", flush=True)
+                continue
             if time.time() - queue_start > QUEUE_DRAIN_TIMEOUT:
                 print(f"[{now_str()}] ⚠️ 队列清空超时({QUEUE_DRAIN_TIMEOUT}s)，"
                       f"放弃剩余 {task_queue.qsize()} 个任务", flush=True)
@@ -630,7 +644,7 @@ class Collector:
         if seed_list:
             print(f"[{now_str()}] 🔵 种子仓库: {len(seed_list)} 个 → 队列", flush=True)
             for repo in seed_list:
-                if self.limiter.should_stop() or self._runtime_exceeded(): break
+                if self._should_stop(): break
                 try:
                     ri = self.http.get_json(
                         f"https://api.github.com/repos/{repo}",
@@ -656,7 +670,7 @@ class Collector:
         for idx, query in enumerate(all_queries, 1):
             nb = len(self.unique_nodes)
             qs = time.time()
-            if self.limiter.should_stop() or self._runtime_exceeded(): break
+            if self._should_stop(): break
             try:
                 self._search_query_to_queue(query, task_queue)
             except RuntimeError:
@@ -694,9 +708,13 @@ class Collector:
             try:
                 if item is None:
                     break
-                # 停止信号：配额耗尽或主限流超限 → Worker 退出
-                if self.limiter.should_stop() or self.quota_mgr.exceeded:
+                # 停止信号：限流超限/运行超时 → 退出；配额耗尽 → 等待恢复
+                if self.limiter.should_stop() or self._runtime_exceeded():
                     break
+                if self.quota_mgr.exceeded:
+                    if not self.quota_mgr.wait_for_reset(self._runtime_exceeded):
+                        break  # 运行超时
+                    continue  # 配额恢复，重新取任务
                 source, repo, kwargs = item
                 self.http = HttpClient(token=self.token, rate_limiter=None,
                                        quota_manager=self.quota_mgr)
@@ -722,7 +740,7 @@ class Collector:
         max_p = (MAX_PAGES * MAX_PAGES_ZH_MULTIPLIER) if has_cjk else MAX_PAGES
 
         for page in range(1, max_p + 1):
-            if self.limiter.should_stop() or self._runtime_exceeded():
+            if self._should_stop():
                 return
             url = (f"https://api.github.com/search/repositories"
                    f"?q={query}&sort=updated&order=desc"
@@ -784,7 +802,7 @@ class Collector:
             full_query = f"{query} pushed:>{time_sfx}"
 
             for page in range(1, CODE_MAX_PAGES + 1):
-                if self.limiter.should_stop() or self._runtime_exceeded():
+                if self._should_stop():
                     break
 
                 url = (f"https://api.github.com/search/code"
@@ -985,7 +1003,7 @@ class Collector:
 
         for page in range(1, max_p + 1):
             # 每次翻页前检查限流和运行时间
-            if self.limiter.should_stop() or self._runtime_exceeded():
+            if self._should_stop():
                 return
 
             url = (f"https://api.github.com/search/repositories"
