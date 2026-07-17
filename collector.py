@@ -113,6 +113,7 @@ class Collector:
         self._branch_cache: Dict[str, str] = {}        # repo → 真实分支名
         self._repo_not_found: Set[str] = set()         # 404 仓库（本次运行）
         self._repo_forbidden: Set[str] = set()         # 403 访问拒绝（本次运行）
+        self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
 
         # 批次持久化（共享）
         self.batch_buffer: List[str] = []
@@ -653,6 +654,7 @@ class Collector:
                     if not ri or ri.get('disabled'): continue
                     br = ri.get("default_branch", "main")
                     self._branch_cache[repo] = br
+                    self._add_seen(repo)  # 种子仓库标记已处理（大小写不敏感）
                     task_queue.put(("种子仓库", repo,
                                     {"branch": br, "size": ri.get("size", -1),
                                      "disabled": False, "pushed_at": ri.get("pushed_at", ""),
@@ -1557,18 +1559,29 @@ class Collector:
         # 已知死仓库 → 不调 API
         if self._is_repo_dead(repo):
             return None
-
-        repo_data = self.http.get_json(
-            f"https://api.github.com/repos/{repo}",
-            timeout=FILE_DOWNLOAD_TIMEOUT,
-            operation_name=f"repo info ({repo})")
-        if not repo_data:
-            self._branch_cache[repo] = ""  # 缓存失败，避免重复调 API
-            self._mark_repo_not_found(repo)
-            return None
-        branch = repo_data.get("default_branch", "main")
-        self._branch_cache[repo] = branch
-        return branch
+        # 并发保护：等其他线程先出结果
+        rl = repo.lower()
+        if rl in self._repo_checking:
+            time.sleep(0.3)
+            if repo in self._branch_cache:
+                return self._branch_cache[repo]
+            if self._is_repo_dead(repo):
+                return None
+        self._repo_checking.add(rl)
+        try:
+            repo_data = self.http.get_json(
+                f"https://api.github.com/repos/{repo}",
+                timeout=FILE_DOWNLOAD_TIMEOUT,
+                operation_name=f"repo info ({repo})")
+            if not repo_data:
+                self._branch_cache[repo] = ""  # 缓存失败，避免重复调 API
+                self._mark_repo_not_found(repo)
+                return None
+            branch = repo_data.get("default_branch", "main")
+            self._branch_cache[repo] = branch
+            return branch
+        finally:
+            self._repo_checking.discard(rl)
 
     # ==================== 仓库级文件变更查询 ====================
 
@@ -1681,7 +1694,8 @@ class Collector:
             return  # 解码失败 → 不标记（下次重试）
 
         # 清洗 surrogate 字符：urllib.parse.quote() 无法处理 \ud800-\udfff
-        content = content.encode('utf-8', errors='replace').decode('utf-8')
+        # encode/decode 的 errors='replace' 在 Python 3.12 部分 surrogate 组合下不稳定
+        content = re.sub(r'[\ud800-\udfff]', '�', content)
 
         content_size_mb = len(content) / 1024 / 1024
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
@@ -1821,15 +1835,24 @@ class Collector:
                   f"(来源 {source_url})", flush=True)
             self.recursive_count += 1
             time.sleep(REPO_SLEEP_SECONDS)
-            # 递归仓库也先调 repo_info 拿分支名，避免 main→404 模式触发次级限流
-            repo_info = self.http.get_json(
-                f"https://api.github.com/repos/{full_name}",
-                timeout=FILE_DOWNLOAD_TIMEOUT,
-                operation_name=f"repo info ({full_name})")
-            if not repo_info or repo_info.get('disabled', False):
-                if not repo_info:
-                    self._mark_repo_not_found(full_name)
-                continue
+            # 并发保护：其他线程可能同时在查同一个 404 仓库
+            rl = full_name.lower()
+            if rl in self._repo_checking:
+                time.sleep(0.3)
+                if self._is_repo_dead(full_name):
+                    continue
+            self._repo_checking.add(rl)
+            try:
+                repo_info = self.http.get_json(
+                    f"https://api.github.com/repos/{full_name}",
+                    timeout=FILE_DOWNLOAD_TIMEOUT,
+                    operation_name=f"repo info ({full_name})")
+                if not repo_info or repo_info.get('disabled', False):
+                    if not repo_info:
+                        self._mark_repo_not_found(full_name)
+                    continue
+            finally:
+                self._repo_checking.discard(rl)
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
             self.process_repo(full_name, branch=branch,
@@ -1854,14 +1877,24 @@ class Collector:
                   f"(来源 {source_url})", flush=True)
             self.recursive_count += 1
             time.sleep(REPO_SLEEP_SECONDS)
-            repo_info = self.http.get_json(
-                f"https://api.github.com/repos/{full_name}",
-                timeout=FILE_DOWNLOAD_TIMEOUT,
-                operation_name=f"repo info ({full_name})")
-            if not repo_info or repo_info.get('disabled', False):
-                if not repo_info:
-                    self._mark_repo_not_found(full_name)
-                continue
+            # 并发保护：其他线程可能同时在查同一个 404 仓库
+            rl = full_name.lower()
+            if rl in self._repo_checking:
+                time.sleep(0.3)
+                if self._is_repo_dead(full_name):
+                    continue
+            self._repo_checking.add(rl)
+            try:
+                repo_info = self.http.get_json(
+                    f"https://api.github.com/repos/{full_name}",
+                    timeout=FILE_DOWNLOAD_TIMEOUT,
+                    operation_name=f"repo info ({full_name})")
+                if not repo_info or repo_info.get('disabled', False):
+                    if not repo_info:
+                        self._mark_repo_not_found(full_name)
+                    continue
+            finally:
+                self._repo_checking.discard(rl)
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
             self.process_repo(full_name, branch=branch,
