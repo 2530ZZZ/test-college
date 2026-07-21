@@ -44,7 +44,8 @@ from config import (
     MAX_PAGES_ZH_MULTIPLIER,
     USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
     VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
-    SHARED_POOL_WORKERS, SHARED_POOL_QUEUE_SIZE,
+    SHARED_POOL_WORKERS,
+    MAIN_QUEUE_SIZE, DISCOVERY_QUEUE_SIZE,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
@@ -510,10 +511,13 @@ class Collector:
             with open(_fname, "w", encoding="utf-8") as _f:
                 pass
 
-        # ── 创建共用线程池（Code Search 和 GitHub 搜索共用） ──
-        task_queue = Queue(maxsize=SHARED_POOL_QUEUE_SIZE)
-        self._task_queue = task_queue  # fork 链也需要引用
-        workers = [threading.Thread(target=self._pool_worker, args=(task_queue,),
+        # ── 创建共用线程池（双队列：主队列搜索来源，发现队列衍生来源） ──
+        main_queue = Queue(maxsize=MAIN_QUEUE_SIZE)
+        disc_queue = Queue(maxsize=DISCOVERY_QUEUE_SIZE)
+        self._task_queue = main_queue   # fork 链引用（兼容旧路径）
+        self._disc_queue = disc_queue
+        workers = [threading.Thread(target=self._pool_worker,
+                                    args=(main_queue, disc_queue),
                                     name=f"W-{i}", daemon=True)
                    for i in range(SHARED_POOL_WORKERS)]
         for w in workers: w.start()
@@ -526,7 +530,7 @@ class Collector:
                                  pool_connections=20, pool_maxsize=20)
             t_gh = threading.Thread(
                 target=self._run_github_thread,
-                args=(gh_http, repo_seeds, task_queue, errors),
+                args=(gh_http, repo_seeds, main_queue, errors),
                 name="GitHub", daemon=True)
             t_gh.start()
 
@@ -537,7 +541,7 @@ class Collector:
                                        quota_manager=self.quota_mgr)
                 self.http = code_http  # 主线程专用，不污染 _main_http
                 t0 = time.time()
-                self._collect_code(task_queue)
+                self._collect_code(main_queue)
                 cn = self._channel_new_nodes.get("Code", 0)
                 self._channel_stats["Code"] = {
                     "name": "Code", "nodes_new": cn,
@@ -554,33 +558,34 @@ class Collector:
             t_gh.join()
 
         # ── 等待队列清空（限流期间可能很慢，加超时保护） ──
-        print(f"[{now_str()}] ⏳ 等待队列清空 (剩余 {task_queue.qsize()})...", flush=True)
+        print(f"[{now_str()}] ⏳ 等待队列清空 (主队列 {main_queue.qsize()}, "
+              f"发现队列 {disc_queue.qsize()})...", flush=True)
         queue_start = time.time()
         QUEUE_DRAIN_TIMEOUT = QUEUE_DRAIN_TIMEOUT_SECONDS
         wait_logged = 0
-        while task_queue.qsize() > 0:
+        while main_queue.qsize() > 0 or disc_queue.qsize() > 0:
             if self.limiter.should_stop() or self._runtime_exceeded():
-                print(f"[{now_str()}] ⚠️ 停止信号，放弃剩余 "
-                      f"{task_queue.qsize()} 个任务", flush=True)
+                print(f"[{now_str()}] ⚠️ 停止信号，放弃剩余任务", flush=True)
                 break
             if self.quota_mgr.exceeded:
-                print(f"[{now_str()}] ⏳ 配额耗尽，等待重置（队列剩余 "
-                      f"{task_queue.qsize()} 个任务）...", flush=True)
+                print(f"[{now_str()}] ⏳ 配额耗尽，等待重置（主队列 {main_queue.qsize()}, "
+                      f"发现队列 {disc_queue.qsize()}）...", flush=True)
                 if not self.quota_mgr.wait_for_reset(self._runtime_exceeded):
                     print(f"[{now_str()}] ⚠️ 运行超时，放弃剩余任务", flush=True)
                     break
                 print(f"[{now_str()}] 🔄 配额恢复，继续处理", flush=True)
                 continue
             if time.time() - queue_start > QUEUE_DRAIN_TIMEOUT:
-                print(f"[{now_str()}] ⚠️ 队列清空超时({QUEUE_DRAIN_TIMEOUT}s)，"
-                      f"放弃剩余 {task_queue.qsize()} 个任务", flush=True)
+                print(f"[{now_str()}] ⚠️ 队列清空超时({QUEUE_DRAIN_TIMEOUT}s)，放弃剩余任务", flush=True)
                 break
             if time.time() - queue_start > wait_logged + 120:
-                print(f"[{now_str()}]   ... 队列剩余 {task_queue.qsize()} 个任务", flush=True)
+                print(f"[{now_str()}]   ... 主队列 {main_queue.qsize()}, "
+                      f"发现队列 {disc_queue.qsize()}", flush=True)
                 wait_logged = time.time()
             time.sleep(3)
         print(f"[{now_str()}] 队列处理完毕", flush=True)
-        for _ in workers: task_queue.put(None)
+        for _ in workers: main_queue.put(None)
+        for _ in workers: disc_queue.put(None)
         for w in workers: w.join()
         self._task_queue = None
 
@@ -711,17 +716,22 @@ class Collector:
                     print(f"[{now_str()}] 🌱 自动收录: {rk}", flush=True)
             self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
 
-    def _pool_worker(self, task_queue: Queue):
-        """共用线程池 Worker：从队列取任务，调用 process_repo。
+    def _pool_worker(self, main_queue: Queue, disc_queue: Queue):
+        """共用线程池 Worker：优先消费发现队列，再消费主队列。
 
         每个 Worker 持有独立 RateLimiter（独立管理限流等待），
         但通过 QuotaManager 和主 limiter 共享停止信号。
         """
         while True:
+            # 优先取发现队列（fork 链/用户仓库/raw 递归，高产）
+            item = None
             try:
-                item = task_queue.get(timeout=30)
+                item = disc_queue.get_nowait()
             except Exception:
-                continue  # 超时或无任务，继续等待
+                try:
+                    item = main_queue.get(timeout=30)
+                except Exception:
+                    continue
             try:
                 if item is None:
                     break
@@ -777,15 +787,11 @@ class Collector:
                 if not self._check_and_add_seen(repo) or self._check_blacklist(github_url):
                     continue
                 self.checked_count += 1
-                try:
-                    task_queue.put(("GitHub", repo,
-                                    {"branch": item.get("default_branch", "main"),
-                                     "size": item.get("size", 0),
-                                     "disabled": item.get("disabled", False),
-                                     "pushed_at": item.get("pushed_at", "")}),
-                                   timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-                except Exception:
-                    pass  # 队列满→丢弃（下次运行还能搜到）
+                task_queue.put(("GitHub", repo,
+                                {"branch": item.get("default_branch", "main"),
+                                 "size": item.get("size", 0),
+                                 "disabled": item.get("disabled", False),
+                                 "pushed_at": item.get("pushed_at", "")}))
             time.sleep(PAGE_SLEEP_SECONDS)
 
     def _collect_code(self, task_queue: Queue):
@@ -884,15 +890,11 @@ class Collector:
                         # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
                         if self._check_and_add_seen(repo_name):
                             self.checked_count += 1
-                            try:
-                                task_queue.put(("Code", repo_name,
-                                                {"branch": default_branch,
-                                                 "size": repo_data.get("size", -1),
-                                                 "disabled": False,
-                                                 "pushed_at": repo_data.get("pushed_at", "")}),
-                                               timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-                            except Exception:
-                                pass  # 队列满→丢弃（下次运行还能搜到）
+                            task_queue.put(("Code", repo_name,
+                                            {"branch": default_branch,
+                                             "size": repo_data.get("size", -1),
+                                             "disabled": False,
+                                             "pushed_at": repo_data.get("pushed_at", "")}))
 
                 time.sleep(PAGE_SLEEP_SECONDS)
 
@@ -1336,8 +1338,8 @@ class Collector:
             self._run_fork_batch(qualified, branch, depth, "🍴 子仓库")
 
     def _run_fork_batch(self, forks: list, branch: str, depth: int, label: str):
-        """提交 fork/用户仓库到共用线程池。"""
-        tq = getattr(self, '_task_queue', None)
+        """提交 fork/用户仓库到发现队列（优先消费，超时可丢弃）。"""
+        tq = getattr(self, '_disc_queue', None)
         if not tq:  # 降级：无共用池时串行
             for fork in forks:
                 fn, nn = self._process_fork_repo(fork, branch, depth)
@@ -1345,7 +1347,7 @@ class Collector:
                 time.sleep(REPO_SLEEP_SECONDS)
             return
 
-        # 有共用池 → 全部提交到队列
+        # 有共用池 → 全部提交到发现队列
         for fork in forks:
             fn = fork.get("full_name")
             if not fn or not self._check_and_add_seen(fn): continue
@@ -1357,7 +1359,7 @@ class Collector:
                          "pushed_at": fork.get("pushed_at", "")}),
                        timeout=QUEUE_PUT_TIMEOUT_SECONDS)
             except Exception:
-                pass  # 队列满，丢弃此 fork（下次运行可能再发现）
+                pass  # 发现队列满，丢弃（下次运行可能再发现）
         print(f"[{now_str()}]   {label}: {len(forks)} 个 → 队列", flush=True)
 
     def _trace_user_repos(self, repo: str, branch: str, depth: int):

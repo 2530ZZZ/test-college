@@ -222,6 +222,12 @@ class HttpClient:
                 remaining = None
                 if remaining_hdr and is_api_call:
                     remaining = int(remaining_hdr)
+                reset_hdr = resp.headers.get("X-RateLimit-Reset")
+                if reset_hdr and is_api_call:
+                    try:
+                        self.quota.set_reset_time(int(reset_hdr))
+                    except Exception:
+                        pass
                 self._record_call(url, resp.status_code, remaining)
                 if is_api_call:
                     self.quota.record()

@@ -37,6 +37,7 @@ class QuotaManager:
         self.max_per_hour = max_per_hour
         self.calls = 0                # 当前窗口已用次数
         self.window_start = time.time()
+        self._reset_time = 0          # GitHub 返回的真实重置时间戳
         self._lock = threading.Lock()
         self.exceeded = False         # 配额耗尽标志（本窗口内不恢复）
         self.total_calls = 0          # 累计调用（统计用）
@@ -134,29 +135,46 @@ class QuotaManager:
         ]
         return "\n".join(lines)
 
-    def wait_for_reset(self, should_stop: callable = None) -> bool:
-        """配额耗尽时暂停等待下个窗口恢复。
+    def set_reset_time(self, reset_timestamp: int):
+        """记录 GitHub API 返回的 X-RateLimit-Reset 时间戳。"""
+        if reset_timestamp > self._reset_time:
+            self._reset_time = reset_timestamp
 
-        分段 sleep（每 30s），每段检查时间和 should_stop 回调。
+    def wait_for_reset(self, should_stop: callable = None) -> bool:
+        """配额耗尽时暂停等待 GitHub 窗口恢复。
+
+        优先使用 GitHub 返回的 X-RateLimit-Reset 时间戳，
+        无数据时估算（window_start + 3600 + 10s 冗余）。
 
         Args:
             should_stop: 返回 True 表示应提前终止（如运行超时）。
 
         Returns:
-            True: 配额已恢复，可以继续
-            False: 提前终止（should_stop 返回了 True）
+            True: 配额已恢复可以继续
+            False: 提前终止
         """
         while True:
             with self._lock:
                 now = time.time()
+                # 有 GitHub 真实重置时间
+                if self._reset_time and now >= self._reset_time:
+                    self.calls = 0
+                    self.window_start = now
+                    self._reset_time = 0
+                    self.exceeded = False
+                    return True
+                # 估算：window_start + 3600
                 if now - self.window_start >= 3600:
                     self.calls = 0
                     self.window_start = now
                     self.exceeded = False
                     return True
-                # 还剩多久到下个整点窗口
-                remaining = 3600 - (now - self.window_start) + 5
-            sleep_sec = min(30, remaining)
+            # 计算等待时长
+            if self._reset_time:
+                wait = max(0, self._reset_time - time.time()) + 2
+            else:
+                wait = 3600 - (time.time() - self.window_start) + 10
+            sleep_sec = min(30, wait)
             if sleep_sec > 0:
                 time.sleep(sleep_sec)
             if should_stop and should_stop():
