@@ -178,16 +178,26 @@ TOPIC_QUERIES = [
     "subconverter",
     "shadowsocks",
     "wireguard",
+    "hysteria",
+    "tuic-protocol",
+    "xray-core",
     # 代理/节点
     "free-proxy",
     "proxy-list",
     "v2ray-nodes",
     "vpn",
+    "proxy-provider",
     # 配置/订阅
     "clash-subscribe",
     "v2ray-subscribe",
     "v2ray-config",
     "clash-config",
+    "vpn-configuration",
+    "clash-meta",
+    "sing-box-config",
+    "subscriptions",
+    "proxy-configuration",
+    "v2ray-proxy",
 ]
 
 # ==================== README 内容搜索 ====================
@@ -227,37 +237,125 @@ CODE_SEARCH_ENABLED = True
 
 # Code 搜索词列表
 CODE_QUERIES = [
-    # === URI 前缀（最高命中率，文件里出现 scheme:// 必然是节点文件） ===
+    # ============================================================
+    # 分组 1: URI 前缀 × 全后缀（搜文件内容中的节点链接）
+    # ============================================================
+    # --- yaml ---
     "vmess:// extension:yaml",
     "vless:// extension:yaml",
     "trojan:// extension:yaml",
     "ss:// extension:yaml",
+    "ssr:// extension:yaml",
     "hysteria2:// extension:yaml",
+    "hy2:// extension:yaml",
     "tuic:// extension:yaml",
+    # --- yml ---
+    "vmess:// extension:yml",
+    "vless:// extension:yml",
+    "trojan:// extension:yml",
+    "ss:// extension:yml",
+    "hysteria2:// extension:yml",
+    "tuic:// extension:yml",
+    # --- json ---
+    "vmess:// extension:json",
+    "vless:// extension:json",
+    "trojan:// extension:json",
+    "ss:// extension:json",
+    "hysteria2:// extension:json",
+    "hy2:// extension:json",
+    "tuic:// extension:json",
+    # --- txt ---
     "vmess:// extension:txt",
     "vless:// extension:txt",
     "trojan:// extension:txt",
     "ss:// extension:txt",
+    "ssr:// extension:txt",
     "hysteria2:// extension:txt",
+    "hy2:// extension:txt",
     "tuic:// extension:txt",
-    "vmess:// extension:json",
-    "vless:// extension:json",
-    "hysteria2:// extension:json",
-    "tuic:// extension:json",
-    # === Clash / Sing-box 配置结构（比 URI 扫描更精准匹配配置块） ===
+    # --- conf ---
+    "vmess:// extension:conf",
+    "vless:// extension:conf",
+    "trojan:// extension:conf",
+    "ss:// extension:conf",
+    "hysteria2:// extension:conf",
+    "tuic:// extension:conf",
+    # --- list ---
+    "vmess:// extension:list",
+    "vless:// extension:list",
+    "trojan:// extension:list",
+    "ss:// extension:list",
+    "hysteria2:// extension:list",
+    "tuic:// extension:list",
+    # --- 无后缀 (base64 等) ---
+    "vmess://",
+    "vless://",
+    "trojan://",
+    "ss://",
+    "hysteria2://",
+    "tuic://",
+
+    # ============================================================
+    # 分组 2: 配置字段匹配 × 后缀（搜 Clash/Sing-box 配置块）
+    # ============================================================
+    # --- 协议 type 声明 ---
     '"type: vmess" extension:yaml',
     '"type: vless" extension:yaml',
     '"type: trojan" extension:yaml',
+    '"type: ss" extension:yaml',
+    '"type: ssr" extension:yaml',
+    '"type: hysteria2" extension:yaml',
+    '"type: tuic" extension:yaml',
+    '"type: vmess" extension:yml',
+    '"type: vless" extension:yml',
+    '"type: trojan" extension:yml',
+    '"type: hysteria2" extension:yml',
     '"type: hysteria2" extension:json',
+    '"type: tuic" extension:json',
+    # --- 通用配置字段 ---
+    '"server:" extension:yaml',
+    '"port:" extension:yaml',
+    '"uuid:" extension:yaml',
+    '"password:" extension:yaml',
+    '"cipher:" extension:yaml',
+    '"network:" extension:yaml',
+    '"sni:" extension:yaml',
+    '"alterId:" extension:yaml',
+    '"server:" extension:yml',
+    '"uuid:" extension:yml',
+    '"server:" extension:json',
+    '"server_port" extension:json',
+    '"method:" extension:json',
+    # --- 数组/块标记 ---
     "proxy-groups extension:yaml",
+    "proxy-groups extension:yml",
     "outbounds extension:json",
-    # === 订阅编码文件 ===
+    '"outbounds" extension:json',
+
+    # ============================================================
+    # 分组 3: 拆分关键词（协议名+配置特征共现，捕捉散落字段）
+    # ============================================================
+    "hysteria2 config extension:yaml",
+    "hy2 outbound extension:json",
+    "tuic server extension:yaml",
+    "vless reality extension:json",
+    "trojan password extension:yaml",
+    "vmess uuid extension:json",
+    "shadowsocks method extension:yaml",
+    "ssr protocol extension:yaml",
+    "hysteria2 server extension:json",
+    "tuic congestion extension:json",
+    "vless flow extension:yaml",
+
+    # ============================================================
+    # 分组 4: 聚合链接 + 搜集器代码
+    # ============================================================
     "subscription-userinfo extension:txt",
-    # === 搜聚合链接文件（raw 引用密集 → 发现大量相关仓库） ===
+    "subscription-userinfo extension:yml",
     "raw.githubusercontent.com extension:yaml",
     "raw.githubusercontent.com extension:json",
     "raw.githubusercontent.com extension:txt",
-    # === 搜其他搜集器代码（找到后遍历作者仓库 + 用户的全部仓库） ===
+    "raw.githubusercontent.com extension:yml",
     "v2ray aggregator extension:py",
     "proxy collector extension:py",
     "vmess:// raw.githubusercontent extension:py",
@@ -443,6 +541,22 @@ BASE_QUERIES = [
         "free proxy scraper",
         "free proxy spider",
         "free proxy bot",
+        # ==================== 7. 聚合/订阅补充 ====================
+        "subconverter config",
+        "proxy provider clash",
+        "clash proxy provider",
+        "surge proxy list",
+        "v2ray node list",
+        "FreeNodes",
+        "singbox outbound config",
+        "mihomo proxy provider",
+        "proxy pool clash",
+        "node pool free",
+        "节点池",
+        "subscribe pool",
+        "免费订阅链接",
+        "sub store",
+        "sub collection github",
 ]
 
 # 是否包含 fork 仓库

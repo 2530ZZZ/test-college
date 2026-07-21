@@ -153,12 +153,27 @@ class Collector:
     # ==================== 持久化 IO ====================
 
     def _add_seen(self, repo: str):
-        """标记仓库为已处理（大小写不敏感）。"""
-        self.seen_repos.add(repo.lower())
+        """标记仓库为已处理（大小写不敏感），线程安全。"""
+        with self._state_lock:
+            self.seen_repos.add(repo.lower())
 
     def _is_seen(self, repo: str) -> bool:
-        """检查仓库是否已处理（大小写不敏感）。"""
-        return repo.lower() in self.seen_repos
+        """检查仓库是否已处理（大小写不敏感），线程安全。"""
+        with self._state_lock:
+            return repo.lower() in self.seen_repos
+
+    def _check_and_add_seen(self, repo: str) -> bool:
+        """原子操作：检查仓库是否已处理，未处理则标记。
+
+        Returns: False=已处理可跳过，True=新仓库已标记应处理。
+        线程安全：检查和标记在同一个锁内完成，无竞态窗口。
+        """
+        r = repo.lower()
+        with self._state_lock:
+            if r in self.seen_repos:
+                return False
+            self.seen_repos.add(r)
+            return True
 
     def _is_repo_dead(self, repo: str) -> bool:
         """检查仓库是否已知不可达（404/403，大小写不敏感）。"""
@@ -759,9 +774,8 @@ class Collector:
                 repo = item.get("full_name")
                 if not repo: continue
                 github_url = f"https://github.com/{repo}"
-                if self._is_seen(repo) or self._check_blacklist(github_url):
+                if not self._check_and_add_seen(repo) or self._check_blacklist(github_url):
                     continue
-                self._add_seen(repo)
                 self.checked_count += 1
                 try:
                     task_queue.put(("GitHub", repo,
@@ -868,8 +882,7 @@ class Collector:
 
                     if has_nodes_flag[0]:
                         # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
-                        if not self._is_seen(repo_name):
-                            self._add_seen(repo_name)
+                        if self._check_and_add_seen(repo_name):
                             self.checked_count += 1
                             try:
                                 task_queue.put(("Code", repo_name,
@@ -1038,14 +1051,13 @@ class Collector:
                 print(f"[{now_str()}] 检查仓库 #{idx}: {github_url}", flush=True)
 
                 # 去重检查
-                if self._is_seen(repo):
+                if not self._check_and_add_seen(repo):
                     print(f"[{now_str()}] ⏭️ 跳过已处理仓库 {github_url}", flush=True)
                     continue
                 if self._check_blacklist(github_url):
                     print(f"[{now_str()}] ⏭️ 跳过黑名单仓库 {github_url}", flush=True)
                     continue
 
-                self._add_seen(repo)
                 self.checked_count += 1
                 print(f"[{now_str()}] 开始处理仓库 {github_url}", flush=True)
 
@@ -1275,9 +1287,8 @@ class Collector:
             # 收集合格兄弟 fork
             for fork in forks:
                 fn = fork.get("full_name")
-                if not fn or self._is_seen(fn): continue
+                if not fn or not self._check_and_add_seen(fn): continue
                 if len(qualified) >= FORK_CHAIN_MAX_FORKS: break
-                self._add_seen(fn)
                 qualified.append(fork)
 
         if qualified:
@@ -1317,9 +1328,8 @@ class Collector:
             # 收集合格 fork
             for fork in forks:
                 fn = fork.get("full_name")
-                if not fn or self._is_seen(fn): continue
+                if not fn or not self._check_and_add_seen(fn): continue
                 if len(qualified) >= FORK_CHAIN_MAX_FORKS: break
-                self._add_seen(fn)
                 qualified.append(fork)
 
         if qualified:
@@ -1338,8 +1348,7 @@ class Collector:
         # 有共用池 → 全部提交到队列
         for fork in forks:
             fn = fork.get("full_name")
-            if not fn or self._is_seen(fn): continue
-            self._add_seen(fn)
+            if not fn or not self._check_and_add_seen(fn): continue
             try:
                 tq.put(("GitHub", fn,
                         {"branch": fork.get("default_branch", branch),
@@ -1387,7 +1396,8 @@ class Collector:
                 found.add(fn)
                 if USER_REPOS_MAX_PER_USER and len(qualified) >= USER_REPOS_MAX_PER_USER:
                     break
-                self._add_seen(fn)
+                if not self._check_and_add_seen(fn):
+                    continue
                 qualified.append(r)
 
         if qualified:
@@ -1793,6 +1803,40 @@ class Collector:
                 and self.recursive_count < MAX_RECURSIVE_REPOS:
             self._discover_recursive(raw_url, content, depth)
 
+        # ---- 订阅链接自动发现（零 API 配额：raw HTTP，非 GitHub） ----
+        _sub_urls = set()
+        for _m in re.finditer(
+            r'(?:https?://)'
+            r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}'
+            r'(?:/\S*)?\b(?:sub|subscribe|link|token|node|proxy|v2ray|clash'
+            r'|ssr|vless|trojan|hysteria|tuic|singbox|shadowrocket'
+            r'|quantumult|surge|loon|stash)\b[^\s"\']{0,200}',
+            content, re.IGNORECASE):
+            _url = _m.group(0).rstrip('.,;:!?)"\']')
+            if 'github.com' not in _url and 'raw.githubusercontent.com' not in _url:
+                _sub_urls.add(_url)
+        for _url in list(_sub_urls)[:5]:  # 最多 5 个，避免过度下载
+            try:
+                _resp = self.http.get(_url, timeout=(8, 15),
+                                      operation_name=f"订阅链接 {_url[:60]}")
+                if _resp and _resp.text:
+                    _sub_proxies = extract_all_strategies(_resp.text)
+                    for _p in _sub_proxies:
+                        if _p.is_valid():
+                            with self._state_lock:
+                                if DEDUP_ENABLED:
+                                    _dk = _p.dedup_key(DEDUP_STRATEGY)
+                                    if _dk in self.global_dedup_keys:
+                                        continue
+                                    self.global_dedup_keys.add(_dk)
+                                _uri = _p.to_uri()
+                                self.unique_nodes.add(_uri)
+                                self.batch_buffer.append(_uri)
+                                self.all_links.append(_url)
+                                has_nodes[0] = True
+            except Exception:
+                pass
+
     def _discover_recursive(self, source_url: str, content: str, depth: int):
         """从下载文件中发现其他 GitHub 仓库链接和 raw 链接，递归处理。
 
@@ -1864,7 +1908,7 @@ class Collector:
         # ── 处理仓库链接 ──
         for match in repo_pattern.finditer(content):
             full_name = match.group(1)
-            if full_name in found or self._is_seen(full_name):
+            if full_name in found or not self._check_and_add_seen(full_name):
                 continue
             github_url = f"https://github.com/{full_name}"
             if self._check_blacklist(github_url) or self._is_repo_dead(full_name):
