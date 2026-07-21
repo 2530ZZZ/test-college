@@ -1,0 +1,328 @@
+[2026-07-22 00:05:04] 🚀 程序启动
+[2026-07-22 00:05:04] 关键词: 105 个
+[2026-07-22 00:05:04] 已加载黑名单: 8697 个
+[2026-07-22 00:05:04] 加载 SHA 缓存 164029 条 (1 分片)
+[2026-07-22 00:05:04] 🚀 程序启动 | 配额上限 4800/小时
+[2026-07-22 00:05:04] 🔵 种子仓库: 38 个 → 队列
+[2026-07-22 00:05:04] 仓库 https://github.com/mahdibland/V2RayAggregator (分支: master, size: 4500379KB, pushed: 2026-07-21T14:48:24Z)
+[2026-07-22 00:05:05] ⏱️ Code [1/97] vmess:// extension:yaml | 1s | +0 节点 | 配额 4798/4800
+[2026-07-22 00:05:05] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件较多 (1528 个)，先通过 commits API 过滤
+[2026-07-22 00:05:06] 仓库 https://github.com/gfpcom/free-proxy-list (分支: main, size: 37072KB, pushed: 2026-07-21T15:18:02Z)[2026-07-22 00:05:06] ⏱️ Code [2/97] vless:// extension:yaml | 2s | +0 节点 | 配额 4795/4800
+
+[2026-07-22 00:05:08] ⏱️ Code [3/97] trojan:// extension:yaml | 2s | +0 节点 | 配额 4793/4800
+[2026-07-22 00:05:09] 仓库 https://github.com/ninjastrikers/nexus-nodes (分支: main, size: 924451KB, pushed: 2026-07-21T14:16:35Z)
+[2026-07-22 00:05:11] 仓库 https://github.com/gfpcom/free-proxy-list 候选文件 1 个
+[2026-07-22 00:05:11] 🔗 递归发现仓库 wiki/gfpcom (来源 https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/README.md)
+[2026-07-22 00:05:11] ⏱️ Code [4/97] ss:// extension:yaml | 3s | +0 节点 | 配额 4789/4800
+[2026-07-22 00:05:12] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件较多 (532 个)，先通过 commits API 过滤
+[2026-07-22 00:05:12]   Compare API 返回 24 个变更文件 (3 次 API 调用)
+[2026-07-22 00:05:12]   commits 过滤: 1528 → 20 (变更文件 24 个)
+[2026-07-22 00:05:12] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件 20 个
+[2026-07-22 00:05:12] repo info (wiki/gfpcom) 404，跳过
+[2026-07-22 00:05:12] ⏱️ Code [5/97] ssr:// extension:yaml | 0s | +0 节点 | 配额 4785/4800
+[2026-07-22 00:05:13] 🔗 递归发现仓库 mahdibland/ShadowsocksAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:14] 仓库 https://github.com/ermaozi/get_subscribe (分支: main, size: 99KB, pushed: 2026-07-21T12:36:52Z)
+[2026-07-22 00:05:16] 📦 批次 0001 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0001.txt (5005 个节点, 累计 5005 个) | 主队列 0/200, 发现队列 0/600
+[2026-07-22 00:05:17] ⏱️ Code [6/97] hysteria2:// extension:yaml | 4s | +5003 节点 | 配额 4782/4800
+[2026-07-22 00:05:17] ⏱️ Code [7/97] hy2:// extension:yaml | 0s | +0 节点 | 配额 4779/4800
+[2026-07-22 00:05:17] ⏱️ Code [8/97] tuic:// extension:yaml | 0s | +0 节点 | 配额 4777/4800
+[2026-07-22 00:05:19] 仓库 https://github.com/mahdibland/ShadowsocksAggregator (分支: master, size: 4500379KB, pushed: 2026-07-21T14:48:24Z)
+[2026-07-22 00:05:20] ⏱️ Code [9/97] vmess:// extension:yml | 2s | +0 节点 | 配额 4775/4800
+[2026-07-22 00:05:20] ⏱️ Code [10/97] vless:// extension:yml | 0s | +0 节点 | 配额 4774/4800
+[2026-07-22 00:05:21] SHA 缓存已保存: 164044 条, 1 分片
+[2026-07-22 00:05:21] 仓库 https://github.com/ermaozi/get_subscribe 候选文件 2 个
+[2026-07-22 00:05:22] 🔗 查子仓库: ermaozi/get_subscribe
+[2026-07-22 00:05:22]   Compare API 返回 300 个变更文件 (3 次 API 调用)[2026-07-22 00:05:22] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件较多 (1508 个)，先通过 commits API 过滤
+
+[2026-07-22 00:05:22]   commits 过滤: 532 → 295 (变更文件 300 个)
+[2026-07-22 00:05:22] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件 295 个
+[2026-07-22 00:05:22] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:05:22] 触发限流，等待 47s ...
+[2026-07-22 00:05:27]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:05:27] 🔗 开始 Fork 链追踪 (ermaozi/get_subscribe)
+[2026-07-22 00:05:28] 👤 遍历用户仓库: ermaozi
+[2026-07-22 00:05:30]   Compare API 返回 24 个变更文件 (3 次 API 调用)
+[2026-07-22 00:05:30]   commits 过滤: 1508 → 0 (变更文件 24 个)
+[2026-07-22 00:05:30] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件经时间过滤后为空
+[2026-07-22 00:05:30] 👤 遍历用户仓库: mahdibland
+[2026-07-22 00:05:30]   👤 用户仓库: 21 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:05:30]   用户 ermaozi 共查 21 个仓库
+Exception in thread W-3:
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 787, in _pool_worker
+    task_queue.task_done()
+    ^^^^^^^^^^
+NameError: name 'task_queue' is not defined. Did you mean: 'main_queue'?
+[2026-07-22 00:05:33]   👤 用户仓库: 19 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:05:33]   用户 mahdibland 共查 19 个仓库
+[2026-07-22 00:05:33] 🔗 发现仓库链接 mahdibland/SSAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:34] 仓库 https://github.com/mahdibland/SSAggregator (分支: master, size: 4500379KB, pushed: 2026-07-21T14:48:24Z)
+[2026-07-22 00:05:34] 仓库 https://github.com/mahdibland/SSAggregator 候选文件较多 (1508 个)，先通过 commits API 过滤
+[2026-07-22 00:05:38] 🔗 查子仓库: ninjastrikers/nexus-nodes
+[2026-07-22 00:05:38]   🍴 子仓库: 6 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:05:38] 🔗 开始 Fork 链追踪 (ninjastrikers/nexus-nodes)
+[2026-07-22 00:05:39]   Compare API 返回 24 个变更文件 (3 次 API 调用)
+[2026-07-22 00:05:39]   commits 过滤: 1508 → 0 (变更文件 24 个)
+[2026-07-22 00:05:39] 仓库 https://github.com/mahdibland/SSAggregator 候选文件经时间过滤后为空
+[2026-07-22 00:05:39] 👤 遍历用户仓库: mahdibland
+[2026-07-22 00:05:41] 👤 遍历用户仓库: ninjastrikers
+[2026-07-22 00:05:43]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:05:43]   用户 ninjastrikers 共查 30 个仓库
+Exception in thread W-2:
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 787, in _pool_worker
+    task_queue.task_done()
+    ^^^^^^^^^^
+NameError: name 'task_queue' is not defined. Did you mean: 'main_queue'?
+[2026-07-22 00:05:43]   用户 mahdibland 共查 0 个仓库
+[2026-07-22 00:05:43] 🔗 发现仓库链接 xxf098/LiteSpeedTest (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:44] ⚠️ 仓库 https://github.com/xxf098/LiteSpeedTest 24776h 未更新，废弃 → 加入黑名单
+[2026-07-22 00:05:44] 🔗 发现仓库链接 iwxf/free-v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:46] 订阅链接 https://api.star-history.com/svg?repos=gfpcom/free-proxy-lis 异常: HTTPSConnectionPool(host='api.star-history.com', port=443): Max retries exceeded with url: /svg?repos=gfpcom/free-proxy-list&type=Date)%5D(https://star-history.com/ (Caused by ResponseError('too many 500 error responses')) (尝试 1/2)
+[2026-07-22 00:05:47] ⚠️ 仓库 https://github.com/iwxf/free-v2ray 8525h 未更新，废弃 → 加入黑名单
+[2026-07-22 00:05:47] 🔗 发现仓库链接 ldir92664/Vmess-Actions (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:47] repo info (ldir92664/Vmess-Actions) 404，跳过
+[2026-07-22 00:05:47] 🔗 发现仓库链接 anaer/Sub (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:48] 仓库 https://github.com/anaer/Sub (分支: main, size: 96KB, pushed: 2026-07-21T11:46:49Z)
+[2026-07-22 00:05:48] 仓库 https://github.com/anaer/Sub 候选文件 2 个
+[2026-07-22 00:05:50] 🔗 发现仓库链接 xishang0128/geoi (来源 https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml)
+[2026-07-22 00:05:51] repo info (xishang0128/geoi) 404，跳过
+[2026-07-22 00:05:53] 👤 遍历用户仓库: anaer
+[2026-07-22 00:05:56]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:05:56]   用户 anaer 共查 30 个仓库
+[2026-07-22 00:05:56] 🔗 发现仓库链接 misersun/config003 (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:57] ⚠️ 仓库 https://github.com/misersun/config003 30156h 未更新，废弃 → 加入黑名单
+[2026-07-22 00:05:57] 🔗 发现仓库链接 mfuu/v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:05:59] 仓库 https://github.com/mfuu/v2ray (分支: master, size: 22KB, pushed: 2026-07-21T14:55:06Z)
+[2026-07-22 00:05:59] 仓库 https://github.com/mfuu/v2ray 候选文件 2 个
+[2026-07-22 00:06:00] 👤 遍历用户仓库: mfuu
+[2026-07-22 00:06:01]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:06:01]   用户 mfuu 共查 30 个仓库
+[2026-07-22 00:06:01] 🔗 发现仓库链接 peasoft/NoMoreWalls (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:03] 仓库 https://github.com/peasoft/NoMoreWalls (分支: master, size: 5040803KB, pushed: 2026-07-21T13:08:29Z)
+[2026-07-22 00:06:03] repo info (alanbobs999/TopFreeProxies) 返回 403 (尝试 1/2)
+[2026-07-22 00:06:03] repo info (alanbobs999/TopFreeProxies) 403（访问被拒，配额剩余 4926），跳过
+[2026-07-22 00:06:04] 仓库 https://github.com/peasoft/NoMoreWalls 候选文件 18 个
+[2026-07-22 00:06:05] 👤 遍历用户仓库: peasoft
+[2026-07-22 00:06:07] 🔵 关键词: 147 个
+[2026-07-22 00:06:08]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:06:08]   用户 peasoft 共查 30 个仓库
+[2026-07-22 00:06:08] 🔗 发现仓库链接 SnapdragonLee/SystemProxy (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:09] 仓库 https://github.com/SnapdragonLee/SystemProxy (分支: master, size: 9980KB, pushed: 2026-07-21T02:52:36Z)
+[2026-07-22 00:06:09] 仓库 https://github.com/SnapdragonLee/SystemProxy 无候选文件 (总计 13 blob, 扩展名过滤 3, processed_shas 跳过 0, SHA 缓存跳过 10)
+[2026-07-22 00:06:09] 👤 遍历用户仓库: SnapdragonLee
+[2026-07-22 00:06:09] ⏱️ Code [11/97] trojan:// extension:yml | 49s | +3400 节点 | 配额 4696/4800
+[2026-07-22 00:06:12] ⏱️ Code [12/97] ss:// extension:yml | 2s | +0 节点 | 配额 4694/4800
+[2026-07-22 00:06:12]   👤 用户仓库: 22 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:06:12]   用户 SnapdragonLee 共查 22 个仓库
+[2026-07-22 00:06:12] 🔗 发现仓库链接 hermanb001/ProxyTest (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:12] ⏱️ Code [13/97] hysteria2:// extension:yml | 0s | +0 节点 | 配额 4691/4800
+[2026-07-22 00:06:14] ⏱️ Code [14/97] tuic:// extension:yml | 2s | +0 节点 | 配额 4690/4800
+[2026-07-22 00:06:14] ⚠️ 仓库 https://github.com/hermanb001/ProxyTest 31695h 未更新，废弃 → 加入黑名单
+[2026-07-22 00:06:14] 🔗 发现仓库链接 LonUp/NodeList (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:14] ⏱️ Code [15/97] vmess:// extension:json | 0s | +0 节点 | 配额 4688/4800
+[2026-07-22 00:06:15] ⏱️ Code [16/97] vless:// extension:json | 0s | +0 节点 | 配额 4687/4800
+[2026-07-22 00:06:17] ⚠️ 仓库 https://github.com/LonUp/NodeList 21597h 未更新，废弃 → 加入黑名单
+[2026-07-22 00:06:17] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:17] ⏱️ Code [17/97] trojan:// extension:json | 2s | +0 节点 | 配额 4684/4800
+[2026-07-22 00:06:17] ⏱️ Code [18/97] ss:// extension:json | 0s | +0 节点 | 配额 4683/4800
+[2026-07-22 00:06:19] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+[2026-07-22 00:06:19] 🔗 发现仓库链接 Qv2ray/Qv2ra (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:19] ⏱️ Code [19/97] hysteria2:// extension:json | 2s | +0 节点 | 配额 4681/4800
+[2026-07-22 00:06:19] ⏱️ [1/147] free nodes pushed:>2026-07-20T16:05:04Z fork:true -language: | 12s | +0 | 配额 4680/4800
+[2026-07-22 00:06:19] ⏱️ Code [20/97] hy2:// extension:json | 0s | +0 节点 | 配额 4679/4800
+[2026-07-22 00:06:21] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:06:21] 触发限流，等待 53s ...
+[2026-07-22 00:06:21] repo info (Qv2ray/Qv2ra) 404，跳过
+[2026-07-22 00:06:21] 🔗 发现仓库链接 2dust/v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:22] repo info (2dust/v2ray) 404，跳过
+[2026-07-22 00:06:22] 🔗 发现仓库链接 TheMRLL/winxra (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:22] 订阅链接 https://api.star-history.com/svg?repos=gfpcom/free-proxy-lis 异常: HTTPSConnectionPool(host='api.star-history.com', port=443): Max retries exceeded with url: /svg?repos=gfpcom/free-proxy-list&type=Date)%5D(https://star-history.com/ (Caused by ResponseError('too many 500 error responses')) (尝试 2/2)
+[2026-07-22 00:06:23] repo info (TheMRLL/winxra) 404，跳过
+[2026-07-22 00:06:23] 🔗 发现仓库链接 shadowsocks/shadowsocks-window (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:23] repo info (shadowsocks/shadowsocks-window) 404，跳过
+[2026-07-22 00:06:23] 🔗 发现仓库链接 HMBSbige/ShadowsocksR-Window (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:25] repo info (HMBSbige/ShadowsocksR-Window) 404，跳过
+[2026-07-22 00:06:25] 🔗 发现仓库链接 yichengchen/clash (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:25] ⏱️ [2/147] free proxy nodes pushed:>2026-07-20T16:05:04Z fork:true -lan | 6s | +0 | 配额 4671/4800
+[2026-07-22 00:06:26] repo info (yichengchen/clash) 404，跳过
+[2026-07-22 00:06:26] 🔗 发现仓库链接 yanue/V2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:27] repo info (yanue/V2ray) 404，跳过
+[2026-07-22 00:06:27] 🔗 发现仓库链接 v2rayA/v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:27] repo info (v2rayA/v2ray) 404，跳过
+[2026-07-22 00:06:27] 🔗 发现仓库链接 Kr328/ClashForAndroi (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:28] repo info (Kr328/ClashForAndroi) 404，跳过
+[2026-07-22 00:06:28] 🔗 发现仓库链接 SagerNet/SagerNe (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:28] 订阅链接 https://api.star-history.com/svg?repos=gfpcom/free-proxy-lis 多次失败，已跳过
+[2026-07-22 00:06:28] 🔗 查子仓库: gfpcom/free-proxy-list
+[2026-07-22 00:06:28] repo info (SagerNet/SagerNe) 404，跳过
+[2026-07-22 00:06:28] 🔗 发现仓库链接 shadowsocks/shadowsocks-androi (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:31] repo info (shadowsocks/shadowsocks-androi) 404，跳过[2026-07-22 00:06:31] ⏱️ [3/147] free v2ray nodes pushed:>2026-07-20T16:05:04Z fork:true -lan | 5s | +0 | 配额 4662/4800
+
+[2026-07-22 00:06:31] 🔗 发现仓库链接 HMBSbige/ShadowsocksR-Androi (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:31]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:06:31] 🔗 开始 Fork 链追踪 (gfpcom/free-proxy-list)
+[2026-07-22 00:06:32] 👤 遍历用户仓库: gfpcom
+[2026-07-22 00:06:32] repo info (HMBSbige/ShadowsocksR-Androi) 404，跳过
+[2026-07-22 00:06:32] 🔗 发现仓库链接 2dust/v2rayN (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:34]   👤 用户仓库: 4 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:06:34]   用户 gfpcom 共查 4 个仓库
+Exception in thread W-1:
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 787, in _pool_worker
+    task_queue.task_done()
+    ^^^^^^^^^^
+NameError: name 'task_queue' is not defined. Did you mean: 'main_queue'?
+[2026-07-22 00:06:34] ⏭️ 仓库 https://github.com/2dust/v2rayN 39h 未更新，跳过解析（追踪 fork 链）
+[2026-07-22 00:06:34] 👤 遍历用户仓库: 2dust
+[2026-07-22 00:06:36] ⏱️ [4/147] free clash nodes pushed:>2026-07-20T16:05:04Z fork:true -lan | 5s | +0 | 配额 4654/4800
+[2026-07-22 00:06:36]   👤 用户仓库: 13 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:06:36]   用户 2dust 共查 13 个仓库
+[2026-07-22 00:06:36] 🔗 发现仓库链接 MasterKia/PersianBlocker (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:39] ⚠️ 仓库 https://github.com/MasterKia/PersianBlocker 450h 未更新，废弃 → 加入黑名单
+[2026-07-22 00:06:39] 🔗 发现仓库链接 bootmortis/iran-hosted-domains (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 00:06:39] ⏱️ [5/147] free trojan nodes pushed:>2026-07-20T16:05:04Z fork:true -la | 3s | +0 | 配额 4649/4800
+[2026-07-22 00:06:39] ⏱️ [6/147] free hysteria nodes pushed:>2026-07-20T16:05:04Z fork:true - | 0s | +0 | 配额 4648/4800
+[2026-07-22 00:06:40] ⚠️ 仓库 https://github.com/bootmortis/iran-hosted-domains 207h 未更新，废弃 → 加入黑名单
+[2026-07-22 00:06:40] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 返回 400 (尝试 1/2)
+[2026-07-22 00:06:40] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 错误，等待 5s 后重试...
+[2026-07-22 00:06:42] ⏱️ [7/147] free vless nodes pushed:>2026-07-20T16:05:04Z fork:true -lan | 3s | +0 | 配额 4645/4800
+[2026-07-22 00:06:45] ⏱️ [8/147] free hysteria2 nodes pushed:>2026-07-20T16:05:04Z fork:true  | 3s | +0 | 配额 4643/4800
+[2026-07-22 00:06:45] ⏱️ [9/147] free tuic nodes pushed:>2026-07-20T16:05:04Z fork:true -lang | 0s | +0 | 配额 4642/4800
+[2026-07-22 00:06:45] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 返回 400 (尝试 2/2)
+[2026-07-22 00:06:45] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 错误，等待 7s 后重试...
+[2026-07-22 00:06:47] ⏱️ [10/147] free reality nodes pushed:>2026-07-20T16:05:04Z fork:true -l | 2s | +0 | 配额 4640/4800
+[2026-07-22 00:06:50] ⏱️ [11/147] free singbox nodes pushed:>2026-07-20T16:05:04Z fork:true -l | 3s | +0 | 配额 4638/4800
+[2026-07-22 00:06:52] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 多次失败，已跳过
+[2026-07-22 00:06:52] 订阅链接 https://play.google.com/store/apps/details?id=com.v2cross.pr 404，跳过
+[2026-07-22 00:06:53] ⏱️ [12/147] free shadowsocks nodes pushed:>2026-07-20T16:05:04Z fork:tru | 3s | +0 | 配额 4636/4800
+[2026-07-22 00:06:53] ⏱️ [13/147] free wireguard nodes pushed:>2026-07-20T16:05:04Z fork:true  | 0s | +0 | 配额 4635/4800
+[2026-07-22 00:06:53] 🔗 查子仓库: mahdibland/V2RayAggregator
+[2026-07-22 00:06:54]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 00:06:54] 🔗 开始 Fork 链追踪 (mahdibland/V2RayAggregator)
+[2026-07-22 00:06:54] 👤 遍历用户仓库: mahdibland
+[2026-07-22 00:06:55]   用户 mahdibland 共查 0 个仓库
+Exception in thread W-0:
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1075, in _bootstrap_inner
+    self.run()
+  File "/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/threading.py", line 1012, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 787, in _pool_worker
+    task_queue.task_done()
+    ^^^^^^^^^^
+NameError: name 'task_queue' is not defined. Did you mean: 'main_queue'?
+[2026-07-22 00:07:00] ⏱️ [14/147] free proxy list pushed:>2026-07-20T16:05:04Z fork:true -lang | 7s | +0 | 配额 4627/4800
+[2026-07-22 00:07:03] ⏱️ [15/147] free proxy subscription pushed:>2026-07-20T16:05:04Z fork:tr | 3s | +0 | 配额 4625/4800
+[2026-07-22 00:07:06] 搜索第2页 返回 403 (尝试 1/2)
+[2026-07-22 00:07:06] 触发限流，等待 6s ...
+[2026-07-22 00:07:12] ⏱️ [16/147] free proxy config pushed:>2026-07-20T16:05:04Z fork:true -la | 9s | +0 | 配额 4622/4800
+[2026-07-22 00:07:15] ⏱️ Code [21/97] tuic:// extension:json | 55s | +0 节点 | 配额 4620/4800
+[2026-07-22 00:07:15] ⏱️ Code [22/97] vmess:// extension:txt | 0s | +0 节点 | 配额 4619/4800
+[2026-07-22 00:07:15] ⏱️ [17/147] free proxy yaml pushed:>2026-07-20T16:05:04Z fork:true -lang | 3s | +0 | 配额 4618/4800
+[2026-07-22 00:07:15] ⏱️ Code [23/97] vless:// extension:txt | 0s | +0 节点 | 配额 4617/4800
+[2026-07-22 00:07:15] ⏱️ Code [24/97] trojan:// extension:txt | 0s | +0 节点 | 配额 4616/4800
+[2026-07-22 00:07:15] ⏱️ Code [25/97] ss:// extension:txt | 0s | +0 节点 | 配额 4614/4800
+[2026-07-22 00:07:16] ⏱️ Code [26/97] ssr:// extension:txt | 0s | +0 节点 | 配额 4613/4800
+[2026-07-22 00:07:16] ⏱️ Code [27/97] hysteria2:// extension:txt | 0s | +0 节点 | 配额 4612/4800
+[2026-07-22 00:07:16] ⏱️ Code [28/97] hy2:// extension:txt | 0s | +0 节点 | 配额 4611/4800
+[2026-07-22 00:07:16] ⏱️ Code [29/97] tuic:// extension:txt | 0s | +0 节点 | 配额 4610/4800
+[2026-07-22 00:07:16] ⏱️ Code [30/97] vmess:// extension:conf | 0s | +0 节点 | 配额 4609/4800
+[2026-07-22 00:07:16] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:07:16] 触发限流，等待 63s ...
+[2026-07-22 00:07:18] ⏱️ [18/147] free proxy json pushed:>2026-07-20T16:05:04Z fork:true -lang | 3s | +0 | 配额 4607/4800
+[2026-07-22 00:07:18] ⏱️ [19/147] free proxy base64 pushed:>2026-07-20T16:05:04Z fork:true -la | 0s | +0 | 配额 4606/4800
+[2026-07-22 00:07:23] ⏱️ [20/147] ACL4SSR pushed:>2026-07-20T16:05:04Z fork:true -language:HTM | 5s | +0 | 配额 4604/4800
+[2026-07-22 00:07:26] ⏱️ [21/147] subconverter pushed:>2026-07-20T16:05:04Z fork:true -languag | 3s | +0 | 配额 4602/4800
+[2026-07-22 00:07:29] ⏸️  主队列 200/200 满，搜索暂停等待
+[2026-07-22 00:08:20] ⏱️ Code [31/97] vless:// extension:conf | 63s | +0 节点 | 配额 4600/4800
+[2026-07-22 00:08:20] ⏱️ Code [32/97] trojan:// extension:conf | 0s | +0 节点 | 配额 4599/4800
+[2026-07-22 00:08:20] ⏱️ Code [33/97] ss:// extension:conf | 0s | +0 节点 | 配额 4598/4800
+[2026-07-22 00:08:20] ⏱️ Code [34/97] hysteria2:// extension:conf | 0s | +0 节点 | 配额 4597/4800
+[2026-07-22 00:08:21] ⏱️ Code [35/97] tuic:// extension:conf | 0s | +0 节点 | 配额 4596/4800
+[2026-07-22 00:08:21] ⏱️ Code [36/97] vmess:// extension:list | 0s | +0 节点 | 配额 4595/4800
+[2026-07-22 00:08:21] ⏱️ Code [37/97] vless:// extension:list | 0s | +0 节点 | 配额 4594/4800
+[2026-07-22 00:08:21] ⏱️ Code [38/97] trojan:// extension:list | 0s | +0 节点 | 配额 4593/4800
+[2026-07-22 00:08:21] ⏱️ Code [39/97] ss:// extension:list | 0s | +0 节点 | 配额 4592/4800
+[2026-07-22 00:08:21] ⏱️ Code [40/97] hysteria2:// extension:list | 0s | +0 节点 | 配额 4591/4800
+[2026-07-22 00:08:22] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:08:22] 触发限流，等待 62s ...
+[2026-07-22 00:09:24] ⏱️ Code [41/97] tuic:// extension:list | 62s | +0 节点 | 配额 4589/4800
+[2026-07-22 00:09:24] ⏱️ Code [42/97] vmess:// | 0s | +0 节点 | 配额 4588/4800
+[2026-07-22 00:09:24] ⏱️ Code [43/97] vless:// | 0s | +0 节点 | 配额 4587/4800
+[2026-07-22 00:09:25] ⏱️ Code [44/97] trojan:// | 0s | +0 节点 | 配额 4586/4800
+[2026-07-22 00:09:25] ⏱️ Code [45/97] ss:// | 0s | +0 节点 | 配额 4585/4800
+[2026-07-22 00:09:25] ⏱️ Code [46/97] hysteria2:// | 0s | +0 节点 | 配额 4584/4800
+[2026-07-22 00:09:25] ⏱️ Code [47/97] tuic:// | 0s | +0 节点 | 配额 4583/4800
+[2026-07-22 00:09:25] ⏱️ Code [48/97] "type: vmess" extension:yaml | 0s | +0 节点 | 配额 4582/4800
+[2026-07-22 00:09:26] ⏱️ Code [49/97] "type: vless" extension:yaml | 0s | +0 节点 | 配额 4581/4800
+[2026-07-22 00:09:26] ⏱️ Code [50/97] "type: trojan" extension:yaml | 0s | +0 节点 | 配额 4580/4800
+[2026-07-22 00:09:26] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:09:26] 触发限流，等待 63s ...
+[2026-07-22 00:10:29] ⏱️ Code [51/97] "type: ss" extension:yaml | 63s | +0 节点 | 配额 4578/4800
+[2026-07-22 00:10:30] ⏱️ Code [52/97] "type: ssr" extension:yaml | 1s | +0 节点 | 配额 4577/4800
+[2026-07-22 00:10:30] ⏱️ Code [53/97] "type: hysteria2" extension:yaml | 0s | +0 节点 | 配额 4576/4800
+[2026-07-22 00:10:30] ⏱️ Code [54/97] "type: tuic" extension:yaml | 0s | +0 节点 | 配额 4575/4800
+[2026-07-22 00:10:30] ⏱️ Code [55/97] "type: vmess" extension:yml | 0s | +0 节点 | 配额 4574/4800
+[2026-07-22 00:10:31] ⏱️ Code [56/97] "type: vless" extension:yml | 0s | +0 节点 | 配额 4573/4800
+[2026-07-22 00:10:31] ⏱️ Code [57/97] "type: trojan" extension:yml | 0s | +0 节点 | 配额 4572/4800
+[2026-07-22 00:10:31] ⏱️ Code [58/97] "type: hysteria2" extension:yml | 0s | +0 节点 | 配额 4571/4800
+[2026-07-22 00:10:31] ⏱️ Code [59/97] "type: hysteria2" extension:json | 0s | +0 节点 | 配额 4570/4800
+[2026-07-22 00:10:31] ⏱️ Code [60/97] "type: tuic" extension:json | 0s | +0 节点 | 配额 4569/4800
+[2026-07-22 00:10:32] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:10:32] 触发限流，等待 62s ...
+[2026-07-22 00:11:34] ⏱️ Code [61/97] "server:" extension:yaml | 62s | +0 节点 | 配额 4567/4800
+[2026-07-22 00:11:34] ⏱️ Code [62/97] "port:" extension:yaml | 0s | +0 节点 | 配额 4566/4800
+[2026-07-22 00:11:34] ⏱️ Code [63/97] "uuid:" extension:yaml | 0s | +0 节点 | 配额 4565/4800
+[2026-07-22 00:11:34] ⏱️ Code [64/97] "password:" extension:yaml | 0s | +0 节点 | 配额 4564/4800
+[2026-07-22 00:11:34] ⏱️ Code [65/97] "cipher:" extension:yaml | 0s | +0 节点 | 配额 4563/4800
+[2026-07-22 00:11:35] ⏱️ Code [66/97] "network:" extension:yaml | 0s | +0 节点 | 配额 4562/4800
+[2026-07-22 00:11:35] ⏱️ Code [67/97] "sni:" extension:yaml | 0s | +0 节点 | 配额 4561/4800
+[2026-07-22 00:11:35] ⏱️ Code [68/97] "alterId:" extension:yaml | 1s | +0 节点 | 配额 4560/4800
+[2026-07-22 00:11:36] ⏱️ Code [69/97] "server:" extension:yml | 0s | +0 节点 | 配额 4559/4800
+[2026-07-22 00:11:36] ⏱️ Code [70/97] "uuid:" extension:yml | 0s | +0 节点 | 配额 4558/4800
+[2026-07-22 00:11:36] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:11:36] 触发限流，等待 63s ...
+[2026-07-22 00:12:39] ⏱️ Code [71/97] "server:" extension:json | 63s | +0 节点 | 配额 4556/4800
+[2026-07-22 00:12:39] ⏱️ Code [72/97] "server_port" extension:json | 0s | +0 节点 | 配额 4555/4800
+[2026-07-22 00:12:39] ⏱️ Code [73/97] "method:" extension:json | 0s | +0 节点 | 配额 4554/4800
+[2026-07-22 00:12:40] ⏱️ Code [74/97] proxy-groups extension:yaml | 0s | +0 节点 | 配额 4553/4800
+[2026-07-22 00:12:40] ⏱️ Code [75/97] proxy-groups extension:yml | 0s | +0 节点 | 配额 4552/4800
+[2026-07-22 00:12:40] ⏱️ Code [76/97] outbounds extension:json | 0s | +0 节点 | 配额 4551/4800
+[2026-07-22 00:12:40] ⏱️ Code [77/97] "outbounds" extension:json | 0s | +0 节点 | 配额 4550/4800
+[2026-07-22 00:12:40] ⏱️ Code [78/97] hysteria2 config extension:yaml | 0s | +0 节点 | 配额 4549/4800
+[2026-07-22 00:12:40] ⏱️ Code [79/97] hy2 outbound extension:json | 0s | +0 节点 | 配额 4548/4800
+[2026-07-22 00:12:41] ⏱️ Code [80/97] tuic server extension:yaml | 0s | +0 节点 | 配额 4547/4800
+[2026-07-22 00:12:41] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:12:41] 触发限流，等待 63s ...
+[2026-07-22 00:13:44] ⏱️ Code [81/97] vless reality extension:json | 63s | +0 节点 | 配额 4545/4800
+[2026-07-22 00:13:44] ⏱️ Code [82/97] trojan password extension:yaml | 0s | +0 节点 | 配额 4544/4800
+[2026-07-22 00:13:44] ⏱️ Code [83/97] vmess uuid extension:json | 0s | +0 节点 | 配额 4543/4800
+[2026-07-22 00:13:45] ⏱️ Code [84/97] shadowsocks method extension:yaml | 1s | +0 节点 | 配额 4542/4800
+[2026-07-22 00:13:45] ⏱️ Code [85/97] ssr protocol extension:yaml | 0s | +0 节点 | 配额 4541/4800
+[2026-07-22 00:13:45] ⏱️ Code [86/97] hysteria2 server extension:json | 0s | +0 节点 | 配额 4540/4800
+[2026-07-22 00:13:45] ⏱️ Code [87/97] tuic congestion extension:json | 0s | +0 节点 | 配额 4539/4800
+[2026-07-22 00:13:45] ⏱️ Code [88/97] vless flow extension:yaml | 0s | +0 节点 | 配额 4538/4800
+[2026-07-22 00:13:46] ⏱️ Code [89/97] subscription-userinfo extension:txt | 0s | +0 节点 | 配额 4537/4800
+[2026-07-22 00:13:46] ⏱️ Code [90/97] subscription-userinfo extension:yml | 0s | +0 节点 | 配额 4536/4800
+[2026-07-22 00:13:46] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 00:13:46] 触发限流，等待 63s ...
+[2026-07-22 00:14:50] ⏱️ Code [91/97] raw.githubusercontent.com extension:yaml | 63s | +0 节点 | 配额 4534/4800
+[2026-07-22 00:14:50] ⏱️ Code [92/97] raw.githubusercontent.com extension:json | 0s | +0 节点 | 配额 4533/4800
+[2026-07-22 00:14:50] ⏱️ Code [93/97] raw.githubusercontent.com extension:txt | 0s | +0 节点 | 配额 4532/4800
+[2026-07-22 00:14:50] ⏱️ Code [94/97] raw.githubusercontent.com extension:yml | 0s | +0 节点 | 配额 4531/4800
+[2026-07-22 00:14:50] ⏱️ Code [95/97] v2ray aggregator extension:py | 0s | +0 节点 | 配额 4530/4800
+[2026-07-22 00:14:50] ⏱️ Code [96/97] proxy collector extension:py | 0s | +0 节点 | 配额 4529/4800
+[2026-07-22 00:14:51] ⏱️ Code [97/97] vmess:// raw.githubusercontent extension:py | 0s | +0 节点 | 配额 4528/4800

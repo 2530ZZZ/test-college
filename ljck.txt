@@ -8696,3 +8696,10 @@ https://github.com/kebingash/RT-PSPNet
 https://github.com/weideng365/docker_image_pusher
 https://github.com/jerryshell/my-flomo
 https://github.com/M-xpression/Qlu-Naviagent-open-source
+https://github.com/xxf098/LiteSpeedTest
+https://github.com/iwxf/free-v2ray
+https://github.com/misersun/config003
+https://github.com/hermanb001/ProxyTest
+https://github.com/LonUp/NodeList
+https://github.com/MasterKia/PersianBlocker
+https://github.com/bootmortis/iran-hosted-domains
