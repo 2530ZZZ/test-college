@@ -115,6 +115,8 @@ class Collector:
         self._repo_not_found: Set[str] = set()         # 404 仓库（本次运行）
         self._repo_forbidden: Set[str] = set()         # 403 访问拒绝（本次运行）
         self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
+        self._main_queue_was_full = False              # 主队列满状态追踪
+        self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
 
         # 批次持久化（共享）
         self.batch_buffer: List[str] = []
@@ -175,6 +177,20 @@ class Collector:
                 return False
             self.seen_repos.add(r)
             return True
+
+    def _log_main_queue(self):
+        """主队列满/恢复时打印日志。"""
+        mq = getattr(self, '_task_queue', None)
+        if not mq:
+            return
+        sz = mq.qsize()
+        cap = mq.maxsize
+        if sz >= cap and not self._main_queue_was_full:
+            self._main_queue_was_full = True
+            print(f"[{now_str()}] ⏸️  主队列 {sz}/{cap} 满，搜索暂停等待", flush=True)
+        elif sz < cap and self._main_queue_was_full:
+            self._main_queue_was_full = False
+            print(f"[{now_str()}] ▶️ 主队列 {sz}/{cap}，搜索恢复", flush=True)
 
     def _is_repo_dead(self, repo: str) -> bool:
         """检查仓库是否已知不可达（404/403，大小写不敏感）。"""
@@ -328,9 +344,13 @@ class Collector:
             f.write(text)
 
         self.batch_file_paths.append(filepath)
+        mq = getattr(self, '_task_queue', None)
+        dq = getattr(self, '_disc_queue', None)
+        mq_sz = mq.qsize() if mq else 0
+        dq_sz = dq.qsize() if dq else 0
         print(f"[{now_str()}] 📦 批次 {seq:04d} 已持久化: "
-              f"{filepath} ({node_count} 个节点, "
-              f"累计 {len(self.unique_nodes)} 个)", flush=True)
+              f"{filepath} ({node_count} 个节点, 累计 {len(self.unique_nodes)} 个)"
+              f" | 主队列 {mq_sz}/{MAIN_QUEUE_SIZE}, 发现队列 {dq_sz}/{DISCOVERY_QUEUE_SIZE}", flush=True)
         # 批次刷盘时顺带保存 SHA 缓存，防止中途崩溃丢失
         self.save_sha_cache()
 
@@ -731,6 +751,11 @@ class Collector:
                 try:
                     item = main_queue.get(timeout=30)
                 except Exception:
+                    tn = threading.current_thread().name
+                    last = self._worker_idle_since.get(tn, 0)
+                    if time.time() - last > 120:
+                        self._worker_idle_since[tn] = time.time()
+                        print(f"[{now_str()}] ⏳ {tn} 等待任务中...", flush=True)
                     continue
             try:
                 if item is None:
@@ -792,6 +817,7 @@ class Collector:
                                  "size": item.get("size", 0),
                                  "disabled": item.get("disabled", False),
                                  "pushed_at": item.get("pushed_at", "")}))
+                self._log_main_queue()
             time.sleep(PAGE_SLEEP_SECONDS)
 
     def _collect_code(self, task_queue: Queue):
@@ -1359,8 +1385,10 @@ class Collector:
                          "pushed_at": fork.get("pushed_at", "")}),
                        timeout=QUEUE_PUT_TIMEOUT_SECONDS)
             except Exception:
-                pass  # 发现队列满，丢弃（下次运行可能再发现）
-        print(f"[{now_str()}]   {label}: {len(forks)} 个 → 队列", flush=True)
+                print(f"[{now_str()}] 🗑️  发现队列满，丢弃 {fn}", flush=True)
+        dq = getattr(self, '_disc_queue', None)
+        dq_sz = dq.qsize() if dq else 0
+        print(f"[{now_str()}]   {label}: {len(forks)} 个 → 发现队列 (队列: {dq_sz}/{DISCOVERY_QUEUE_SIZE})", flush=True)
 
     def _trace_user_repos(self, repo: str, branch: str, depth: int):
         """遍历同用户名下的所有公开仓库，查是否有节点产出。

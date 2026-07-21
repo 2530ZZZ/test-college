@@ -153,6 +153,7 @@ class QuotaManager:
             True: 配额已恢复可以继续
             False: 提前终止
         """
+        _logged = False
         while True:
             with self._lock:
                 now = time.time()
@@ -162,6 +163,10 @@ class QuotaManager:
                     self.window_start = now
                     self._reset_time = 0
                     self.exceeded = False
+                    if _logged:
+                        from datetime import datetime, timezone
+                        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] "
+                              f"🔄 配额恢复，继续工作", flush=True)
                     return True
                 # 估算：window_start + 3600
                 if now - self.window_start >= 3600:
@@ -169,6 +174,21 @@ class QuotaManager:
                     self.window_start = now
                     self.exceeded = False
                     return True
+            # 首次等待日志
+            if not _logged:
+                _logged = True
+                from datetime import datetime, timezone
+                wait = 0
+                if self._reset_time:
+                    wait = max(0, self._reset_time - time.time())
+                else:
+                    wait = 3600 - (time.time() - self.window_start) + 10
+                reset_utc = datetime.fromtimestamp(
+                    time.time() + wait, tz=timezone.utc
+                ).strftime('%H:%M UTC')
+                print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] "
+                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait:.0f}min 至 {reset_utc}",
+                      flush=True)
             # 计算等待时长
             if self._reset_time:
                 wait = max(0, self._reset_time - time.time()) + 2
