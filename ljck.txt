@@ -8703,3 +8703,5 @@ https://github.com/hermanb001/ProxyTest
 https://github.com/LonUp/NodeList
 https://github.com/MasterKia/PersianBlocker
 https://github.com/bootmortis/iran-hosted-domains
+https://github.com/Jsnzkpg/Jsnzkpg
+https://github.com/Flikify/Free-Node

@@ -1,0 +1,406 @@
+[2026-07-22 14:08:05] 🚀 程序启动
+[2026-07-22 14:08:05] 关键词: 105 个
+[2026-07-22 14:08:05] 已加载黑名单: 8704 个
+[2026-07-22 14:08:06] 加载 SHA 缓存 164044 条 (1 分片)
+[2026-07-22 14:08:06] 🚀 程序启动 | 配额上限 4800/小时
+[2026-07-22 14:08:06] 🔵 种子仓库: 38 个 → 队列
+[2026-07-22 14:08:06] 仓库 https://github.com/mahdibland/V2RayAggregator (分支: master, size: 4501032KB, pushed: 2026-07-22T04:08:33Z)
+[2026-07-22 14:08:06] ⏱️ Code [1/97] vmess:// extension:yaml | 1s | +0 节点 | 配额 4798/4800
+[2026-07-22 14:08:07] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件较多 (1530 个)，先通过 commits API 过滤
+[2026-07-22 14:08:08] 仓库 https://github.com/gfpcom/free-proxy-list (分支: main, size: 37072KB, pushed: 2026-07-22T04:15:57Z)[2026-07-22 14:08:08] ⏱️ Code [2/97] vless:// extension:yaml | 2s | +0 节点 | 配额 4795/4800
+
+[2026-07-22 14:08:09] ⏱️ Code [3/97] trojan:// extension:yaml | 2s | +0 节点 | 配额 4793/4800
+[2026-07-22 14:08:11] 仓库 https://github.com/ninjastrikers/nexus-nodes (分支: main, size: 930731KB, pushed: 2026-07-22T03:35:18Z)[2026-07-22 14:08:11] 仓库 https://github.com/gfpcom/free-proxy-list 候选文件 1 个
+
+[2026-07-22 14:08:11] 🔗 递归发现仓库 wiki/gfpcom (来源 https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/README.md)
+[2026-07-22 14:08:13] ⏱️ Code [4/97] ss:// extension:yaml | 3s | +2 节点 | 配额 4789/4800
+[2026-07-22 14:08:13] repo info (wiki/gfpcom) 404，跳过
+[2026-07-22 14:08:13] ⏱️ Code [5/97] ssr:// extension:yaml | 0s | +0 节点 | 配额 4787/4800
+[2026-07-22 14:08:14] 🔗 查子仓库: gfpcom/free-proxy-list
+[2026-07-22 14:08:15] 仓库 https://github.com/ermaozi/get_subscribe (分支: main, size: 120KB, pushed: 2026-07-22T00:41:35Z)[2026-07-22 14:08:15] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件较多 (534 个)，先通过 commits API 过滤[2026-07-22 14:08:15]   Compare API 返回 25 个变更文件 (3 次 API 调用)
+
+
+[2026-07-22 14:08:15]   commits 过滤: 1530 → 22 (变更文件 25 个)
+[2026-07-22 14:08:15] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件 22 个
+[2026-07-22 14:08:15] 🔗 递归发现仓库 mianfeifq/share (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:08:16] 🔗 递归发现仓库 mahdibland/ShadowsocksAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 14:08:17] ⏱️ Code [6/97] hysteria2:// extension:yaml | 4s | +2758 节点 | 配额 4783/4800
+[2026-07-22 14:08:20] repo info (mianfeifq/share) 404，跳过
+[2026-07-22 14:08:20] 🔗 递归发现仓库 vpei/Free-Node-Merge (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)[2026-07-22 14:08:20] 仓库 https://github.com/ermaozi/get_subscribe 候选文件 2 个
+
+[2026-07-22 14:08:21] 仓库 https://github.com/mahdibland/ShadowsocksAggregator (分支: master, size: 4501032KB, pushed: 2026-07-22T04:08:33Z)
+[2026-07-22 14:08:20] ⏱️ Code [7/97] hy2:// extension:yaml | 3s | +0 节点 | 配额 4775/4800
+[2026-07-22 14:08:21] 📦 批次 0001 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0001.txt (5099 个节点, 累计 5099 个) | 主队列 1/200, 发现队列 0/600
+[2026-07-22 14:08:23] repo info (vpei/Free-Node-Merge) 返回 403 (尝试 1/2)
+[2026-07-22 14:08:23] ⏱️ Code [8/97] tuic:// extension:yaml | 2s | +2339 节点 | 配额 4772/4800[2026-07-22 14:08:23] repo info (vpei/Free-Node-Merge) 403（访问被拒，配额剩余 4973），跳过
+
+[2026-07-22 14:08:24] ⏱️ Code [9/97] vmess:// extension:yml | 1s | +0 节点 | 配额 4771/4800
+[2026-07-22 14:08:24] ⏱️ Code [10/97] vless:// extension:yml | 0s | +0 节点 | 配额 4770/4800
+[2026-07-22 14:08:25] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-22 14:08:25] 触发限流，等待 46s ...
+[2026-07-22 14:08:26] SHA 缓存已保存: 164061 条, 1 分片
+[2026-07-22 14:08:27] 🔗 递归发现仓库 ssrsub/ssr (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:08:27]   Compare API 返回 300 个变更文件 (3 次 API 调用)
+[2026-07-22 14:08:27]   commits 过滤: 534 → 297 (变更文件 300 个)
+[2026-07-22 14:08:27] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件 297 个
+[2026-07-22 14:08:27] 仓库 https://github.com/ssrsub/ssr (分支: master, size: 22950KB, pushed: 2026-07-22T02:43:38Z)
+[2026-07-22 14:08:28] 仓库 https://github.com/ssrsub/ssr 候选文件 3 个
+[2026-07-22 14:08:29]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:08:29] 🔗 开始 Fork 链追踪 (gfpcom/free-proxy-list)
+[2026-07-22 14:08:29] 🔗 查子仓库: ermaozi/get_subscribe
+[2026-07-22 14:08:29] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件较多 (1513 个)，先通过 commits API 过滤
+[2026-07-22 14:08:29] 👤 遍历用户仓库: ssrsub
+[2026-07-22 14:08:31] 👤 遍历用户仓库: gfpcom
+[2026-07-22 14:08:33]   👤 用户仓库: 5 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:08:33]   用户 ssrsub 共查 5 个仓库
+[2026-07-22 14:08:33] 🔗 递归发现仓库 mahdibland/ShadowsocksAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:08:35]   👤 用户仓库: 4 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:08:35]   用户 gfpcom 共查 4 个仓库
+[2026-07-22 14:08:35] 仓库 https://github.com/pawdroid/Free-servers (分支: main, size: 83KB, pushed: 2026-07-22T06:00:27Z)
+[2026-07-22 14:08:35] 仓库 https://github.com/mahdibland/ShadowsocksAggregator (分支: master, size: 4501032KB, pushed: 2026-07-22T04:08:33Z)
+[2026-07-22 14:08:37] 仓库 https://github.com/pawdroid/Free-servers 候选文件 32 个[2026-07-22 14:08:37]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+
+[2026-07-22 14:08:37] 🔗 开始 Fork 链追踪 (ermaozi/get_subscribe)[2026-07-22 14:08:37]   Compare API 返回 25 个变更文件 (3 次 API 调用)
+
+[2026-07-22 14:08:37]   commits 过滤: 1513 → 5 (变更文件 25 个)
+[2026-07-22 14:08:37] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件 5 个
+[2026-07-22 14:08:38] 🔗 发现仓库链接 2dust/v2ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/README.md)
+[2026-07-22 14:08:38] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-en.md)
+[2026-07-22 14:08:38] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pt-BR.md)
+[2026-07-22 14:08:38] 🔗 发现仓库链接 Shinlor/V2Ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-fr.md)
+[2026-07-22 14:08:38] 🔗 发现仓库链接 mellow-io/mello (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ko-KR.md)[2026-07-22 14:08:38] 🔗 发现仓库链接 Kr328/ClashForAndroi (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-de.md)
+
+[2026-07-22 14:08:38] 🔗 发现仓库链接 shadowsocksrr/shadowsocksr-cshar (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ar.md)[2026-07-22 14:08:38] 🔗 发现仓库链接 yichengchen/clash (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-id.md)[2026-07-22 14:08:38] 🔗 发现仓库链接 Pawdroid/shadowrocket_for_androi (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-pl.md)[2026-07-22 14:08:38] 🔗 发现仓库链接 yichenchen/clash (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-vi.md)[2026-07-22 14:08:38] 🔗 发现仓库链接 shadowsocksrr/shadowsocksr-androi (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ja.md)[2026-07-22 14:08:38] 🔗 发现仓库链接 qinyuhang/ShadowsocksX-NG- (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-ur-PK.md)
+
+
+
+
+
+[2026-07-22 14:08:38] 🔗 发现仓库链接 2dust/v2rayN (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-hi.md)
+[2026-07-22 14:08:39] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件较多 (1508 个)，先通过 commits API 过滤
+[2026-07-22 14:08:39] repo info (Cenmrev/V2Ray) 404，跳过
+[2026-07-22 14:08:39] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-22 14:08:40] 👤 遍历用户仓库: ermaozi
+
+[2026-07-22 14:08:40] repo info (shadowsocksrr/shadowsocksr-cshar) 404，跳过[2026-07-22 14:08:40] 🔗 发现仓库链接 yanue/V2ray (来源 https://raw.githubusercontent.com/pawdroid/Free-servers/main/static/README-en.md)[2026-07-22 14:08:40] repo info (Shinlor/V2Ray) 404，跳过
+
+
+[2026-07-22 14:08:40] repo info (yichenchen/clash) 404，跳过[2026-07-22 14:08:40] repo info (shadowsocksrr/shadowsocksr-androi) 404，跳过
+
+[2026-07-22 14:08:42] repo info (2dust/v2ray) 404，跳过
+[2026-07-22 14:08:42] repo info (Pawdroid/shadowrocket_for_androi) 404，跳过[2026-07-22 14:08:42] repo info (Kr328/ClashForAndroi) 404，跳过
+
+[2026-07-22 14:08:42] repo info (qinyuhang/ShadowsocksX-NG-) 404，跳过
+[2026-07-22 14:08:44] repo info (yichengchen/clash) 404，跳过[2026-07-22 14:08:44] repo info (mellow-io/mello) 404，跳过
+[2026-07-22 14:08:44] ⏭️ 仓库 https://github.com/2dust/v2rayN 53h 未更新，跳过解析（追踪 fork 链）
+
+[2026-07-22 14:08:45] 👤 遍历用户仓库: 2dust
+[2026-07-22 14:08:49] repo info (yanue/V2ray) 404，跳过
+[2026-07-22 14:08:53]   👤 用户仓库: 21 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:08:53]   用户 ermaozi 共查 21 个仓库
+[2026-07-22 14:08:53] 仓库 https://github.com/sevcator/5ubscrpt10n (分支: main, size: 67267658KB, pushed: 2026-07-22T03:40:40Z)
+[2026-07-22 14:08:53]   👤 用户仓库: 13 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:08:53]   用户 2dust 共查 13 个仓库
+[2026-07-22 14:08:53] 🔗 查子仓库: pawdroid/Free-servers
+[2026-07-22 14:08:53] 仓库 https://github.com/sevcator/5ubscrpt10n 候选文件较多 (145 个)，先通过 commits API 过滤
+[2026-07-22 14:08:55]   Compare API 返回 25 个变更文件 (3 次 API 调用)
+[2026-07-22 14:08:55]   commits 过滤: 1508 → 0 (变更文件 25 个)
+[2026-07-22 14:08:55] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件经时间过滤后为空
+[2026-07-22 14:08:55] 👤 遍历用户仓库: mahdibland
+[2026-07-22 14:08:59] 👤 遍历用户仓库: mahdibland
+[2026-07-22 14:09:00]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:00] 🔗 开始 Fork 链追踪 (pawdroid/Free-servers)
+[2026-07-22 14:09:00]   👤 用户仓库: 19 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:00]   用户 mahdibland 共查 19 个仓库
+[2026-07-22 14:09:00] 🔗 递归发现仓库 Jsnzkpg/Jsnzkpg (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:09:00] 👤 遍历用户仓库: pawdroid
+[2026-07-22 14:09:02]   用户 mahdibland 共查 0 个仓库
+[2026-07-22 14:09:02] 🔗 发现仓库链接 mahdibland/SSAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 14:09:02]   👤 用户仓库: 15 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:02]   用户 pawdroid 共查 15 个仓库
+[2026-07-22 14:09:02] 仓库 https://github.com/roosterkid/openproxylist (分支: main, size: 1072585KB, pushed: 2026-07-22T06:00:32Z)
+[2026-07-22 14:09:04] 仓库 https://github.com/Jsnzkpg/Jsnzkpg (分支: Jsnzkpg, size: 24724KB, pushed: 2026-07-21T13:01:41Z)
+[2026-07-22 14:09:04]   Compare API 返回 148 个变更文件 (3 次 API 调用)
+[2026-07-22 14:09:04]   commits 过滤: 145 → 145 (变更文件 148 个)
+[2026-07-22 14:09:04] 仓库 https://github.com/sevcator/5ubscrpt10n 候选文件 145 个
+[2026-07-22 14:09:06] 仓库 https://github.com/roosterkid/openproxylist 候选文件 9 个[2026-07-22 14:09:06] 仓库 https://github.com/mahdibland/SSAggregator (分支: master, size: 4501032KB, pushed: 2026-07-22T04:08:33Z)
+
+[2026-07-22 14:09:07] 仓库 https://github.com/Jsnzkpg/Jsnzkpg 候选文件 1 个
+[2026-07-22 14:09:07] 📦 批次 0002 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0002.txt (5013 个节点, 累计 10188 个) | 主队列 9/200, 发现队列 0/600
+[2026-07-22 14:09:08] SHA 缓存已保存: 164406 条, 1 分片
+[2026-07-22 14:09:08] 仓库 https://github.com/mahdibland/SSAggregator 候选文件较多 (1508 个)，先通过 commits API 过滤
+[2026-07-22 14:09:08] 仓库 https://github.com/Jsnzkpg/Jsnzkpg 未提取到节点，加入黑名单
+[2026-07-22 14:09:08] 🔗 递归发现仓库 anaer/Sub (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:09:08] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:09:10] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:09:10] 仓库 https://github.com/anaer/Sub (分支: main, size: 96KB, pushed: 2026-07-21T11:46:49Z)
+[2026-07-22 14:09:10] 仓库 https://github.com/anaer/Sub 候选文件 2 个
+[2026-07-22 14:09:10] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:09:11] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:09:11] 📦 批次 0003 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0003.txt (5456 个节点, 累计 15568 个) | 主队列 11/200, 发现队列 0/600
+[2026-07-22 14:09:12] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:09:12] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:09:12] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:09:13] ⏱️ Code [11/97] trojan:// extension:yml | 48s | +10469 节点 | 配额 4694/4800
+[2026-07-22 14:09:13] ⏱️ Code [12/97] ss:// extension:yml | 0s | +0 节点 | 配额 4693/4800
+[2026-07-22 14:09:13] ⏱️ Code [13/97] hysteria2:// extension:yml | 0s | +0 节点 | 配额 4691/4800
+[2026-07-22 14:09:14] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:09:14] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:09:15] SHA 缓存已保存: 164423 条, 1 分片
+[2026-07-22 14:09:16] ⏱️ Code [14/97] tuic:// extension:yml | 2s | +45 节点 | 配额 4690/4800
+[2026-07-22 14:09:16] ⏱️ Code [15/97] vmess:// extension:json | 0s | +27 节点 | 配额 4688/4800
+[2026-07-22 14:09:17] ⏱️ Code [16/97] vless:// extension:json | 0s | +9 节点 | 配额 4687/4800
+[2026-07-22 14:09:17] ⏱️ Code [17/97] trojan:// extension:json | 0s | +8 节点 | 配额 4686/4800
+[2026-07-22 14:09:17] ⏱️ Code [18/97] ss:// extension:json | 0s | +12 节点 | 配额 4685/4800
+[2026-07-22 14:09:19]   Compare API 返回 25 个变更文件 (3 次 API 调用)
+[2026-07-22 14:09:19]   commits 过滤: 1508 → 0 (变更文件 25 个)
+[2026-07-22 14:09:19] 仓库 https://github.com/mahdibland/SSAggregator 候选文件经时间过滤后为空
+[2026-07-22 14:09:19] 👤 遍历用户仓库: mahdibland
+[2026-07-22 14:09:19] ⏱️ Code [19/97] hysteria2:// extension:json | 2s | +408 节点 | 配额 4682/4800
+[2026-07-22 14:09:19] 📦 批次 0004 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0004.txt (5407 个节点, 累计 21000 个) | 主队列 14/200, 发现队列 0/600
+[2026-07-22 14:09:20] SHA 缓存已保存: 164430 条, 1 分片
+[2026-07-22 14:09:20] 📦 批次 0005 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0005.txt (5063 个节点, 累计 26060 个) | 主队列 14/200, 发现队列 0/600
+[2026-07-22 14:09:20] SHA 缓存已保存: 164433 条, 1 分片
+[2026-07-22 14:09:20] 🔗 发现仓库链接 xishang0128/geoi (来源 https://raw.githubusercontent.com/anaer/Sub/main/clash.yaml)
+[2026-07-22 14:09:20] 🔗 查子仓库: roosterkid/openproxylist
+[2026-07-22 14:09:20] 📦 批次 0006 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0006.txt (5650 个节点, 累计 31688 个) | 主队列 14/200, 发现队列 0/600
+[2026-07-22 14:09:21] SHA 缓存已保存: 164440 条, 1 分片
+[2026-07-22 14:09:21] ⏱️ Code [20/97] hy2:// extension:json | 2s | +15597 节点 | 配额 4680/4800
+[2026-07-22 14:09:21]   用户 mahdibland 共查 0 个仓库
+[2026-07-22 14:09:21] repo info (xishang0128/geoi) 404，跳过
+[2026-07-22 14:09:21] Code搜索第1页 返回 403 (尝试 1/2)[2026-07-22 14:09:21] 🔗 发现仓库链接 ldir92664/Vmess-Actions (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+
+[2026-07-22 14:09:22] 触发限流，等待 54s ...
+[2026-07-22 14:09:22] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:09:22] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:09:24] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:09:24] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过[2026-07-22 14:09:24] repo info (ldir92664/Vmess-Actions) 404，跳过
+
+[2026-07-22 14:09:25] 🔗 发现仓库链接 anaer/Sub (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)[2026-07-22 14:09:25] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+
+[2026-07-22 14:09:25] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:09:25] 📦 批次 0007 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0007.txt (5002 个节点, 累计 36690 个) | 主队列 16/200, 发现队列 0/600
+[2026-07-22 14:09:26] SHA 缓存已保存: 164442 条, 1 分片
+[2026-07-22 14:09:26]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:26] 🔗 开始 Fork 链追踪 (roosterkid/openproxylist)
+[2026-07-22 14:09:27] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:09:27] 👤 遍历用户仓库: roosterkid
+[2026-07-22 14:09:27] 仓库 https://github.com/anaer/Sub (分支: main, size: 96KB, pushed: 2026-07-21T11:46:49Z)
+[2026-07-22 14:09:28] 🔗 查子仓库: ninjastrikers/nexus-nodes
+[2026-07-22 14:09:28] 仓库 https://github.com/anaer/Sub 候选文件 1 个
+[2026-07-22 14:09:30] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:09:30] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:09:34]   🍴 子仓库: 6 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:34] 🔗 开始 Fork 链追踪 (ninjastrikers/nexus-nodes)
+[2026-07-22 14:09:34]   👤 用户仓库: 11 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:34]   用户 roosterkid 共查 11 个仓库
+[2026-07-22 14:09:34] 仓库 https://github.com/V2RayRoot/V2RayConfig (分支: main, size: 508318KB, pushed: 2026-07-22T04:25:19Z)
+[2026-07-22 14:09:34] 👤 遍历用户仓库: ninjastrikers
+[2026-07-22 14:09:35] 👤 遍历用户仓库: anaer
+[2026-07-22 14:09:37] 仓库 https://github.com/V2RayRoot/V2RayConfig 无候选文件 (总计 19 blob, 扩展名过滤 2, processed_shas 跳过 0, SHA 缓存跳过 17)
+[2026-07-22 14:09:37] 🔗 查子仓库: V2RayRoot/V2RayConfig
+[2026-07-22 14:09:40]   🍴 子仓库: 19 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:40] 🔗 开始 Fork 链追踪 (V2RayRoot/V2RayConfig)
+[2026-07-22 14:09:41] 👤 遍历用户仓库: V2RayRoot
+[2026-07-22 14:09:42]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:42]   用户 anaer 共查 30 个仓库
+[2026-07-22 14:09:43] 🔗 发现仓库链接 mfuu/v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-22 14:09:43]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:43]   用户 ninjastrikers 共查 30 个仓库
+[2026-07-22 14:09:43] 仓库 https://github.com/Farid-Karimi/Config-Collector (分支: main, size: 332958KB, pushed: 2026-07-22T02:26:42Z)
+[2026-07-22 14:09:44] 仓库 https://github.com/mfuu/v2ray (分支: master, size: 34KB, pushed: 2026-07-21T21:55:22Z)
+[2026-07-22 14:09:44] repo info (alanbobs999/TopFreeProxies) 返回 403 (尝试 1/2)
+[2026-07-22 14:09:44] repo info (alanbobs999/TopFreeProxies) 403（访问被拒，配额剩余 4883），跳过
+[2026-07-22 14:09:44]   👤 用户仓库: 7 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:44]   用户 V2RayRoot 共查 7 个仓库
+[2026-07-22 14:09:44] 仓库在黑名单中: https://github.com/ehsanghaffar/config-sub-platform
+[2026-07-22 14:09:44] 仓库在黑名单中: https://github.com/Airuop/config-fetcher
+[2026-07-22 14:09:44] 仓库 https://github.com/free-nodes/v2rayfree (分支: main, size: 20422KB, pushed: 2026-07-22T02:56:44Z)
+[2026-07-22 14:09:44] 📦 批次 0008 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0008.txt (6919 个节点, 累计 43630 个) | 主队列 21/200, 发现队列 0/600
+[2026-07-22 14:09:44] SHA 缓存已保存: 164443 条, 1 分片
+[2026-07-22 14:09:44] 👤 遍历用户仓库: anaer
+[2026-07-22 14:09:44] 📦 批次 0009 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0009.txt (10152 个节点, 累计 53792 个) | 主队列 21/200, 发现队列 0/600
+[2026-07-22 14:09:45] SHA 缓存已保存: 164445 条, 1 分片
+[2026-07-22 14:09:46] 仓库 https://github.com/mfuu/v2ray 候选文件 3 个
+[2026-07-22 14:09:47] 仓库 https://github.com/Farid-Karimi/Config-Collector 候选文件 5 个
+[2026-07-22 14:09:47] 仓库 https://github.com/free-nodes/v2rayfree 候选文件 5 个
+[2026-07-22 14:09:47] 📦 批次 0010 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0010.txt (5939 个节点, 累计 59728 个) | 主队列 22/200, 发现队列 0/600
+[2026-07-22 14:09:48] SHA 缓存已保存: 164449 条, 1 分片
+[2026-07-22 14:09:48] 🔗 递归发现仓库 Misaka-blog/chromego_merge (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+[2026-07-22 14:09:49] 仓库 https://github.com/Misaka-blog/chromego_merge (分支: main, size: 121025KB, pushed: 2026-07-22T01:45:08Z)
+[2026-07-22 14:09:49]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:09:49]   用户 anaer 共查 30 个仓库
+[2026-07-22 14:09:49] 🔗 递归发现仓库 kxswa/k (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:09:51] 🔗 发现仓库链接 clashbk/clas (来源 https://raw.githubusercontent.com/free-nodes/v2rayfree/main/README.md)
+[2026-07-22 14:09:51] 📦 批次 0011 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0011.txt (5092 个节点, 累计 64808 个) | 主队列 23/200, 发现队列 0/600
+[2026-07-22 14:09:51] SHA 缓存已保存: 164454 条, 1 分片
+[2026-07-22 14:09:51] repo info (clashbk/clas) 404，跳过
+[2026-07-22 14:09:51] ⚠️ 仓库 https://github.com/kxswa/k 大小为 0，跳过
+[2026-07-22 14:09:51] 🔗 递归发现仓库 Rokate/Proxy-Sub (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:09:51] 🔗 发现仓库链接 free-nodes/clashfree (来源 https://raw.githubusercontent.com/free-nodes/v2rayfree/main/README.md)
+[2026-07-22 14:09:52] 仓库 https://github.com/Misaka-blog/chromego_merge 候选文件 1 个
+[2026-07-22 14:09:52] repo info (Rokate/Proxy-Sub) 404，跳过
+[2026-07-22 14:09:52] 仓库 https://github.com/free-nodes/clashfree (分支: main, size: 15957KB, pushed: 2026-07-22T04:00:53Z)
+[2026-07-22 14:09:52] 🔗 递归发现仓库 vveg26/SubAutoConv (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:09:53] 👤 遍历用户仓库: Misaka-blog
+[2026-07-22 14:09:54] repo info (vveg26/SubAutoConv) 404，跳过
+[2026-07-22 14:09:54] 🔗 递归发现仓库 tbbatbb/Proxy (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:09:55] 仓库 https://github.com/free-nodes/clashfree 候选文件 2 个
+[2026-07-22 14:09:55] 📦 批次 0012 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0012.txt (9401 个节点, 累计 74226 个) | 主队列 25/200, 发现队列 0/600
+[2026-07-22 14:09:55] 🔵 关键词: 147 个
+[2026-07-22 14:09:55] SHA 缓存已保存: 164457 条, 1 分片
+[2026-07-22 14:09:55] 🔗 发现仓库链接 free-nodes/clashfre (来源 https://raw.githubusercontent.com/free-nodes/clashfree/main/README.md)
+[2026-07-22 14:09:55] repo info (tbbatbb/Proxy) 404，跳过
+[2026-07-22 14:09:55] 🔗 递归发现仓库 paimonhub/Paimonnode (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:09:56] repo info (free-nodes/clashfre) 404，跳过
+[2026-07-22 14:09:56] 📦 批次 0013 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0013.txt (5920 个节点, 累计 80137 个) | 主队列 25/200, 发现队列 0/600
+[2026-07-22 14:09:57] SHA 缓存已保存: 164463 条, 1 分片
+[2026-07-22 14:09:58] repo info (paimonhub/Paimonnode) 返回 403 (尝试 1/2)
+[2026-07-22 14:09:58] repo info (paimonhub/Paimonnode) 403（访问被拒，配额剩余 4863），跳过
+[2026-07-22 14:10:02] 🔗 递归发现仓库 peasoft/NoMoreWalls (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:10:03] 仓库 https://github.com/peasoft/NoMoreWalls (分支: master, size: 5041100KB, pushed: 2026-07-22T05:37:19Z)
+[2026-07-22 14:10:04] 仓库 https://github.com/peasoft/NoMoreWalls 候选文件 23 个
+[2026-07-22 14:10:04]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:04]   用户 Misaka-blog 共查 30 个仓库
+[2026-07-22 14:10:04] 🔗 递归发现仓库 ripaojiedian/freenode (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+[2026-07-22 14:10:05] 仓库 https://github.com/ripaojiedian/freenode (分支: main, size: 9436KB, pushed: 2026-07-22T00:46:43Z)
+[2026-07-22 14:10:07] 仓库 https://github.com/ripaojiedian/freenode 候选文件 2 个
+[2026-07-22 14:10:07] 👤 遍历用户仓库: free-nodes
+[2026-07-22 14:10:08] 👤 遍历用户仓库: peasoft
+[2026-07-22 14:10:08] 📦 批次 0014 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0014.txt (6984 个节点, 累计 87116 个) | 主队列 63/200, 发现队列 0/600
+[2026-07-22 14:10:08] SHA 缓存已保存: 164491 条, 1 分片
+[2026-07-22 14:10:08] 👤 遍历用户仓库: ripaojiedian
+[2026-07-22 14:10:08]   👤 用户仓库: 10 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:08]   用户 free-nodes 共查 10 个仓库
+[2026-07-22 14:10:09] 订阅链接 https://Play.Google.com/Store/apps/detailsidCOM.V2ray.ang# 404，跳过
+[2026-07-22 14:10:09] 📦 批次 0015 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0015.txt (5292 个节点, 累计 92411 个) | 主队列 63/200, 发现队列 0/600
+[2026-07-22 14:10:09] SHA 缓存已保存: 164494 条, 1 分片
+[2026-07-22 14:10:09] 🔗 查子仓库: Farid-Karimi/Config-Collector
+[2026-07-22 14:10:09]   👤 用户仓库: 1 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:09]   用户 ripaojiedian 共查 1 个仓库
+[2026-07-22 14:10:09] 🔗 发现仓库链接 Fukki-Z/nodefree (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+[2026-07-22 14:10:10]   🍴 子仓库: 2 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:10] 🔗 开始 Fork 链追踪 (Farid-Karimi/Config-Collector)
+[2026-07-22 14:10:10]   父仓库: mrvcoder/V2rayCollector
+[2026-07-22 14:10:10] 仓库在黑名单中: https://github.com/mrvcoder/V2rayCollector
+[2026-07-22 14:10:10]   父仓库 +0 个节点
+[2026-07-22 14:10:10] repo info (Fukki-Z/nodefree) 404，跳过
+[2026-07-22 14:10:10] 🔗 发现仓库链接 vxiaov/free_proxie (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+[2026-07-22 14:10:11] repo info (vxiaov/free_proxie) 404，跳过
+[2026-07-22 14:10:11] 🔗 发现仓库链接 mahdibland/V2RayAggregato (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+[2026-07-22 14:10:11]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:11]   用户 peasoft 共查 30 个仓库
+[2026-07-22 14:10:11] 🔗 递归发现仓库 vveg26/get_proxy (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:10:11]   🍴 兄弟仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:11] 👤 遍历用户仓库: Farid-Karimi
+[2026-07-22 14:10:11] ⏱️ [1/147] free nodes pushed:>2026-07-21T06:08:05Z fork:true -language: | 17s | +25594 | 配额 4599/4800
+[2026-07-22 14:10:11] 📦 批次 0016 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0016.txt (7444 个节点, 累计 99842 个) | 主队列 100/200, 发现队列 0/600
+[2026-07-22 14:10:12] repo info (vveg26/get_proxy) 404，跳过[2026-07-22 14:10:12] repo info (mahdibland/V2RayAggregato) 404，跳过
+
+[2026-07-22 14:10:12] SHA 缓存已保存: 164497 条, 1 分片
+[2026-07-22 14:10:12] 🔗 发现仓库链接 peasoft/NoMoreWall (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+[2026-07-22 14:10:12] 🔗 递归发现仓库 ew732e8d8h1hi/q832yqwdu21u (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:10:13] 📦 批次 0017 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0017.txt (5689 个节点, 累计 105633 个) | 主队列 100/200, 发现队列 0/600
+[2026-07-22 14:10:13] SHA 缓存已保存: 164505 条, 1 分片
+[2026-07-22 14:10:15] repo info (peasoft/NoMoreWall) 404，跳过[2026-07-22 14:10:15]   👤 用户仓库: 29 个 → 发现队列 (队列: 0/600)[2026-07-22 14:10:15] repo info (ew732e8d8h1hi/q832yqwdu21u) 404，跳过
+
+
+[2026-07-22 14:10:15] ⏱️ [2/147] free proxy nodes pushed:>2026-07-21T06:08:05Z fork:true -lan | 3s | +7926 | 配额 4591/4800[2026-07-22 14:10:15]   用户 Farid-Karimi 共查 29 个仓库[2026-07-22 14:10:15] 🔗 发现仓库链接 ermaozi/get_subscrib (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+
+[2026-07-22 14:10:15] 🔗 递归发现仓库 AzadNetCH/Clash (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+
+[2026-07-22 14:10:15] 仓库在黑名单中: https://github.com/crashgfw/free-airport-nodes
+[2026-07-22 14:10:15] 仓库在黑名单中: https://github.com/lza6/free-VPN
+[2026-07-22 14:10:15] 仓库在黑名单中: https://github.com/guying23/AutoMergePublicNodes
+[2026-07-22 14:10:15] 仓库 https://github.com/rtwo2/FastNodes (分支: main, size: 1748744KB, pushed: 2026-07-22T02:36:38Z)[2026-07-22 14:10:15] 🔗 查子仓库: free-nodes/v2rayfree
+
+[2026-07-22 14:10:18] repo info (ermaozi/get_subscrib) 404，跳过
+[2026-07-22 14:10:18] 🔗 发现仓库链接 Flikify/Free-Node (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)[2026-07-22 14:10:18] ⏭️ 仓库 https://github.com/AzadNetCH/Clash 106h 未更新，跳过解析（追踪 fork 链）
+
+[2026-07-22 14:10:18] 👤 遍历用户仓库: AzadNetCH[2026-07-22 14:10:18] ⏱️ Code [21/97] tuic:// extension:json | 57s | +76078 节点 | 配额 4588/4800
+
+[2026-07-22 14:10:19] 仓库 https://github.com/rtwo2/FastNodes 候选文件较多 (181 个)，先通过 commits API 过滤
+[2026-07-22 14:10:19] ⏱️ Code [22/97] vmess:// extension:txt | 0s | +0 节点 | 配额 4586/4800
+[2026-07-22 14:10:21] ⚠️ 仓库 https://github.com/Flikify/Free-Node 1177h 未更新，废弃 → 加入黑名单
+[2026-07-22 14:10:21] 🔗 发现仓库链接 Flikify/Free-Nod (来源 https://raw.githubusercontent.com/mfuu/v2ray/master/list.json)
+[2026-07-22 14:10:23]   👤 用户仓库: 5 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:23]   用户 AzadNetCH 共查 5 个仓库
+[2026-07-22 14:10:24] 🔗 递归发现仓库 lisylva-lee/v2dyku (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:10:23] ⏱️ Code [23/97] vless:// extension:txt | 4s | +20 节点 | 配额 4579/4800
+[2026-07-22 14:10:26]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:26] 🔗 开始 Fork 链追踪 (free-nodes/v2rayfree)
+[2026-07-22 14:10:26] repo info (lisylva-lee/v2dyku) 404，跳过
+[2026-07-22 14:10:26] 🔗 递归发现仓库 budamu/clashconfig (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-22 14:10:26] ⏱️ [3/147] free v2ray nodes pushed:>2026-07-21T06:08:05Z fork:true -lan | 11s | +2154 | 配额 4575/4800[2026-07-22 14:10:26] ⏱️ Code [24/97] trojan:// extension:txt | 1s | +0 节点 | 配额 4574/4800[2026-07-22 14:10:26] repo info (Flikify/Free-Nod) 404，跳过
+
+
+[2026-07-22 14:10:27] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:10:28] 👤 遍历用户仓库: free-nodes
+[2026-07-22 14:10:28] repo info (budamu/clashconfig) 404，跳过
+[2026-07-22 14:10:28] 订阅链接 http://v2raynode.cczzuu.top/node/20260607-v2ray.txt 连接错误 (尝试 1/2)
+[2026-07-22 14:10:29] ⏱️ Code [25/97] ss:// extension:txt | 2s | +0 节点 | 配额 4570/4800
+[2026-07-22 14:10:29] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:10:29] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:10:30] 📦 批次 0018 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0018.txt (5203 个节点, 累计 110725 个) | 主队列 96/200, 发现队列 0/600
+[2026-07-22 14:10:31] 订阅链接 https://proxypool.laowang.me/clash/proxies 连接错误 (尝试 1/2)
+[2026-07-22 14:10:31] 订阅链接 http://v2raynode.cczzuu.top/node/20260607-v2ray.txt 连接错误 (尝试 2/2)
+[2026-07-22 14:10:31] ⏱️ Code [26/97] ssr:// extension:txt | 2s | +805 节点 | 配额 4567/4800[2026-07-22 14:10:31] 订阅链接 http://v2raynode.cczzuu.top/node/20260607-v2ray.txt 多次失败，已跳过
+
+[2026-07-22 14:10:31] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:10:32] ⏱️ Code [27/97] hysteria2:// extension:txt | 0s | +0 节点 | 配额 4566/4800
+[2026-07-22 14:10:33] 订阅链接 https://proxypool.laowang.me/clash/proxies 连接错误 (尝试 2/2)
+[2026-07-22 14:10:33] 订阅链接 https://proxypool.laowang.me/clash/proxies 多次失败，已跳过
+[2026-07-22 14:10:34] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:10:34] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:10:34]   Compare API 返回 186 个变更文件 (3 次 API 调用)
+[2026-07-22 14:10:34]   commits 过滤: 181 → 181 (变更文件 186 个)
+[2026-07-22 14:10:34] 仓库 https://github.com/rtwo2/FastNodes 候选文件 181 个
+[2026-07-22 14:10:34] ⏱️ Code [28/97] hy2:// extension:txt | 2s | +0 节点 | 配额 4564/4800
+[2026-07-22 14:10:34] ⏱️ Code [29/97] tuic:// extension:txt | 0s | +0 节点 | 配额 4563/4800
+[2026-07-22 14:10:35] ⏱️ Code [30/97] vmess:// extension:conf | 0s | +0 节点 | 配额 4562/4800
+[2026-07-22 14:10:35] Code搜索第1页 返回 403 (尝试 1/2)[2026-07-22 14:10:35] SHA 缓存已保存: 164514 条, 1 分片
+
+[2026-07-22 14:10:36] 触发限流，等待 47s ...[2026-07-22 14:10:36] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:10:36] 订阅链接 https://pc.adlionvm.tk/clash/proxies 连接错误 (尝试 1/2)
+
+[2026-07-22 14:10:38]   用户 free-nodes 共查 0 个仓库
+[2026-07-22 14:10:38] ⏭️ 仓库 https://github.com/wzdnzd/aggregator 137h 未更新，跳过解析（追踪 fork 链）
+[2026-07-22 14:10:38] 🔗 查子仓库: wzdnzd/aggregator
+[2026-07-22 14:10:39] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)[2026-07-22 14:10:39] 订阅链接 https://pc.adlionvm.tk/clash/proxies 连接错误 (尝试 2/2)
+
+[2026-07-22 14:10:39] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过[2026-07-22 14:10:39] 订阅链接 https://pc.adlionvm.tk/clash/proxies 多次失败，已跳过
+
+[2026-07-22 14:10:41] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:10:42] 👤 遍历用户仓库: mfuu
+[2026-07-22 14:10:43] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:10:43] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:10:44] ⏱️ [4/147] free clash nodes pushed:>2026-07-21T06:08:05Z fork:true -lan | 17s | +1027 | 配额 4556/4800
+[2026-07-22 14:10:44]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:44] 🔗 开始 Fork 链追踪 (wzdnzd/aggregator)
+[2026-07-22 14:10:45] 👤 遍历用户仓库: wzdnzd
+[2026-07-22 14:10:45] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:10:46]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:46]   用户 mfuu 共查 30 个仓库
+[2026-07-22 14:10:46] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 返回 400 (尝试 1/2)
+[2026-07-22 14:10:46] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 错误，等待 5s 后重试...
+[2026-07-22 14:10:47] ⏱️ [5/147] free trojan nodes pushed:>2026-07-21T06:08:05Z fork:true -la | 3s | +4129 | 配额 4550/4800
+[2026-07-22 14:10:47] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:10:47] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:10:47]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-22 14:10:47]   用户 wzdnzd 共查 30 个仓库
+[2026-07-22 14:10:47] 仓库 https://github.com/aiboboxx/v2rayfree (分支: main, size: 20422KB, pushed: 2026-07-22T02:56:44Z)
+[2026-07-22 14:10:48] ⏱️ [6/147] free hysteria nodes pushed:>2026-07-21T06:08:05Z fork:true - | 0s | +752 | 配额 4549/4800
+[2026-07-22 14:10:48] 📦 批次 0019 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0019.txt (5112 个节点, 累计 115842 个) | 主队列 94/200, 发现队列 0/600
+[2026-07-22 14:10:50] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:10:51] 订阅链接 https://freedog.buzz/link/qjlYYgPi5S1qSiwo?clash=1|https://w 异常: Exceeded 30 redirects. (尝试 1/2)
+[2026-07-22 14:10:51] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 返回 400 (尝试 2/2)
+[2026-07-22 14:10:51] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 错误，等待 7s 后重试...
+[2026-07-22 14:10:52] SHA 缓存已保存: 164633 条, 1 分片
+[2026-07-22 14:10:52] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:10:52] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:10:53] 仓库 https://github.com/aiboboxx/v2rayfree 无候选文件 (总计 11 blob, 扩展名过滤 0, processed_shas 跳过 5, SHA 缓存跳过 6)
+[2026-07-22 14:10:53] 🔗 查子仓库: aiboboxx/v2rayfree
+[2026-07-22 14:10:55] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 1/2)
+[2026-07-22 14:10:56] ⏱️ [7/147] free vless nodes pushed:>2026-07-21T06:08:05Z fork:true -lan | 8s | +181 | 配额 4545/4800
+[2026-07-22 14:10:57] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 连接错误 (尝试 2/2)
+[2026-07-22 14:10:57] 订阅链接 https://proxy.huwo.club/v2ray.txt?ch=1&js=eyJhbGciOiJIUzI1Ni 多次失败，已跳过
+[2026-07-22 14:10:58] 订阅链接 https://pub-api-1.bianyuan.xyz/sub?target=(OutputFormat)&url 多次失败，已跳过
