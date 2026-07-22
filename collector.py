@@ -573,9 +573,11 @@ class Collector:
                 errors["Code"] = str(e)
                 import traceback; traceback.print_exc()
 
-        # ── 等待 GitHub 线程完成 ──
+        # ── 等待 GitHub 线程完成（超时 10 分钟防止死锁） ──
         if GITHUB_SEARCH_ENABLED:
-            t_gh.join()
+            t_gh.join(timeout=600)
+            if t_gh.is_alive():
+                print(f"[{now_str()}] ⚠️ GitHub 搜索线程超时未完成，跳过", flush=True)
 
         # ── 等待队列清空（限流期间可能很慢，加超时保护） ──
         print(f"[{now_str()}] ⏳ 等待队列清空 (主队列 {main_queue.qsize()}, "
@@ -745,11 +747,14 @@ class Collector:
         while True:
             # 优先取发现队列（fork 链/用户仓库/raw 递归，高产）
             item = None
+            from_queue = None  # 记录任务来源队列
             try:
                 item = disc_queue.get_nowait()
+                from_queue = disc_queue
             except Exception:
                 try:
                     item = main_queue.get(timeout=30)
+                    from_queue = main_queue
                 except Exception:
                     tn = threading.current_thread().name
                     last = self._worker_idle_since.get(tn, 0)
@@ -784,7 +789,8 @@ class Collector:
                 traceback.print_exc()
                 print(f"[{now_str()}] ⚠️ Worker 异常: {repo}: {e}", flush=True)
             finally:
-                task_queue.task_done()
+                if from_queue is not None:
+                    from_queue.task_done()
 
     def _search_query_to_queue(self, query: str, task_queue: Queue):
         """搜索单个关键词，结果直接放进线程池队列。"""
@@ -812,12 +818,17 @@ class Collector:
                 if not self._check_and_add_seen(repo) or self._check_blacklist(github_url):
                     continue
                 self.checked_count += 1
-                task_queue.put(("GitHub", repo,
-                                {"branch": item.get("default_branch", "main"),
-                                 "size": item.get("size", 0),
-                                 "disabled": item.get("disabled", False),
-                                 "pushed_at": item.get("pushed_at", "")}))
-                self._log_main_queue()
+                try:
+                    task_queue.put(("GitHub", repo,
+                                    {"branch": item.get("default_branch", "main"),
+                                     "size": item.get("size", 0),
+                                     "disabled": item.get("disabled", False),
+                                     "pushed_at": item.get("pushed_at", "")}),
+                                   timeout=60)
+                    self._log_main_queue()
+                except Exception:
+                    print(f"[{now_str()}] ⚠️ 主队列超时 60s 无空间，搜索中断", flush=True)
+                    return
             time.sleep(PAGE_SLEEP_SECONDS)
 
     def _collect_code(self, task_queue: Queue):
@@ -916,11 +927,15 @@ class Collector:
                         # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
                         if self._check_and_add_seen(repo_name):
                             self.checked_count += 1
-                            task_queue.put(("Code", repo_name,
-                                            {"branch": default_branch,
-                                             "size": repo_data.get("size", -1),
-                                             "disabled": False,
-                                             "pushed_at": repo_data.get("pushed_at", "")}))
+                            try:
+                                task_queue.put(("Code", repo_name,
+                                                {"branch": default_branch,
+                                                 "size": repo_data.get("size", -1),
+                                                 "disabled": False,
+                                                 "pushed_at": repo_data.get("pushed_at", "")}),
+                                               timeout=60)
+                            except Exception:
+                                return  # 主队列超时，中断 code search
 
                 time.sleep(PAGE_SLEEP_SECONDS)
 
@@ -1843,7 +1858,11 @@ class Collector:
             r'|quantumult|surge|loon|stash)\b[^\s"\']{0,200}',
             content, re.IGNORECASE):
             _url = _m.group(0).rstrip('.,;:!?)"\']')
-            if 'github.com' not in _url and 'raw.githubusercontent.com' not in _url:
+            _black = ('google.com', 'star-history.com', 'play.google.com',
+                       'apple.com', 'microsoft.com', 'facebook.com', 'twitter.com',
+                       'youtube.com', 'reddit.com', 'wikipedia.org')
+            if ('github.com' not in _url and 'raw.githubusercontent.com' not in _url
+                    and not any(d in _url for d in _black)):
                 _sub_urls.add(_url)
         for _url in list(_sub_urls)[:5]:  # 最多 5 个，避免过度下载
             try:
