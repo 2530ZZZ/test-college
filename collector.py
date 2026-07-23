@@ -37,7 +37,7 @@ from config import (
     PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
     FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
     MAX_PARENT_TRACE_DEPTH, FORK_CHAIN_CHILD_DEPTH,
-    AUTO_SEED_ENABLED, AUTO_SEED_MIN_CONSECUTIVE, AUTO_SEED_MIN_NODES,
+    AUTO_SEED_ENABLED,
     TOPIC_SEARCH_ENABLED, TOPIC_QUERIES, REPO_MAX_AGE_HOURS,
     README_SEARCH_ENABLED, README_QUERIES, README_MAX_PAGES,
     CODE_SEARCH_ENABLED, CODE_QUERIES, CODE_MAX_PAGES,
@@ -45,13 +45,16 @@ from config import (
     USER_REPOS_ENABLED, USER_REPOS_MAX_PER_USER,
     VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
     SHARED_POOL_WORKERS,
-    MAIN_QUEUE_SIZE, DISCOVERY_QUEUE_SIZE,
+    MAIN_QUEUE_SIZE, DISCOVERY_QUEUE_SIZE, MAIN_QUEUE_HALT,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
+    AUTO_SEED_SORT_WINDOW_HOURS,
+    SEEN_REPOS_PERSIST_ENABLED, SEEN_REPOS_DIR, SEEN_REPOS_MAX_BYTES,
+    SUB_URL_MAX_PER_FILE, SAFE_WRITE_ENABLED,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
     GITHUB_SEARCH_ENABLED, QUOTA_MAX_PER_HOUR,
     SKIP_PROCESSING_AGE_HOURS,
-    QUEUE_DRAIN_TIMEOUT_SECONDS, QUEUE_PUT_TIMEOUT_SECONDS,
+    QUEUE_PUT_TIMEOUT_SECONDS,
     BLACKLIST_EVICTION_ENABLED, BLACKLIST_EVICTION_RATIO,
     LOG_FAILED_CANDIDATES,
     PARALLEL_DOWNLOAD_MB_HIGH, PARALLEL_DOWNLOAD_MB_MED,
@@ -117,6 +120,9 @@ class Collector:
         self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
         self._main_queue_was_full = False              # 主队列满状态追踪
         self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
+        self.seen_cache: Dict[str, str] = {}            # 已处理仓库持久化
+        self._sub_urls_seen: Set[str] = set()           # 订阅链接跨文件去重
+        self._sub_urls_seen.clear()
 
         # 批次持久化（共享）
         self.batch_buffer: List[str] = []
@@ -140,6 +146,7 @@ class Collector:
         # 加载持久化状态
         self.load_blacklist()
         self.load_sha_cache()
+        self.load_seen_cache()
 
     # ── 线程安全 HTTP 客户端 ──
 
@@ -154,6 +161,77 @@ class Collector:
         self._http_local.http = val
 
     # ==================== 持久化 IO ====================
+
+    @staticmethod
+    def _safe_write(filepath: str, content: str, mode: str = "w"):
+        """安全写入：先写 tmp 再 rename，防崩溃丢数据。"""
+        if not SAFE_WRITE_ENABLED:
+            with open(filepath, mode, encoding="utf-8") as f:
+                f.write(content)
+            return
+        import tempfile, os as _os
+        _dir = _os.path.dirname(filepath) or "."
+        _fd, _tmp = tempfile.mkstemp(dir=_dir, suffix=".tmp")
+        try:
+            with open(_fd, mode, encoding="utf-8") as f:
+                f.write(content)
+            _os.replace(_tmp, filepath)
+        except Exception:
+            _os.unlink(_tmp)
+
+    def load_seen_cache(self):
+        """加载已处理仓库缓存（分片 pickle）。"""
+        if not SEEN_REPOS_PERSIST_ENABLED:
+            return
+        if not os.path.isdir(SEEN_REPOS_DIR):
+            self.seen_cache = {}
+            return
+        self.seen_cache = {}
+        try:
+            for fname in sorted(os.listdir(SEEN_REPOS_DIR)):
+                if fname.endswith('.pkl'):
+                    with open(os.path.join(SEEN_REPOS_DIR, fname), 'rb') as f:
+                        self.seen_cache.update(pickle.load(f))
+        except Exception:
+            self.seen_cache = {}
+        print(f"[{now_str()}] 加载已处理仓库缓存 {len(self.seen_cache)} 条", flush=True)
+
+    def save_seen_cache(self):
+        """保存已处理仓库缓存到分片 pickle。"""
+        if not SEEN_REPOS_PERSIST_ENABLED or not self.seen_cache:
+            return
+        os.makedirs(SEEN_REPOS_DIR, exist_ok=True)
+        for old in os.listdir(SEEN_REPOS_DIR):
+            if old.endswith('.pkl'):
+                os.remove(os.path.join(SEEN_REPOS_DIR, old))
+        items = sorted(self.seen_cache.items())
+        chunk, seq = {}, 0
+        for k, v in items:
+            chunk[k] = v
+            if len(chunk) * 120 >= SEEN_REPOS_MAX_BYTES:
+                with open(os.path.join(SEEN_REPOS_DIR, f"seen_{seq:04d}.pkl"), 'wb') as f:
+                    pickle.dump(chunk, f)
+                chunk.clear(); seq += 1
+        if chunk:
+            with open(os.path.join(SEEN_REPOS_DIR, f"seen_{seq:04d}.pkl"), 'wb') as f:
+                pickle.dump(chunk, f)
+
+    def _check_seen_cache(self, repo: str, pushed_at: str) -> bool:
+        """检查已处理仓库缓存。True=可跳过，False=需要处理。"""
+        if not SEEN_REPOS_PERSIST_ENABLED or not pushed_at:
+            return False
+        r = repo.lower()
+        if r in self.seen_cache and self.seen_cache[r] == pushed_at:
+            self.seen_cache[r] = pushed_at  # touch LRU
+            return True
+        return False
+
+    def _mark_seen_cache(self, repo: str, pushed_at: str):
+        """标记仓库已处理。"""
+        if SEEN_REPOS_PERSIST_ENABLED and pushed_at:
+            self.seen_cache[repo.lower()] = pushed_at
+
+    def _check_blacklist(self, github_url: str) -> bool:
 
     def _add_seen(self, repo: str):
         """标记仓库为已处理（大小写不敏感），线程安全。"""
@@ -179,18 +257,18 @@ class Collector:
             return True
 
     def _log_main_queue(self):
-        """主队列满/恢复时打印日志。"""
+        """主队列满/恢复时打印日志（磁滞：180 停 / 20 启）。"""
         mq = getattr(self, '_task_queue', None)
         if not mq:
             return
         sz = mq.qsize()
         cap = mq.maxsize
-        if sz >= cap and not self._main_queue_was_full:
+        if sz >= MAIN_QUEUE_HALT and not self._main_queue_was_full:
             self._main_queue_was_full = True
-            print(f"[{now_str()}] ⏸️  主队列 {sz}/{cap} 满，搜索暂停等待", flush=True)
-        elif sz < cap and self._main_queue_was_full:
+            print(f"[{now_str()}] ⏸️  主队列 {sz}/{cap} ≥ {MAIN_QUEUE_HALT}，搜索暂停等待", flush=True)
+        elif sz < 20 and self._main_queue_was_full:
             self._main_queue_was_full = False
-            print(f"[{now_str()}] ▶️ 主队列 {sz}/{cap}，搜索恢复", flush=True)
+            print(f"[{now_str()}] ▶️ 主队列 {sz}/{cap} < 20，搜索恢复", flush=True)
 
     def _is_repo_dead(self, repo: str) -> bool:
         """检查仓库是否已知不可达（404/403，大小写不敏感）。"""
@@ -351,8 +429,9 @@ class Collector:
         print(f"[{now_str()}] 📦 批次 {seq:04d} 已持久化: "
               f"{filepath} ({node_count} 个节点, 累计 {len(self.unique_nodes)} 个)"
               f" | 主队列 {mq_sz}/{MAIN_QUEUE_SIZE}, 发现队列 {dq_sz}/{DISCOVERY_QUEUE_SIZE}", flush=True)
-        # 批次刷盘时顺带保存 SHA 缓存，防止中途崩溃丢失
+        # 批次刷盘时顺带保存持久化状态，防止中途崩溃丢失
         self.save_sha_cache()
+        self.save_seen_cache()
 
         # 同步写入 no/ 分片和 no_w_li.txt（边搜集边持久化）
         no_dir = os.path.join(os.getcwd(), "no")
@@ -449,16 +528,33 @@ class Collector:
 
     @staticmethod
     def _update_seed_entry(seeds: dict, key: str, new_node_count: int):
-        """更新种子条目：有新节点则刷新时间戳和连续产出计数。"""
+        """更新种子条目：有节点则标记并记录时间。"""
         if key not in seeds:
             seeds[key] = {}
         if new_node_count > 0:
             seeds[key]["last_new_node"] = datetime.now(timezone.utc).isoformat()
-            seeds[key]["total_new_nodes"] = (seeds[key].get("total_new_nodes", 0)
-                                              + new_node_count)
-            seeds[key]["consecutive_runs"] = seeds[key].get("consecutive_runs", 0) + 1
-        else:
-            seeds[key]["consecutive_runs"] = 0
+            seeds[key]["_had_nodes"] = True
+
+    @staticmethod
+    def _sort_seeds(seeds: dict):
+        """种子仓库重排序：24h内更新+有节点→最前，其余→靠后。"""
+        cutoff = (datetime.now(timezone.utc) -
+                  timedelta(hours=AUTO_SEED_SORT_WINDOW_HOURS))
+        def _key(item):
+            _repo, meta = item
+            _last = meta.get("last_new_node", "")
+            try:
+                _dt = datetime.fromisoformat(_last)
+                _recent = _dt > cutoff
+            except Exception:
+                _recent = False
+            _nodes = meta.get("_had_nodes", False)
+            return (0 if (_recent and _nodes) else 1, _last)
+        sorted_items = sorted(seeds.items(), key=_key)
+        seeds.clear()
+        for k, v in sorted_items:
+            v.pop("_had_nodes", None)  # 临时标记，写盘前清理
+            seeds[k] = v
 
     @staticmethod
     def _prune_seeds(seeds: dict) -> dict:
@@ -579,11 +675,9 @@ class Collector:
             if t_gh.is_alive():
                 print(f"[{now_str()}] ⚠️ GitHub 搜索线程超时未完成，跳过", flush=True)
 
-        # ── 等待队列清空（限流期间可能很慢，加超时保护） ──
+        # ── 等待队列清空 ──
         print(f"[{now_str()}] ⏳ 等待队列清空 (主队列 {main_queue.qsize()}, "
               f"发现队列 {disc_queue.qsize()})...", flush=True)
-        queue_start = time.time()
-        QUEUE_DRAIN_TIMEOUT = QUEUE_DRAIN_TIMEOUT_SECONDS
         wait_logged = 0
         while main_queue.qsize() > 0 or disc_queue.qsize() > 0:
             if self.limiter.should_stop() or self._runtime_exceeded():
@@ -597,10 +691,7 @@ class Collector:
                     break
                 print(f"[{now_str()}] 🔄 配额恢复，继续处理", flush=True)
                 continue
-            if time.time() - queue_start > QUEUE_DRAIN_TIMEOUT:
-                print(f"[{now_str()}] ⚠️ 队列清空超时({QUEUE_DRAIN_TIMEOUT}s)，放弃剩余任务", flush=True)
-                break
-            if time.time() - queue_start > wait_logged + 120:
+            if time.time() - wait_logged > 120:
                 print(f"[{now_str()}]   ... 主队列 {main_queue.qsize()}, "
                       f"发现队列 {disc_queue.qsize()}", flush=True)
                 wait_logged = time.time()
@@ -613,7 +704,7 @@ class Collector:
 
         # ── 淘汰无产出来源并写回种子文件 ──
         with self._state_lock:
-            repo_seeds = self._prune_seeds(repo_seeds)
+            self._sort_seeds(repo_seeds)
         self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
 
         # 报告线程错误
@@ -729,13 +820,13 @@ class Collector:
         with self._state_lock:
             self._channel_new_nodes["种子仓库"] = self._channel_new_nodes.get("种子仓库", 0)
 
-        # 自动收录
+        # 自动收录：只要产生节点就标记（不限新节点数）
         if AUTO_SEED_ENABLED:
-            for rk, m in list(repo_seeds.items()):
-                if (m.get("consecutive_runs", 0) >= AUTO_SEED_MIN_CONSECUTIVE
-                        and m.get("total_new_nodes", 0) >= AUTO_SEED_MIN_NODES
-                        and rk not in self._initial_seed_keys):
+            for rk, m in repo_seeds.items():
+                if m.get("_had_nodes") and rk not in self._initial_seed_keys:
                     print(f"[{now_str()}] 🌱 自动收录: {rk}", flush=True)
+            # 排序：24h内更新+有节点 → 最前
+            self._sort_seeds(repo_seeds)
             self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
 
     def _pool_worker(self, main_queue: Queue, disc_queue: Queue):
@@ -917,7 +1008,7 @@ class Collector:
                     try:
                         self._handle_one_file(
                             repo_name, default_branch, file_path,
-                            file_sha, has_nodes_flag, depth=0)
+                            file_sha, has_nodes_flag, raw_depth=0)
                     except RuntimeError:
                         return  # 限流超限
                     except Exception:
@@ -1123,7 +1214,7 @@ class Collector:
                 # 自动种子追踪：搜索发现的仓库也记录产出
                 if AUTO_SEED_ENABLED:
                     new_nodes = len(self.unique_nodes) - before_repo
-                    if new_nodes >= AUTO_SEED_MIN_NODES:
+                    if new_nodes > 0:
                         self._update_seed_entry(repo_seeds, repo, new_nodes)
 
                 time.sleep(REPO_SLEEP_SECONDS)
@@ -1132,7 +1223,7 @@ class Collector:
 
     def process_repo(self, repo: str, branch: str = "main",
                      size: int = -1, disabled: bool = False,
-                     pushed_at: str = "", depth: int = 0,
+                     pushed_at: str = "", raw_depth: int = 0,
                      seed_key: str = None):
         """处理单个仓库。
 
@@ -1145,9 +1236,14 @@ class Collector:
             size: 仓库大小（从搜索结果获取）
             disabled: 是否已禁用（从搜索结果获取）
             pushed_at: 最后推送时间（从搜索结果获取）
-            depth: 递归发现深度
+            raw_depth: raw 递归发现深度
         """
         github_url = f"https://github.com/{repo}"
+
+        # 已处理仓库缓存检查（pushed_at 未变→跳过）
+        if self._check_seen_cache(repo, pushed_at):
+            print(f"[{now_str()}] ⏭️ 仓库 {github_url} 未更新，跳过", flush=True)
+            return
 
         # 黑名单检查
         if self._check_blacklist(github_url):
@@ -1184,12 +1280,12 @@ class Collector:
                     print(f"[{now_str()}] ⏭️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，跳过解析（追踪 fork 链）", flush=True)
                     # 追踪 fork/用户仓库，但不解析本仓库文件
-                    if FORK_CHAIN_ENABLED and depth < MAX_PARENT_TRACE_DEPTH:
+                    if FORK_CHAIN_ENABLED and raw_depth < MAX_PARENT_TRACE_DEPTH:
                         if FORK_CHAIN_CHILD_DEPTH > 0:
-                            self._trace_child_forks(repo, branch, depth)
-                        self._trace_fork_chain(repo, branch, pushed_at, depth)
+                            self._trace_child_forks(repo, branch, raw_depth)
+                        self._trace_fork_chain(repo, branch, pushed_at, raw_depth)
                     if USER_REPOS_ENABLED:
-                        self._trace_user_repos(repo, branch, depth)
+                        self._trace_user_repos(repo, branch, raw_depth)
                     return
             except Exception:
                 pass  # 时间解析失败，放行
@@ -1206,7 +1302,7 @@ class Collector:
         # 主要路径：递归树 API
         if USE_RECURSIVE_TREE:
             success = self._process_with_recursive_tree(
-                repo, branch, has_nodes_flag, depth)
+                repo, branch, has_nodes_flag, raw_depth)
             if not success:
                 # 树 API 404 可能是因为分支名不对（种子仓库进来默认是 main），
                 # 懒查真实分支名，只消耗 1 次 API 调用，然后重试
@@ -1214,7 +1310,7 @@ class Collector:
                 if actual_branch and actual_branch != branch:
                     print(f"[{now_str()}]   分支名修正: {branch} → {actual_branch}", flush=True)
                     success = self._process_with_recursive_tree(
-                        repo, actual_branch, has_nodes_flag, depth)
+                        repo, actual_branch, has_nodes_flag, raw_depth)
 
             if not success:
                 print(f"[{now_str()}] 树 API 失败，回退到 Contents API", flush=True)
@@ -1262,20 +1358,23 @@ class Collector:
                 with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
                     f.write(github_url + "\n")
 
+        # 标记已处理（成功后写入缓存，下次 pushed_at 不变则跳过）
+        self._mark_seen_cache(repo, pushed_at)
+
         # Fork 链追踪：有节点产出的仓库 → 查子仓库 + 回溯父仓库 + 查兄弟仓库
-        if FORK_CHAIN_ENABLED and has_nodes_flag[0] and depth < MAX_PARENT_TRACE_DEPTH:
+        if FORK_CHAIN_ENABLED and has_nodes_flag[0] and raw_depth < MAX_PARENT_TRACE_DEPTH:
             if FORK_CHAIN_CHILD_DEPTH > 0:
-                self._trace_child_forks(repo, branch, depth)
-            self._trace_fork_chain(repo, branch, pushed_at, depth)
+                self._trace_child_forks(repo, branch, raw_depth)
+            self._trace_fork_chain(repo, branch, pushed_at, raw_depth)
 
         # 同用户仓库遍历：有节点产出 → 扫光该用户所有公开仓库
         if USER_REPOS_ENABLED and has_nodes_flag[0]:
-            self._trace_user_repos(repo, branch, depth)
+            self._trace_user_repos(repo, branch, raw_depth)
 
     # ==================== Fork 链追踪 ====================
 
     def _trace_fork_chain(self, repo: str, branch: str,
-                          pushed_at: str, depth: int):
+                          pushed_at: str, raw_depth: int):
         """追溯 fork 仓库的父仓库，遍历其所有 fork 仓库。
 
         触发条件：当前仓库产出了节点（has_nodes=True）。
@@ -1310,7 +1409,7 @@ class Collector:
                                   size=parent.get("size", -1),
                                   disabled=False,
                                   pushed_at=parent.get("pushed_at", ""),
-                                  depth=depth + 1)
+                                  raw_depth=raw_depth + 1)
             except Exception as e:
                 print(f"[{now_str()}]   ⚠️ 父仓库 {parent_name}: {e}", flush=True)
             new_parent = len(self.unique_nodes) - before_parent
@@ -1335,9 +1434,9 @@ class Collector:
                 qualified.append(fork)
 
         if qualified:
-            self._run_fork_batch(qualified, branch, depth, "🍴 兄弟仓库")
+            self._run_fork_batch(qualified, branch, raw_depth, "🍴 兄弟仓库")
 
-    def _process_fork_repo(self, fork: dict, branch: str, depth: int) -> tuple:
+    def _process_fork_repo(self, fork: dict, branch: str, raw_depth: int) -> tuple:
         """处理单个 fork/用户仓库（串行降级路径）。"""
         self.http = HttpClient(token=self.token, rate_limiter=None,
                                quota_manager=self.quota_mgr)
@@ -1349,13 +1448,13 @@ class Collector:
                               size=fork.get("size", -1),
                               disabled=fork.get("disabled", False),
                               pushed_at=fork.get("pushed_at", ""),
-                              depth=depth + 1)
+                              raw_depth=raw_depth + 1)
         except Exception as e:
             print(f"[{now_str()}]   ⚠️ {fork_name}: {e}", flush=True)
         new_nodes = len(self.unique_nodes) - before
         return (fork_name, new_nodes)
 
-    def _trace_child_forks(self, repo: str, branch: str, depth: int):
+    def _trace_child_forks(self, repo: str, branch: str, raw_depth: int):
         """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
         print(f"[{now_str()}] 🔗 查子仓库: {repo}", flush=True)
         qualified = []
@@ -1376,14 +1475,14 @@ class Collector:
                 qualified.append(fork)
 
         if qualified:
-            self._run_fork_batch(qualified, branch, depth, "🍴 子仓库")
+            self._run_fork_batch(qualified, branch, raw_depth, "🍴 子仓库")
 
-    def _run_fork_batch(self, forks: list, branch: str, depth: int, label: str):
+    def _run_fork_batch(self, forks: list, branch: str, raw_depth: int, label: str):
         """提交 fork/用户仓库到发现队列（优先消费，超时可丢弃）。"""
         tq = getattr(self, '_disc_queue', None)
         if not tq:  # 降级：无共用池时串行
             for fork in forks:
-                fn, nn = self._process_fork_repo(fork, branch, depth)
+                fn, nn = self._process_fork_repo(fork, branch, raw_depth)
                 if nn > 0: print(f"[{now_str()}]   {label}: {fn} +{nn}", flush=True)
                 time.sleep(REPO_SLEEP_SECONDS)
             return
@@ -1405,7 +1504,7 @@ class Collector:
         dq_sz = dq.qsize() if dq else 0
         print(f"[{now_str()}]   {label}: {len(forks)} 个 → 发现队列 (队列: {dq_sz}/{DISCOVERY_QUEUE_SIZE})", flush=True)
 
-    def _trace_user_repos(self, repo: str, branch: str, depth: int):
+    def _trace_user_repos(self, repo: str, branch: str, raw_depth: int):
         """遍历同用户名下的所有公开仓库，查是否有节点产出。
 
         触发条件：仓库产出了节点（不管是否重复）。
@@ -1446,7 +1545,7 @@ class Collector:
                 qualified.append(r)
 
         if qualified:
-            self._run_fork_batch(qualified, branch, depth, "👤 用户仓库")
+            self._run_fork_batch(qualified, branch, raw_depth, "👤 用户仓库")
         print(f"[{now_str()}]   用户 {owner} 共查 {len(qualified)} 个仓库", flush=True)
 
     def _check_readme_spam(self, repo: str, branch: str) -> bool:
@@ -1468,7 +1567,7 @@ class Collector:
 
     def _process_with_recursive_tree(self, repo: str, branch: str,
                                      has_nodes: List[bool],
-                                     depth: int = 0) -> bool:
+                                     raw_depth: int = 0) -> bool:
         """使用 git/trees API 获取递归文件树。
 
         一次 API 调用获取全仓库文件列表，然后过滤、下载、提取。
@@ -1567,7 +1666,7 @@ class Collector:
             for file_path, sha, _size in files_to_check:
                 if self.limiter.should_stop():
                     raise RuntimeError("限流超限")
-                self._handle_one_file(repo, branch, file_path, sha, has_nodes, depth)
+                self._handle_one_file(repo, branch, file_path, sha, has_nodes, raw_depth)
         else:
             # 按文件大小升序 → 小文件先跑完释放内存
             files_to_check.sort(key=lambda x: x[2])
@@ -1580,7 +1679,7 @@ class Collector:
                 workers = PARALLEL_DOWNLOAD_WORKERS
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {executor.submit(
-                    self._handle_one_file, repo, branch, fp, s, has_nodes, depth
+                    self._handle_one_file, repo, branch, fp, s, has_nodes, raw_depth
                 ): fp for fp, s, _sz in files_to_check}
                 for future in as_completed(futures):
                     if self.limiter.should_stop():
@@ -1718,7 +1817,7 @@ class Collector:
     # ==================== 文件处理 ====================
 
     def _handle_one_file(self, repo: str, branch: str, file_path: str,
-                         sha: str, has_nodes: List[bool], depth: int):
+                         sha: str, has_nodes: List[bool], raw_depth: int):
         """处理单个文件：下载 → 提取节点 → 去重 → 入 buffer。
 
         使用 uri_parser 协议解析层提取 StandardProxy，
@@ -1844,9 +1943,9 @@ class Collector:
             self._flush_batch()
 
         # ---- raw 链接递归发现 ----
-        if ENABLE_RAW_RECURSIVE and depth < MAX_RECURSIVE_DEPTH \
+        if ENABLE_RAW_RECURSIVE and raw_depth < MAX_RECURSIVE_DEPTH \
                 and self.recursive_count < MAX_RECURSIVE_REPOS:
-            self._discover_recursive(raw_url, content, depth)
+            self._discover_recursive(raw_url, content, raw_depth)
 
         # ---- 订阅链接自动发现（零 API 配额：raw HTTP，非 GitHub） ----
         _sub_urls = set()
@@ -1864,7 +1963,13 @@ class Collector:
             if ('github.com' not in _url and 'raw.githubusercontent.com' not in _url
                     and not any(d in _url for d in _black)):
                 _sub_urls.add(_url)
-        for _url in list(_sub_urls)[:5]:  # 最多 5 个，避免过度下载
+        for _url in list(_sub_urls):
+            if _url in self._sub_urls_seen:
+                continue
+            self._sub_urls_seen.add(_url)
+        _new_urls = [u for u in _sub_urls if u not in self._sub_urls_seen][:SUB_URL_MAX_PER_FILE]
+        for _url in _new_urls:
+            self._sub_urls_seen.add(_url)
             try:
                 _resp = self.http.get(_url, timeout=(8, 15),
                                       operation_name=f"订阅链接 {_url[:60]}")
@@ -1886,7 +1991,7 @@ class Collector:
             except Exception:
                 pass
 
-    def _discover_recursive(self, source_url: str, content: str, depth: int):
+    def _discover_recursive(self, source_url: str, content: str, raw_depth: int):
         """从下载文件中发现其他 GitHub 仓库链接和 raw 链接，递归处理。
 
         两种模式：
@@ -1952,7 +2057,7 @@ class Collector:
                               size=repo_info.get("size", -1),
                               disabled=False,
                               pushed_at=repo_info.get("pushed_at", ""),
-                              depth=depth + 1)
+                              raw_depth=raw_depth + 1)
 
         # ── 处理仓库链接 ──
         for match in repo_pattern.finditer(content):
@@ -1994,7 +2099,7 @@ class Collector:
                               size=repo_info.get("size", -1),
                               disabled=False,
                               pushed_at=repo_info.get("pushed_at", ""),
-                              depth=depth + 1)
+                              raw_depth=raw_depth + 1)
 
     # ==================== 回退路径：Contents API ====================
 
@@ -2086,7 +2191,7 @@ class Collector:
                     continue
 
                 self._handle_one_file(repo, branch, item_path, item_sha,
-                                      has_nodes, depth=0)
+                                      has_nodes, raw_depth=0)
 
     # ==================== 最终输出 ====================
 
