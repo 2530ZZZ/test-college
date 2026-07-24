@@ -232,6 +232,11 @@ class Collector:
             self.seen_cache[repo.lower()] = pushed_at
 
     def _check_blacklist(self, github_url: str) -> bool:
+        """检查 URL 是否在黑名单中，命中时标记为"热"条目。"""
+        if github_url in self.blacklist_repos:
+            self._blacklist_touched.add(github_url)
+            return True
+        return False
 
     def _add_seen(self, repo: str):
         """标记仓库为已处理（大小写不敏感），线程安全。"""
