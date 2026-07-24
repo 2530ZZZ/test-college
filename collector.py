@@ -1853,8 +1853,8 @@ class Collector:
             return  # 解码失败 → 不标记（下次重试）
 
         # 清洗 surrogate 字符：urllib.parse.quote() 无法处理 \ud800-\udfff
-        # encode/decode 的 errors='replace' 在 Python 3.12 部分 surrogate 组合下不稳定
-        content = re.sub(r'[\ud800-\udfff]', '�', content)
+        # Python 3 正则引擎不匹配 surrogate（非法 Unicode），改用 encode/decode
+        content = content.encode('utf-8', errors='surrogatepass').decode('utf-8', errors='replace')
 
         content_size_mb = len(content) / 1024 / 1024
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
