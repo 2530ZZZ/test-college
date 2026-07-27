@@ -121,6 +121,8 @@ class Collector:
         self._search_resume = threading.Event()         # Worker 唤醒搜索的信号
         self._search_resume.set()                       # 初始允许搜索
         self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
+        self._worker_repo_count: Dict[str, int] = {}   # Worker 处理仓库计数
+        self._main_queue_total: int = 0                # 主队列总计（不含 fork/raw/用户）
         self.seen_cache: Dict[str, str] = {}            # 已处理仓库持久化
         self._sub_urls_seen: Set[str] = set()           # 订阅链接跨文件去重
         self._sub_urls_seen.clear()
@@ -238,6 +240,12 @@ class Collector:
             self._blacklist_touched.add(github_url)
             return True
         return False
+
+    def _wlog(self, msg: str):
+        """Worker 前缀日志：主线程无前缀，Worker 带 [W-N]."""
+        tn = getattr(self, '_worker_prefix', '')
+        prefix = f"[{tn}] " if tn else ""
+        print(f"[{now_str()}] {prefix}{msg}", flush=True)
 
     def _add_seen(self, repo: str):
         """标记仓库为已处理（大小写不敏感），线程安全。"""
@@ -723,6 +731,7 @@ class Collector:
         print(f"[{now_str()}] ⏳ 等待队列清空 (主队列 {main_queue.qsize()}, "
               f"发现队列 {disc_queue.qsize()})...", flush=True)
         wait_logged = 0
+        heartbeat_time = time.time()
         while main_queue.qsize() > 0 or disc_queue.qsize() > 0:
             if self.limiter.should_stop() or self._runtime_exceeded():
                 print(f"[{now_str()}] ⚠️ 停止信号，放弃剩余任务", flush=True)
@@ -733,9 +742,20 @@ class Collector:
                     break
                 print(f"[{now_str()}] 🔄 配额恢复，继续处理", flush=True)
                 continue
+            # 10分钟心跳
+            if time.time() - heartbeat_time > 600:
+                heartbeat_time = time.time()
+                elapsed = time.time() - self._start_time
+                wc = ", ".join(f"{k} {v}" for k, v in
+                               sorted(self._worker_repo_count.items()))
+                print(f"[{now_str()}] ⏱️ 运行 {elapsed:.0f}s | "
+                      f"节点 {len(self.unique_nodes)} | "
+                      f"已发现 {self._main_queue_total} 仓库 | "
+                      f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
+                      f"主队列 {main_queue.qsize()}/{MAIN_QUEUE_SIZE} "
+                      f"发现队列 {disc_queue.qsize()}/{DISCOVERY_QUEUE_SIZE} | "
+                      f"Worker: {wc}", flush=True)
             if time.time() - wait_logged > 120:
-                print(f"[{now_str()}]   ... 主队列 {main_queue.qsize()}, "
-                      f"发现队列 {disc_queue.qsize()}", flush=True)
                 wait_logged = time.time()
             time.sleep(3)
         print(f"[{now_str()}] 队列处理完毕", flush=True)
@@ -761,6 +781,7 @@ class Collector:
                 br = ri.get("default_branch", "main")
                 self._branch_cache[repo] = br
                 self._add_seen(repo)
+                self._main_queue_total += 1
                 task_queue.put(("种子仓库", repo,
                                 {"branch": br, "size": ri.get("size", -1),
                                  "disabled": False, "pushed_at": ri.get("pushed_at", ""),
@@ -846,8 +867,14 @@ class Collector:
                 self.http = HttpClient(token=self.token, rate_limiter=None,
                                        quota_manager=self.quota_mgr)
                 before = len(self.unique_nodes)
+                self._worker_prefix = threading.current_thread().name
+                self._wlog(f"🔧 开始处理 {repo}")
                 self.process_repo(repo, **kwargs)
                 new_nodes = len(self.unique_nodes) - before
+                self._wlog(f"✅ 完成 {repo} (+{new_nodes} 节点)")
+                tn = threading.current_thread().name
+                self._worker_repo_count[tn] = self._worker_repo_count.get(tn, 0) + 1
+                self._worker_prefix = ""
                 ch = self._channel_new_nodes
                 ch[source] = ch.get(source, 0) + new_nodes
                 # 种子仓库产出也更新对应种子条目
@@ -888,6 +915,7 @@ class Collector:
                 if not self._check_and_add_seen(repo) or self._check_blacklist(github_url):
                     continue
                 self.checked_count += 1
+                self._main_queue_total += 1
                 task_queue.put(("GitHub", repo,
                                 {"branch": item.get("default_branch", "main"),
                                  "size": item.get("size", 0),
@@ -991,6 +1019,7 @@ class Collector:
                         # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
                         if self._check_and_add_seen(repo_name):
                             self.checked_count += 1
+                            self._main_queue_total += 1
                             task_queue.put(("Code", repo_name,
                                             {"branch": default_branch,
                                              "size": repo_data.get("size", -1),
@@ -1060,6 +1089,7 @@ class Collector:
         print(f"  ─────────────────────────")
         print(f"  节点总数: {len(self.unique_nodes)}, "
               f"批次: {len(self.batch_file_paths)}, "
+              f"主队列仓库: {self._main_queue_total}, "
               f"源链接: {len(self.all_links)}")
         print(f"  新增节点: {total_new}, 总API: {qs['total']}")
         print(f"  配额剩余: {qs['remaining']}/{QUOTA_MAX_PER_HOUR}"
@@ -1264,7 +1294,7 @@ class Collector:
         if branch == "main" and repo in self._branch_cache and self._branch_cache[repo]:
             branch = self._branch_cache[repo]
 
-        print(f"[{now_str()}] 仓库 {github_url} (分支: {branch}, "
+        self._wlog(f"仓库 {github_url} (分支: {branch}, "
               f"size: {size}KB, pushed: {pushed_at})", flush=True)
 
         has_nodes_flag = [False]
