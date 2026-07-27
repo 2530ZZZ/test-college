@@ -1,0 +1,14 @@
+[2026-07-27 18:08:40] 🚀 程序启动
+[2026-07-27 18:08:40] 关键词: 105 个
+[2026-07-27 18:08:40] 已加载黑名单: 9808 个
+[2026-07-27 18:08:41] 加载 SHA 缓存 197312 条 (1 分片)
+[2026-07-27 18:08:41] 🚀 程序启动 | 配额上限 4800/小时
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/main.py", line 106, in <module>
+    main()
+  File "/home/runner/work/test-college/test-college/main.py", line 93, in main
+    collector.run()
+  File "/home/runner/work/test-college/test-college/collector.py", line 666, in run
+    if SEED_STAGE_ENABLED and not self._runtime_exceeded():
+       ^^^^^^^^^^^^^^^^^^
+NameError: name 'SEED_STAGE_ENABLED' is not defined
