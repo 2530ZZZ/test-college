@@ -122,6 +122,18 @@ class StandardProxy:
         if self.raw_link:
             return self.raw_link
 
+        # 兜底清洗：无论哪个解析路径产出的 remark/sni/uuid，
+        # 都可能残留 surrogate 字符（如 YAML 正则路径未解码 \uXXXX）
+        for _attr in ('remark', 'sni', 'uuid', 'transport', 'security'):
+            _val = getattr(self, _attr, '')
+            if isinstance(_val, str) and _val:
+                try:
+                    setattr(self, _attr,
+                            _val.encode('utf-8', errors='surrogatepass')
+                               .decode('utf-8', errors='replace'))
+                except Exception:
+                    pass
+
         p = self.protocol.lower()
         host = f"{self.server}:{self.port}"
         userinfo = quote(str(self.uuid or ""), safe='')
