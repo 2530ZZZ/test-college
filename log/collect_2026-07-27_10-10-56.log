@@ -1,0 +1,889 @@
+[2026-07-27 18:10:56] 🚀 程序启动
+[2026-07-27 18:10:56] 关键词: 105 个
+[2026-07-27 18:10:56] 已加载黑名单: 9808 个
+[2026-07-27 18:10:57] 加载 SHA 缓存 197312 条 (1 分片)
+[2026-07-27 18:10:57] 🚀 程序启动 | 配额上限 4800/小时
+[2026-07-27 18:10:57] 🔵 阶段 1: 种子仓库 (38 个)
+[2026-07-27 18:10:57] 🔵 种子仓库: 38 个 → 队列
+[2026-07-27 18:10:57] [W-0] 🔧 开始处理 mahdibland/V2RayAggregator
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:10:57] ⚠️ Worker 异常: mahdibland/V2RayAggregator: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:10:58] [W-1] 🔧 开始处理 gfpcom/free-proxy-list
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:10:58] ⚠️ Worker 异常: gfpcom/free-proxy-list: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:10:58] [W-2] 🔧 开始处理 ninjastrikers/nexus-nodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:10:58] ⚠️ Worker 异常: ninjastrikers/nexus-nodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:10:59] [W-3] 🔧 开始处理 ermaozi/get_subscribe
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:10:59] ⚠️ Worker 异常: ermaozi/get_subscribe: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:00] [W-0] 🔧 开始处理 pawdroid/Free-servers
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:00] ⚠️ Worker 异常: pawdroid/Free-servers: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:01] [W-1] 🔧 开始处理 sevcator/5ubscrpt10n
+[2026-07-27 18:11:01] ⏭️ 仓库 https://github.com/sevcator/5ubscrpt10n 44h 未更新，跳过解析（追踪 fork 链）
+[2026-07-27 18:11:01] 🔗 查子仓库: sevcator/5ubscrpt10n
+[2026-07-27 18:11:01] [W-2] 🔧 开始处理 roosterkid/openproxylist
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:01] ⚠️ Worker 异常: roosterkid/openproxylist: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:02]   🍴 子仓库: 23 个 → 发现队列 (队列: 0/600)
+[2026-07-27 18:11:02] 🔗 开始 Fork 链追踪 (sevcator/5ubscrpt10n)
+[2026-07-27 18:11:03] 👤 遍历用户仓库: sevcator
+[2026-07-27 18:11:03] [W-3] 🔧 开始处理 V2RayRoot/V2RayConfig
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:03] ⚠️ Worker 异常: V2RayRoot/V2RayConfig: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:04] [W-0] 🔧 开始处理 Farid-Karimi/Config-Collector
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:04] ⚠️ Worker 异常: Farid-Karimi/Config-Collector: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:04]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-27 18:11:04]   用户 sevcator 共查 30 个仓库
+[2026-07-27 18:11:04] [W-0] ✅ 完成 sevcator/5ubscrpt10n (+0 节点)
+[2026-07-27 18:11:07] [W-2] 🔧 开始处理 ehsanghaffar/config-sub-platform
+[2026-07-27 18:11:07] 仓库在黑名单中: https://github.com/ehsanghaffar/config-sub-platform
+[2026-07-27 18:11:07] [W-2] ✅ 完成 ehsanghaffar/config-sub-platform (+0 节点)
+[2026-07-27 18:11:08] [W-3] 🔧 开始处理 Airuop/config-fetcher
+[2026-07-27 18:11:08] 仓库在黑名单中: https://github.com/Airuop/config-fetcher
+[2026-07-27 18:11:08] [W-3] ✅ 完成 Airuop/config-fetcher (+0 节点)
+[2026-07-27 18:11:09] [W-0] 🔧 开始处理 free-nodes/v2rayfree
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:09] ⚠️ Worker 异常: free-nodes/v2rayfree: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:09] [W-1] 🔧 开始处理 crashgfw/free-airport-nodes
+[2026-07-27 18:11:09] 仓库在黑名单中: https://github.com/crashgfw/free-airport-nodes
+[2026-07-27 18:11:09] [W-1] ✅ 完成 crashgfw/free-airport-nodes (+0 节点)
+[2026-07-27 18:11:10] [W-2] 🔧 开始处理 lza6/free-VPN
+[2026-07-27 18:11:10] 仓库在黑名单中: https://github.com/lza6/free-VPN
+[2026-07-27 18:11:10] [W-2] ✅ 完成 lza6/free-VPN (+0 节点)
+[2026-07-27 18:11:11] [W-3] 🔧 开始处理 guying23/AutoMergePublicNodes
+[2026-07-27 18:11:11] 仓库在黑名单中: https://github.com/guying23/AutoMergePublicNodes
+[2026-07-27 18:11:11] [W-3] ✅ 完成 guying23/AutoMergePublicNodes (+0 节点)
+[2026-07-27 18:11:12] [W-0] 🔧 开始处理 rtwo2/FastNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:12] ⚠️ Worker 异常: rtwo2/FastNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:12] [W-1] 🔧 开始处理 wzdnzd/aggregator
+[2026-07-27 18:11:12] ⏭️ 仓库 https://github.com/wzdnzd/aggregator 106h 未更新，跳过解析（追踪 fork 链）
+[2026-07-27 18:11:12] 🔗 查子仓库: wzdnzd/aggregator
+[2026-07-27 18:11:13] [W-2] 🔧 开始处理 aiboboxx/v2rayfree
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:13] ⚠️ Worker 异常: aiboboxx/v2rayfree: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:14]   🍴 子仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-27 18:11:14] 🔗 开始 Fork 链追踪 (wzdnzd/aggregator)
+[2026-07-27 18:11:14] [W-3] 🔧 开始处理 awesome-vpn/awesome-vpn
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:14] ⚠️ Worker 异常: awesome-vpn/awesome-vpn: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:14] 👤 遍历用户仓库: wzdnzd
+[2026-07-27 18:11:15] [W-0] 🔧 开始处理 bruceblink/free-v2ray
+[2026-07-27 18:11:15] 仓库在黑名单中: https://github.com/bruceblink/free-v2ray
+[2026-07-27 18:11:15] [W-0] ✅ 完成 bruceblink/free-v2ray (+0 节点)
+[2026-07-27 18:11:15]   👤 用户仓库: 30 个 → 发现队列 (队列: 0/600)
+[2026-07-27 18:11:15]   用户 wzdnzd 共查 30 个仓库
+[2026-07-27 18:11:15] ✅ 完成 wzdnzd/aggregator (+0 节点)
+[2026-07-27 18:11:16] [W-2] 🔧 开始处理 Mr-Meshky/vify
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:16] ⚠️ Worker 异常: Mr-Meshky/vify: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:16] [W-3] 🔧 开始处理 pog7x/vpn-configs
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:16] ⚠️ Worker 异常: pog7x/vpn-configs: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:17] [W-0] 🔧 开始处理 mheidari98/.proxy
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:17] ⚠️ Worker 异常: mheidari98/.proxy: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:18] [W-1] 🔧 开始处理 yitong2333/proxy-minging
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:18] ⚠️ Worker 异常: yitong2333/proxy-minging: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:19] [W-2] 🔧 开始处理 MhdiTaheri/V2rayCollector_Py
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:19] ⚠️ Worker 异常: MhdiTaheri/V2rayCollector_Py: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:19] [W-3] 🔧 开始处理 mohamadfg-dev/telegram-v2ray-configs-collector
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:19] ⚠️ Worker 异常: mohamadfg-dev/telegram-v2ray-configs-collector: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:20] [W-0] 🔧 开始处理 free18/v2ray
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:20] ⚠️ Worker 异常: free18/v2ray: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:21] [W-1] 🔧 开始处理 Epodonios/v2ray-configs
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:21] ⚠️ Worker 异常: Epodonios/v2ray-configs: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:22] [W-2] 🔧 开始处理 acymz/AutoVPN
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:22] ⚠️ Worker 异常: acymz/AutoVPN: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:22] [W-3] 🔧 开始处理 snakem982/proxypool
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:22] ⚠️ Worker 异常: snakem982/proxypool: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:23] [W-0] 🔧 开始处理 Leon406/SubCrawler
+[2026-07-27 18:11:23] 仓库在黑名单中: https://github.com/Leon406/SubCrawler
+[2026-07-27 18:11:23] [W-0] ✅ 完成 Leon406/SubCrawler (+0 节点)
+[2026-07-27 18:11:24] [W-1] 🔧 开始处理 603711936/SmartSub
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:24] ⚠️ Worker 异常: 603711936/SmartSub: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:25] [W-2] 🔧 开始处理 Triton-ix/v2ray-Finder
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:25] ⚠️ Worker 异常: Triton-ix/v2ray-Finder: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:25] repo info (alanbobs999/TopFreeProxies) 返回 403 (尝试 1/2)
+[2026-07-27 18:11:25] repo info (alanbobs999/TopFreeProxies) 403（访问被拒，配额剩余 4927），跳过
+[2026-07-27 18:11:26] [W-3] 🔧 开始处理 wrfree/free
+[2026-07-27 18:11:26] 仓库在黑名单中: https://github.com/wrfree/free
+[2026-07-27 18:11:26] [W-3] ✅ 完成 wrfree/free (+0 节点)
+[2026-07-27 18:11:26] [W-0] 🔧 开始处理 barry-far/V2ray-Config
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:26] ⚠️ Worker 异常: barry-far/V2ray-Config: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:27] [W-1] 🔧 开始处理 Ruk1ng001/freeSub
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:27] ⚠️ Worker 异常: Ruk1ng001/freeSub: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:11:28] [W-2] 🔧 开始处理 learnhard-cn/free_proxy_ss
+[2026-07-27 18:11:28] 仓库在黑名单中: https://github.com/learnhard-cn/free_proxy_ss
+[2026-07-27 18:11:28] [W-2] ✅ 完成 learnhard-cn/free_proxy_ss (+0 节点)
+[2026-07-27 18:11:29] ⏳ 等待队列清空 (主队列 0, 发现队列 0)...
+[2026-07-27 18:11:29] 队列处理完毕
+[2026-07-27 18:11:29] 🔵 阶段 2: Code Search (97 个词)
+[2026-07-27 18:11:29] ⏱️ Code [1/97] vmess:// extension:yaml | 0s | +0 节点 | 配额 4751/4800
+[2026-07-27 18:11:29] ⏱️ Code [2/97] vless:// extension:yaml | 0s | +0 节点 | 配额 4750/4800
+[2026-07-27 18:11:29] ⏱️ Code [3/97] trojan:// extension:yaml | 0s | +0 节点 | 配额 4749/4800
+[2026-07-27 18:11:30] ⏱️ Code [4/97] ss:// extension:yaml | 0s | +0 节点 | 配额 4748/4800
+[2026-07-27 18:11:30] ⏱️ Code [5/97] ssr:// extension:yaml | 0s | +0 节点 | 配额 4747/4800
+[2026-07-27 18:11:30] ⏱️ Code [6/97] hysteria2:// extension:yaml | 0s | +0 节点 | 配额 4746/4800
+[2026-07-27 18:11:32] ⏱️ Code [7/97] hy2:// extension:yaml | 2s | +0 节点 | 配额 4745/4800
+[2026-07-27 18:11:32] ⏱️ Code [8/97] tuic:// extension:yaml | 0s | +0 节点 | 配额 4744/4800
+[2026-07-27 18:11:33] ⏱️ Code [9/97] vmess:// extension:yml | 0s | +0 节点 | 配额 4743/4800
+[2026-07-27 18:11:33] ⏱️ Code [10/97] vless:// extension:yml | 0s | +0 节点 | 配额 4742/4800
+[2026-07-27 18:11:33] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:11:33] 触发限流，等待 61s ...
+[2026-07-27 18:11:56] ⏳ W-3 等待任务中...
+[2026-07-27 18:11:56] ⏳ W-0 等待任务中...
+[2026-07-27 18:11:57] ⏳ W-1 等待任务中...
+[2026-07-27 18:11:58] ⏳ W-2 等待任务中...
+[2026-07-27 18:12:34] ⏱️ Code [11/97] trojan:// extension:yml | 61s | +0 节点 | 配额 4740/4800
+[2026-07-27 18:12:34] ⏱️ Code [12/97] ss:// extension:yml | 0s | +0 节点 | 配额 4739/4800
+[2026-07-27 18:12:35] ⏱️ Code [13/97] hysteria2:// extension:yml | 0s | +0 节点 | 配额 4738/4800
+[2026-07-27 18:12:35] ⏱️ Code [14/97] tuic:// extension:yml | 0s | +0 节点 | 配额 4737/4800
+[2026-07-27 18:12:35] ⏱️ Code [15/97] vmess:// extension:json | 0s | +0 节点 | 配额 4736/4800
+[2026-07-27 18:12:35] ⏱️ Code [16/97] vless:// extension:json | 0s | +0 节点 | 配额 4735/4800
+[2026-07-27 18:12:35] ⏱️ Code [17/97] trojan:// extension:json | 0s | +0 节点 | 配额 4734/4800
+[2026-07-27 18:12:35] ⏱️ Code [18/97] ss:// extension:json | 0s | +0 节点 | 配额 4733/4800
+[2026-07-27 18:12:36] ⏱️ Code [19/97] hysteria2:// extension:json | 0s | +0 节点 | 配额 4732/4800
+[2026-07-27 18:12:36] ⏱️ Code [20/97] hy2:// extension:json | 0s | +0 节点 | 配额 4731/4800
+[2026-07-27 18:12:36] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:12:36] 触发限流，等待 63s ...
+[2026-07-27 18:13:39] ⏱️ Code [21/97] tuic:// extension:json | 63s | +0 节点 | 配额 4729/4800
+[2026-07-27 18:13:39] ⏱️ Code [22/97] vmess:// extension:txt | 0s | +0 节点 | 配额 4728/4800
+[2026-07-27 18:13:40] ⏱️ Code [23/97] vless:// extension:txt | 0s | +0 节点 | 配额 4727/4800
+[2026-07-27 18:13:40] ⏱️ Code [24/97] trojan:// extension:txt | 0s | +0 节点 | 配额 4726/4800
+[2026-07-27 18:13:40] ⏱️ Code [25/97] ss:// extension:txt | 0s | +0 节点 | 配额 4725/4800
+[2026-07-27 18:13:40] ⏱️ Code [26/97] ssr:// extension:txt | 0s | +0 节点 | 配额 4724/4800
+[2026-07-27 18:13:40] ⏱️ Code [27/97] hysteria2:// extension:txt | 0s | +0 节点 | 配额 4723/4800
+[2026-07-27 18:13:40] ⏱️ Code [28/97] hy2:// extension:txt | 0s | +0 节点 | 配额 4722/4800
+[2026-07-27 18:13:41] ⏱️ Code [29/97] tuic:// extension:txt | 0s | +0 节点 | 配额 4721/4800
+[2026-07-27 18:13:41] ⏱️ Code [30/97] vmess:// extension:conf | 0s | +0 节点 | 配额 4720/4800
+[2026-07-27 18:13:41] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:13:41] 触发限流，等待 63s ...
+[2026-07-27 18:13:56] ⏳ W-3 等待任务中...
+[2026-07-27 18:13:56] ⏳ W-0 等待任务中...
+[2026-07-27 18:13:57] ⏳ W-1 等待任务中...
+[2026-07-27 18:13:58] ⏳ W-2 等待任务中...
+[2026-07-27 18:14:44] ⏱️ Code [31/97] vless:// extension:conf | 63s | +0 节点 | 配额 4718/4800
+[2026-07-27 18:14:44] ⏱️ Code [32/97] trojan:// extension:conf | 0s | +0 节点 | 配额 4717/4800
+[2026-07-27 18:14:44] ⏱️ Code [33/97] ss:// extension:conf | 0s | +0 节点 | 配额 4716/4800
+[2026-07-27 18:14:45] ⏱️ Code [34/97] hysteria2:// extension:conf | 0s | +0 节点 | 配额 4715/4800
+[2026-07-27 18:14:45] ⏱️ Code [35/97] tuic:// extension:conf | 0s | +0 节点 | 配额 4714/4800
+[2026-07-27 18:14:45] ⏱️ Code [36/97] vmess:// extension:list | 0s | +0 节点 | 配额 4713/4800
+[2026-07-27 18:14:45] ⏱️ Code [37/97] vless:// extension:list | 0s | +0 节点 | 配额 4712/4800
+[2026-07-27 18:14:45] ⏱️ Code [38/97] trojan:// extension:list | 0s | +0 节点 | 配额 4711/4800
+[2026-07-27 18:14:45] ⏱️ Code [39/97] ss:// extension:list | 0s | +0 节点 | 配额 4710/4800
+[2026-07-27 18:14:46] ⏱️ Code [40/97] hysteria2:// extension:list | 0s | +0 节点 | 配额 4709/4800
+[2026-07-27 18:14:46] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:14:46] 触发限流，等待 63s ...
+[2026-07-27 18:15:49] ⏱️ Code [41/97] tuic:// extension:list | 63s | +0 节点 | 配额 4707/4800
+[2026-07-27 18:15:49] ⏱️ Code [42/97] vmess:// | 0s | +0 节点 | 配额 4706/4800
+[2026-07-27 18:15:50] ⏱️ Code [43/97] vless:// | 0s | +0 节点 | 配额 4705/4800
+[2026-07-27 18:15:50] ⏱️ Code [44/97] trojan:// | 0s | +0 节点 | 配额 4704/4800
+[2026-07-27 18:15:50] ⏱️ Code [45/97] ss:// | 0s | +0 节点 | 配额 4703/4800
+[2026-07-27 18:15:50] ⏱️ Code [46/97] hysteria2:// | 0s | +0 节点 | 配额 4702/4800
+[2026-07-27 18:15:50] ⏱️ Code [47/97] tuic:// | 0s | +0 节点 | 配额 4701/4800
+[2026-07-27 18:15:51] ⏱️ Code [48/97] "type: vmess" extension:yaml | 0s | +0 节点 | 配额 4700/4800
+[2026-07-27 18:15:51] ⏱️ Code [49/97] "type: vless" extension:yaml | 0s | +0 节点 | 配额 4699/4800
+[2026-07-27 18:15:51] ⏱️ Code [50/97] "type: trojan" extension:yaml | 0s | +0 节点 | 配额 4698/4800
+[2026-07-27 18:15:51] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:15:51] 触发限流，等待 63s ...
+[2026-07-27 18:15:56] ⏳ W-3 等待任务中...
+[2026-07-27 18:15:56] ⏳ W-0 等待任务中...
+[2026-07-27 18:15:57] ⏳ W-1 等待任务中...
+[2026-07-27 18:15:58] ⏳ W-2 等待任务中...
+[2026-07-27 18:16:54] ⏱️ Code [51/97] "type: ss" extension:yaml | 63s | +0 节点 | 配额 4696/4800
+[2026-07-27 18:16:54] ⏱️ Code [52/97] "type: ssr" extension:yaml | 0s | +0 节点 | 配额 4695/4800
+[2026-07-27 18:16:55] ⏱️ Code [53/97] "type: hysteria2" extension:yaml | 0s | +0 节点 | 配额 4694/4800
+[2026-07-27 18:16:55] ⏱️ Code [54/97] "type: tuic" extension:yaml | 0s | +0 节点 | 配额 4693/4800
+[2026-07-27 18:16:55] ⏱️ Code [55/97] "type: vmess" extension:yml | 0s | +0 节点 | 配额 4692/4800
+[2026-07-27 18:16:55] ⏱️ Code [56/97] "type: vless" extension:yml | 0s | +0 节点 | 配额 4691/4800
+[2026-07-27 18:16:56] ⏱️ Code [57/97] "type: trojan" extension:yml | 0s | +0 节点 | 配额 4690/4800
+[2026-07-27 18:16:56] ⏱️ Code [58/97] "type: hysteria2" extension:yml | 0s | +0 节点 | 配额 4689/4800
+[2026-07-27 18:16:56] ⏱️ Code [59/97] "type: hysteria2" extension:json | 0s | +0 节点 | 配额 4688/4800
+[2026-07-27 18:16:56] ⏱️ Code [60/97] "type: tuic" extension:json | 0s | +0 节点 | 配额 4687/4800
+[2026-07-27 18:16:56] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:16:56] 触发限流，等待 63s ...
+[2026-07-27 18:17:56] ⏳ W-3 等待任务中...
+[2026-07-27 18:17:56] ⏳ W-0 等待任务中...
+[2026-07-27 18:17:57] ⏳ W-1 等待任务中...
+[2026-07-27 18:17:58] ⏳ W-2 等待任务中...
+[2026-07-27 18:18:00] ⏱️ Code [61/97] "server:" extension:yaml | 63s | +0 节点 | 配额 4685/4800
+[2026-07-27 18:18:00] ⏱️ Code [62/97] "port:" extension:yaml | 0s | +0 节点 | 配额 4684/4800
+[2026-07-27 18:18:00] ⏱️ Code [63/97] "uuid:" extension:yaml | 0s | +0 节点 | 配额 4683/4800
+[2026-07-27 18:18:00] ⏱️ Code [64/97] "password:" extension:yaml | 0s | +0 节点 | 配额 4682/4800
+[2026-07-27 18:18:00] ⏱️ Code [65/97] "cipher:" extension:yaml | 0s | +0 节点 | 配额 4681/4800
+[2026-07-27 18:18:01] ⏱️ Code [66/97] "network:" extension:yaml | 0s | +0 节点 | 配额 4680/4800
+[2026-07-27 18:18:01] ⏱️ Code [67/97] "sni:" extension:yaml | 0s | +0 节点 | 配额 4679/4800
+[2026-07-27 18:18:01] ⏱️ Code [68/97] "alterId:" extension:yaml | 0s | +0 节点 | 配额 4678/4800
+[2026-07-27 18:18:01] ⏱️ Code [69/97] "server:" extension:yml | 0s | +0 节点 | 配额 4677/4800
+[2026-07-27 18:18:01] ⏱️ Code [70/97] "uuid:" extension:yml | 0s | +0 节点 | 配额 4676/4800
+[2026-07-27 18:18:02] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:18:02] 触发限流，等待 63s ...
+[2026-07-27 18:19:05] ⏱️ Code [71/97] "server:" extension:json | 63s | +0 节点 | 配额 4674/4800
+[2026-07-27 18:19:05] ⏱️ Code [72/97] "server_port" extension:json | 0s | +0 节点 | 配额 4673/4800
+[2026-07-27 18:19:05] ⏱️ Code [73/97] "method:" extension:json | 0s | +0 节点 | 配额 4672/4800
+[2026-07-27 18:19:05] ⏱️ Code [74/97] proxy-groups extension:yaml | 0s | +0 节点 | 配额 4671/4800
+[2026-07-27 18:19:06] ⏱️ Code [75/97] proxy-groups extension:yml | 0s | +0 节点 | 配额 4670/4800
+[2026-07-27 18:19:06] ⏱️ Code [76/97] outbounds extension:json | 0s | +0 节点 | 配额 4669/4800
+[2026-07-27 18:19:06] ⏱️ Code [77/97] "outbounds" extension:json | 0s | +0 节点 | 配额 4668/4800
+[2026-07-27 18:19:06] ⏱️ Code [78/97] hysteria2 config extension:yaml | 0s | +0 节点 | 配额 4667/4800
+[2026-07-27 18:19:06] ⏱️ Code [79/97] hy2 outbound extension:json | 0s | +0 节点 | 配额 4666/4800
+[2026-07-27 18:19:06] ⏱️ Code [80/97] tuic server extension:yaml | 0s | +0 节点 | 配额 4665/4800
+[2026-07-27 18:19:06] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:19:06] 触发限流，等待 64s ...
+[2026-07-27 18:19:56] ⏳ W-3 等待任务中...
+[2026-07-27 18:19:56] ⏳ W-0 等待任务中...
+[2026-07-27 18:19:57] ⏳ W-1 等待任务中...
+[2026-07-27 18:19:58] ⏳ W-2 等待任务中...
+[2026-07-27 18:20:11] ⏱️ Code [81/97] vless reality extension:json | 64s | +0 节点 | 配额 4663/4800
+[2026-07-27 18:20:11] ⏱️ Code [82/97] trojan password extension:yaml | 0s | +0 节点 | 配额 4662/4800
+[2026-07-27 18:20:11] ⏱️ Code [83/97] vmess uuid extension:json | 0s | +0 节点 | 配额 4661/4800
+[2026-07-27 18:20:11] ⏱️ Code [84/97] shadowsocks method extension:yaml | 0s | +0 节点 | 配额 4660/4800
+[2026-07-27 18:20:11] ⏱️ Code [85/97] ssr protocol extension:yaml | 0s | +0 节点 | 配额 4659/4800
+[2026-07-27 18:20:12] ⏱️ Code [86/97] hysteria2 server extension:json | 1s | +0 节点 | 配额 4658/4800
+[2026-07-27 18:20:12] ⏱️ Code [87/97] tuic congestion extension:json | 0s | +0 节点 | 配额 4657/4800
+[2026-07-27 18:20:12] ⏱️ Code [88/97] vless flow extension:yaml | 0s | +0 节点 | 配额 4656/4800
+[2026-07-27 18:20:13] ⏱️ Code [89/97] subscription-userinfo extension:txt | 0s | +0 节点 | 配额 4655/4800
+[2026-07-27 18:20:13] ⏱️ Code [90/97] subscription-userinfo extension:yml | 0s | +0 节点 | 配额 4654/4800
+[2026-07-27 18:20:13] Code搜索第1页 返回 403 (尝试 1/2)
+[2026-07-27 18:20:13] 触发限流，等待 63s ...
+[2026-07-27 18:21:16] ⏱️ Code [91/97] raw.githubusercontent.com extension:yaml | 63s | +0 节点 | 配额 4652/4800
+[2026-07-27 18:21:16] ⏱️ Code [92/97] raw.githubusercontent.com extension:json | 0s | +0 节点 | 配额 4651/4800
+[2026-07-27 18:21:17] ⏱️ Code [93/97] raw.githubusercontent.com extension:txt | 0s | +0 节点 | 配额 4650/4800
+[2026-07-27 18:21:17] ⏱️ Code [94/97] raw.githubusercontent.com extension:yml | 0s | +0 节点 | 配额 4649/4800
+[2026-07-27 18:21:17] ⏱️ Code [95/97] v2ray aggregator extension:py | 0s | +0 节点 | 配额 4648/4800
+[2026-07-27 18:21:17] ⏱️ Code [96/97] proxy collector extension:py | 0s | +0 节点 | 配额 4647/4800
+[2026-07-27 18:21:17] ⏱️ Code [97/97] vmess:// raw.githubusercontent extension:py | 0s | +0 节点 | 配额 4646/4800
+[2026-07-27 18:21:17] ⏳ 等待队列清空 (主队列 0, 发现队列 0)...
+[2026-07-27 18:21:17] 队列处理完毕
+[2026-07-27 18:21:17] 🔵 阶段 3: 关键词搜索
+[2026-07-27 18:21:17] 🔵 关键词: 147 个
+[2026-07-27 18:21:21] [W-0] 🔧 开始处理 wang1680/proxypool[2026-07-27 18:21:21] [W-3] 🔧 开始处理 FreeFolksOn/abc-configs-free-vpn-proxy-list[2026-07-27 18:21:21] [W-1] 🔧 开始处理 LingQingOutAt11/free-vpn-subscriptions[2026-07-27 18:21:21] [W-2] 🔧 开始处理 imalyzer/mihomo-node-checker
+
+
+
+[2026-07-27 18:21:21] ⚠️ 仓库 https://github.com/imalyzer/mihomo-node-checker 大小为 0，跳过Traceback (most recent call last):
+
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+[2026-07-27 18:21:21] [W-2] ✅ 完成 imalyzer/mihomo-node-checker (+0 节点)
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 junjun266/FreeProxyGo  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: FreeFolksOn/abc-configs-free-vpn-proxy-list: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 hansenlandun-prog/freeproxy-node-sub
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: hansenlandun-prog/freeproxy-node-sub: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 AtomHeartFather/draw-your-font
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: AtomHeartFather/draw-your-font: Collector._wlog() got an unexpected keyword argument 'flush'
+Traceback (most recent call last):
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 xcai413/fanqiang-navigationTypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:21] ⚠️ Worker 异常: wang1680/proxypool: Collector._wlog() got an unexpected keyword argument 'flush'TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+Traceback (most recent call last):
+[2026-07-27 18:21:21] ⚠️ Worker 异常: LingQingOutAt11/free-vpn-subscriptions: Collector._wlog() got an unexpected keyword argument 'flush'  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+[2026-07-27 18:21:21] [W-0] 🔧 开始处理 brianpht/addendum
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+Traceback (most recent call last):
+[2026-07-27 18:21:21] ⚠️ Worker 异常: xcai413/fanqiang-navigation: Collector._wlog() got an unexpected keyword argument 'flush'[2026-07-27 18:21:21] [W-1] 🔧 开始处理 mfuu/v2ray
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:21] ⚠️ Worker 异常: junjun266/FreeProxyGo: Collector._wlog() got an unexpected keyword argument 'flush'Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+
+
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 sandu9618/email-blastTypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 rrzt/FreeNodes
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:21] ⚠️ Worker 异常: brianpht/addendum: Collector._wlog() got an unexpected keyword argument 'flush'  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+Traceback (most recent call last):
+[2026-07-27 18:21:21] ⚠️ Worker 异常: mfuu/v2ray: Collector._wlog() got an unexpected keyword argument 'flush'Traceback (most recent call last):
+[2026-07-27 18:21:21] [W-0] 🔧 开始处理 cyj4215/FreeNodes
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+Traceback (most recent call last):
+[2026-07-27 18:21:21] [W-1] 🔧 开始处理 viereck-lan/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: cyj4215/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-0] 🔧 开始处理 shenguidao/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: viereck-lan/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-1] 🔧 开始处理 jiayou88/FreeNodes-
+Traceback (most recent call last):
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: sandu9618/email-blast: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 4258806/FreeNodes
+Traceback (most recent call last):
+[2026-07-27 18:21:21] ⚠️ Worker 异常: shenguidao/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'[2026-07-27 18:21:21] ⚠️ Worker 异常: rrzt/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:21] [W-0] 🔧 开始处理 davidchim/proxypool  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 AndriiShramko/4dgs-human-avatar-comfyui-nodes-dataset  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+Traceback (most recent call last):
+[2026-07-27 18:21:21] ⚠️ Worker 异常: jiayou88/FreeNodes-: Collector._wlog() got an unexpected keyword argument 'flush'Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+[2026-07-27 18:21:21] [W-1] 🔧 开始处理 Barabama/FreeNodes[2026-07-27 18:21:21] ⚠️ Worker 异常: 4258806/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+Traceback (most recent call last):
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 wenxig/free-nodes-subTypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+[2026-07-27 18:21:21] ⚠️ Worker 异常: davidchim/proxypool: Collector._wlog() got an unexpected keyword argument 'flush'TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+Traceback (most recent call last):
+
+[2026-07-27 18:21:21] [W-0] 🔧 开始处理 perfectweiwei-rgb/FreeNodes
+Traceback (most recent call last):
+[2026-07-27 18:21:21] ⚠️ Worker 异常: AndriiShramko/4dgs-human-avatar-comfyui-nodes-dataset: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 hank66zxc/FreeNodesTypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: hank66zxc/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 lerjtl/Testfree
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: lerjtl/Testfree: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 wanvfx/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: wanvfx/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 XHegit/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: XHegit/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 fushuain-collab/free-nodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: fushuain-collab/free-nodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 luochen1975/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: luochen1975/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 yangfh158/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: yangfh158/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: wenxig/free-nodes-sub: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 gwcctv/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: gwcctv/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 PENZA84/subseek
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: PENZA84/subseek: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 githubwubian/proxypool
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: githubwubian/proxypool: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 twj0/subseek
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: twj0/subseek: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-3] 🔧 开始处理 zainokta/denia
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: zainokta/denia: Collector._wlog() got an unexpected keyword argument 'flush'
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: perfectweiwei-rgb/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: Barabama/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] [W-2] 🔧 开始处理 chengege666/FreeNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:21] ⚠️ Worker 异常: chengege666/FreeNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-3] 🔧 开始处理 pietertaute123-art/Johari_atomli[2026-07-27 18:21:25] [W-0] 🔧 开始处理 DXFH/clash-free-cleaner
+[2026-07-27 18:21:25] [W-1] 🔧 开始处理 2OTT/Free-Nodes[2026-07-27 18:21:25] [W-2] 🔧 开始处理 PENZA84/free-node
+
+
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+Traceback (most recent call last):
+[2026-07-27 18:21:25] ⚠️ 仓库 https://github.com/pietertaute123-art/Johari_atomli 大小为 0，跳过
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] [W-2] ✅ 完成 pietertaute123-art/Johari_atomli (+0 节点)  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: 2OTT/Free-Nodes: Collector._wlog() got an unexpected keyword argument 'flush'[2026-07-27 18:21:25] [W-3] 🔧 开始处理 HakurouKen/free-node
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: DXFH/clash-free-cleaner: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 Matrixstar2000/FastNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: Matrixstar2000/FastNodes: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 muxd93/awesome-vpn
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: muxd93/awesome-vpn: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 yuchi-chang/flowpiler
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: yuchi-chang/flowpiler: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 way-fu/free-nodes-auto
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: way-fu/free-nodes-auto: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 yuanlinbi-art/free-vpn-subscriptions
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: yuanlinbi-art/free-vpn-subscriptions: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 Taimdev9/trl-cloud
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: Taimdev9/trl-cloud: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 xogametaim-prog/Online-24h-bot-discord
+Traceback (most recent call last):
+Traceback (most recent call last):
+[2026-07-27 18:21:25] ⚠️ Worker 异常: PENZA84/free-node: Collector._wlog() got an unexpected keyword argument 'flush'  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] [W-1] 🔧 开始处理 rithu-007-c/restaurantapp
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+[2026-07-27 18:21:25] [W-2] 🔧 开始处理 EoKz/oracle-auto-launcher
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+Traceback (most recent call last):
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] ⚠️ Worker 异常: HakurouKen/free-node: Collector._wlog() got an unexpected keyword argument 'flush'  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+[2026-07-27 18:21:25] ⚠️ Worker 异常: xogametaim-prog/Online-24h-bot-discord: Collector._wlog() got an unexpected keyword argument 'flush'[2026-07-27 18:21:25] [W-3] 🔧 开始处理 ksaurabh252/media-dlTypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+[2026-07-27 18:21:25] ⚠️ Worker 异常: rithu-007-c/restaurantapp: Collector._wlog() got an unexpected keyword argument 'flush'[2026-07-27 18:21:25] ⚠️ Worker 异常: EoKz/oracle-auto-launcher: Collector._wlog() got an unexpected keyword argument 'flush'[2026-07-27 18:21:25] ⚠️ 仓库 https://github.com/ksaurabh252/media-dl 大小为 0，跳过
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 minenike/FreeProxyGo
+
+[2026-07-27 18:21:25] [W-1] 🔧 开始处理 xiaozhengren/Free-servers[2026-07-27 18:21:25] [W-2] 🔧 开始处理 ce-net/ce-test
+
+
+Traceback (most recent call last):
+[2026-07-27 18:21:25] [W-2] ✅ 完成 ksaurabh252/media-dl (+0 节点)  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+[2026-07-27 18:21:25] [W-3] 🔧 开始处理 Zezo-Ai/synaptic
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+Traceback (most recent call last):
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: xiaozhengren/Free-servers: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: minenike/FreeProxyGo: Collector._wlog() got an unexpected keyword argument 'flush'  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] [W-1] 🔧 开始处理 NakedClark/renus  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+[2026-07-27 18:21:25] ⚠️ Worker 异常: ce-net/ce-test: Collector._wlog() got an unexpected keyword argument 'flush'Traceback (most recent call last):
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 Yannik666/nodes[2026-07-27 18:21:25] ⚠️ Worker 异常: Zezo-Ai/synaptic: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+Traceback (most recent call last):
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] [W-2] 🔧 开始处理 superokde/free-nodes
+[2026-07-27 18:21:25] [W-3] 🔧 开始处理 yashveer-singh-speaks/port-killer[2026-07-27 18:21:25] ⚠️ Worker 异常: NakedClark/renus: Collector._wlog() got an unexpected keyword argument 'flush'  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+
+
+[2026-07-27 18:21:25] ⚠️ Worker 异常: Yannik666/nodes: Collector._wlog() got an unexpected keyword argument 'flush'
+
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] [W-0] 🔧 开始处理 zkena/Local-Video-Library  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] [W-1] 🔧 开始处理 DuChen212/Free-servers
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+Traceback (most recent call last):
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+Traceback (most recent call last):
+[2026-07-27 18:21:25] ⚠️ Worker 异常: yashveer-singh-speaks/port-killer: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+[2026-07-27 18:21:25] [W-3] 🔧 开始处理 DuChen212/proxypoolTypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+[2026-07-27 18:21:25] ⚠️ Worker 异常: superokde/free-nodes: Collector._wlog() got an unexpected keyword argument 'flush'
+
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+Traceback (most recent call last):
+[2026-07-27 18:21:25] ⚠️ Worker 异常: DuChen212/Free-servers: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: zkena/Local-Video-Library: Collector._wlog() got an unexpected keyword argument 'flush'  File "/home/runner/work/test-college/test-college/collector.py", line 873, in _pool_worker
+    self.process_repo(repo, **kwargs)
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1298, in process_repo
+    self._wlog(f"仓库 {github_url} (分支: {branch}, "
+TypeError: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:25] ⚠️ Worker 异常: DuChen212/proxypool: Collector._wlog() got an unexpected keyword argument 'flush'
+[2026-07-27 18:21:27] ⏱️ [1/147] free nodes pushed:>2026-07-26T10:10:56Z fork:true -language: | 10s | +0 | 配额 4643/4800
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/main.py", line 106, in <module>
+    main()
+  File "/home/runner/work/test-college/test-college/main.py", line 93, in main
+    collector.run()
+  File "/home/runner/work/test-college/test-college/collector.py", line 705, in run
+    self._collect_keywords(main_queue)
+  File "/home/runner/work/test-college/test-college/collector.py", line 829, in _collect_keywords
+    self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
+                                                   ^^^^^^^^^^
+NameError: name 'repo_seeds' is not defined
