@@ -246,7 +246,8 @@ class Collector:
         """Worker 前缀日志：主线程无前缀，Worker 带 [W-N]."""
         tn = getattr(self, '_worker_prefix', '')
         prefix = f"[{tn}] " if tn else ""
-        print(f"[{now_str()}] {prefix}{msg}", flush=True, **kwargs)
+        kwargs.setdefault('flush', True)
+        print(f"[{now_str()}] {prefix}{msg}", **kwargs)
 
     def _add_seen(self, repo: str):
         """标记仓库为已处理（大小写不敏感），线程安全。"""
