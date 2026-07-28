@@ -771,7 +771,7 @@ class Collector:
         if not seed_list:
             return
         print(f"[{now_str()}] 🔵 种子仓库: {len(seed_list)} 个 → 队列", flush=True)
-        for repo in seed_list:
+        for _idx, repo in enumerate(seed_list, 1):
             if self._should_stop(): break
             if not self._wait_queue_slot(task_queue): break
             try:
@@ -784,6 +784,8 @@ class Collector:
                 self._branch_cache[repo] = br
                 self._add_seen(repo)
                 self._main_queue_total += 1
+                print(f"[{now_str()}] 🔵 [种子 {_idx}/{len(seed_list)}] {repo} "
+                      f"| 配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
                 task_queue.put(("种子仓库", repo,
                                 {"branch": br, "size": ri.get("size", -1),
                                  "disabled": False, "pushed_at": ri.get("pushed_at", ""),
@@ -910,6 +912,8 @@ class Collector:
             items = data.get("items", [])
             if not items:
                 break
+            print(f"[{now_str()}]   第{page}页 items:{len(items)} "
+                  f"| 配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
             for item in items:
                 repo = item.get("full_name")
                 if not repo: continue
@@ -972,6 +976,8 @@ class Collector:
                 if not items:
                     break
 
+                print(f"[{now_str()}]   Code第{page}页 items:{len(items)} "
+                      f"| 配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
                 for item in items:
                     if self.limiter.should_stop():
                         break

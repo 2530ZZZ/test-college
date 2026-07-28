@@ -187,7 +187,7 @@ class QuotaManager:
                     time.time() + wait, tz=timezone.utc
                 ).strftime('%H:%M UTC')
                 print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] "
-                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait:.0f}min 至 {reset_utc}",
+                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait/60:.0f}min 至 {reset_utc}",
                       flush=True)
             # 计算等待时长
             if self._reset_time:
