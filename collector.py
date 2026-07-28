@@ -770,34 +770,46 @@ class Collector:
         seed_list = list(repo_seeds.keys())
         if not seed_list:
             return
+        self._worker_prefix = "W-种子"
         print(f"[{now_str()}] 🔵 种子仓库: {len(seed_list)} 个 → 队列", flush=True)
         for _idx, repo in enumerate(seed_list, 1):
             if self._should_stop(): break
             if not self._wait_queue_slot(task_queue): break
+            _prefix = f"🔵 [种子 {_idx}/{len(seed_list)}] {repo}"
+            _qt = f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}"
             try:
                 ri = self.http.get_json(
                     f"https://api.github.com/repos/{repo}",
                     timeout=FILE_DOWNLOAD_TIMEOUT,
                     operation_name=f"repo info ({repo})")
-                if not ri or ri.get('disabled'): continue
+                if not ri:
+                    self._wlog(f"❌ {_prefix} 404 | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
+                    continue
+                if ri.get('disabled'):
+                    self._wlog(f"❌ {_prefix} 已禁用 | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
+                    continue
+                if ri.get('size', 0) == 0:
+                    self._wlog(f"❌ {_prefix} 大小为0 | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
+                    continue
                 br = ri.get("default_branch", "main")
                 self._branch_cache[repo] = br
                 self._add_seen(repo)
                 self._main_queue_total += 1
-                print(f"[{now_str()}] 🔵 [种子 {_idx}/{len(seed_list)}] {repo} "
-                      f"| 配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
                 task_queue.put(("种子仓库", repo,
                                 {"branch": br, "size": ri.get("size", -1),
                                  "disabled": False, "pushed_at": ri.get("pushed_at", ""),
                                  "seed_key": repo}),
                                timeout=QUEUE_PUT_TIMEOUT_SECONDS)
+                self._wlog(f"{_prefix} | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
             except Exception as e:
-                print(f"[{now_str()}] ⚠️ {repo}: {e}", flush=True)
+                self._wlog(f"⚠️ {_prefix}: {e} | {_qt}")
             self._update_seed_entry(repo_seeds, repo, 0)
             time.sleep(REPO_SLEEP_SECONDS)
+        self._worker_prefix = ""
 
     def _collect_keywords(self, task_queue: Queue):
         """关键词搜索阶段：Topic + README + BASE_QUERIES 全部关键词。"""
+        self._worker_prefix = "W-关键词"
         _time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
             '%Y-%m-%dT%H:%M:%SZ')
 
@@ -829,7 +841,8 @@ class Collector:
                   f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
 
         # 保存统计
-            self._save_seed_file(SEED_REPOS_FILE, "repos", self._repo_seeds)
+        self._worker_prefix = ""
+        self._save_seed_file(SEED_REPOS_FILE, "repos", self._repo_seeds)
 
     def _pool_worker(self, main_queue: Queue, disc_queue: Queue):
         """共用线程池 Worker：优先消费发现队列，再消费主队列。
@@ -912,13 +925,16 @@ class Collector:
             items = data.get("items", [])
             if not items:
                 break
-            print(f"[{now_str()}]   第{page}页 items:{len(items)} "
-                  f"| 配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
+            _qt = f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}"
+            _qz = f"主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}"
+            print(f"[{now_str()}]   第{page}页 items:{len(items)} | {_qt} | {_qz}", flush=True)
             for item in items:
                 repo = item.get("full_name")
                 if not repo: continue
                 github_url = f"https://github.com/{repo}"
-                if not self._check_and_add_seen(repo) or self._check_blacklist(github_url):
+                if not self._check_and_add_seen(repo):
+                    continue
+                if self._check_blacklist(github_url):
                     continue
                 self.checked_count += 1
                 self._main_queue_total += 1
@@ -946,6 +962,7 @@ class Collector:
         if not CODE_QUERIES:
             return
 
+        self._worker_prefix = "W-Code"
         time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
             '%Y-%m-%dT%H:%M:%SZ')
 
@@ -976,8 +993,9 @@ class Collector:
                 if not items:
                     break
 
-                print(f"[{now_str()}]   Code第{page}页 items:{len(items)} "
-                      f"| 配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
+                _qt = f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}"
+                _qz = f"主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}"
+                print(f"[{now_str()}]   Code第{page}页 items:{len(items)} | {_qt} | {_qz}", flush=True)
                 for item in items:
                     if self.limiter.should_stop():
                         break
@@ -1046,6 +1064,7 @@ class Collector:
             self._channel_new_nodes["Code"] = len(self.unique_nodes) - code_nodes_before
         self._code_files_found = code_files
         self._code_repos_processed = len(repos_found)
+        self._worker_prefix = ""
 
     # ── 搜索辅助 ──
 
