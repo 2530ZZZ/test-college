@@ -244,7 +244,7 @@ class Collector:
 
     def _wlog(self, msg: str, **kwargs):
         """Worker 前缀日志：主线程无前缀，Worker 带 [W-N]."""
-        tn = getattr(self, '_worker_prefix', '')
+        tn = getattr(getattr(self, '_worker_local', None), 'prefix', '')
         prefix = f"[{tn}] " if tn else ""
         kwargs.setdefault('flush', True)
         print(f"[{now_str()}] {prefix}{msg}", **kwargs)
@@ -770,7 +770,7 @@ class Collector:
         seed_list = list(repo_seeds.keys())
         if not seed_list:
             return
-        self._worker_prefix = "W-种子"
+        self._worker_local.prefix = "W-种子"
         print(f"[{now_str()}] 🔵 种子仓库: {len(seed_list)} 个 → 队列", flush=True)
         for _idx, repo in enumerate(seed_list, 1):
             if self._should_stop(): break
@@ -805,11 +805,11 @@ class Collector:
                 self._wlog(f"⚠️ {_prefix}: {e} | {_qt}")
             self._update_seed_entry(repo_seeds, repo, 0)
             time.sleep(REPO_SLEEP_SECONDS)
-        self._worker_prefix = ""
+        self._worker_local.prefix = ""
 
     def _collect_keywords(self, task_queue: Queue):
         """关键词搜索阶段：Topic + README + BASE_QUERIES 全部关键词。"""
-        self._worker_prefix = "W-关键词"
+        self._worker_local.prefix = "W-关键词"
         _time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
             '%Y-%m-%dT%H:%M:%SZ')
 
@@ -841,7 +841,7 @@ class Collector:
                   f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
 
         # 保存统计
-        self._worker_prefix = ""
+        self._worker_local.prefix = ""
         self._save_seed_file(SEED_REPOS_FILE, "repos", self._repo_seeds)
 
     def _pool_worker(self, main_queue: Queue, disc_queue: Queue):
@@ -884,14 +884,14 @@ class Collector:
                 self.http = HttpClient(token=self.token, rate_limiter=None,
                                        quota_manager=self.quota_mgr)
                 before = len(self.unique_nodes)
-                self._worker_prefix = threading.current_thread().name
+                self._worker_local.prefix = threading.current_thread().name
                 self._wlog(f"🔧 开始处理 {repo}")
                 self.process_repo(repo, **kwargs)
                 new_nodes = len(self.unique_nodes) - before
                 self._wlog(f"✅ 完成 {repo} (+{new_nodes} 节点)")
                 tn = threading.current_thread().name
                 self._worker_repo_count[tn] = self._worker_repo_count.get(tn, 0) + 1
-                self._worker_prefix = ""
+                self._worker_local.prefix = ""
                 ch = self._channel_new_nodes
                 ch[source] = ch.get(source, 0) + new_nodes
                 # 种子仓库产出也更新对应种子条目
@@ -962,7 +962,7 @@ class Collector:
         if not CODE_QUERIES:
             return
 
-        self._worker_prefix = "W-Code"
+        self._worker_local.prefix = "W-Code"
         time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
             '%Y-%m-%dT%H:%M:%SZ')
 
@@ -1064,7 +1064,7 @@ class Collector:
             self._channel_new_nodes["Code"] = len(self.unique_nodes) - code_nodes_before
         self._code_files_found = code_files
         self._code_repos_processed = len(repos_found)
-        self._worker_prefix = ""
+        self._worker_local.prefix = ""
 
     # ── 搜索辅助 ──
 
