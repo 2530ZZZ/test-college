@@ -121,6 +121,7 @@ class Collector:
         self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
         self._search_resume = threading.Event()         # Worker 唤醒搜索的信号
         self._search_resume.set()                       # 初始允许搜索
+        self._worker_local = threading.local()          # 线程独立前缀
         self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
         self._worker_repo_count: Dict[str, int] = {}   # Worker 处理仓库计数
         self._main_queue_total: int = 0                # 主队列总计（不含 fork/raw/用户）
