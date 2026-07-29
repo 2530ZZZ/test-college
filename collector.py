@@ -199,7 +199,7 @@ class Collector:
                         self.seen_cache.update(pickle.load(f))
         except Exception:
             self.seen_cache = {}
-        print(f"[{now_str()}] 加载已处理仓库缓存 {len(self.seen_cache)} 条", flush=True)
+        self._wlog(f"加载已处理仓库缓存 {len(self.seen_cache)} 条")
 
     def save_seen_cache(self):
         """保存已处理仓库缓存到分片 pickle。"""
@@ -244,11 +244,26 @@ class Collector:
         return False
 
     def _wlog(self, msg: str, **kwargs):
-        """Worker 前缀日志：主线程无前缀，Worker 带 [W-N]."""
-        tn = getattr(getattr(self, '_worker_local', None), 'prefix', '')
+        """统一日志：优先用显式前缀，否则 fallback 到线程名。"""
+        tn = getattr(getattr(self, '_worker_local', None), 'prefix', None)
+        if tn is None:
+            tn = threading.current_thread().name
         prefix = f"[{tn}] " if tn else ""
         kwargs.setdefault('flush', True)
         print(f"[{now_str()}] {prefix}{msg}", **kwargs)
+
+    def _qs(self) -> str:
+        """队列状态：主队列 + 发现队列。"""
+        mq = getattr(self, '_task_queue', None)
+        dq = getattr(self, '_disc_queue', None)
+        return (f"主队列 {mq.qsize() if mq else 0}/{MAIN_QUEUE_SIZE} "
+                f"发现队列 {dq.qsize() if dq else 0}/{DISCOVERY_QUEUE_SIZE}")
+
+    def _qt(self) -> str:
+        """配额状态：剩余/上限 + UTC 时间。"""
+        from datetime import datetime, timezone
+        utc = datetime.now(timezone.utc).strftime('%H:%M UTC')
+        return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {utc}"
 
     def _add_seen(self, repo: str):
         """标记仓库为已处理（大小写不敏感），线程安全。"""
@@ -280,13 +295,13 @@ class Collector:
         if mq.qsize() < 80:
             return True
         self._search_resume.clear()
-        print(f"[{now_str()}] ⏸️  主队列 ≥ 80（{mq.qsize()}/{mq.maxsize}），搜索暂停", flush=True)
+        self._wlog(f"⏸️  主队列 ≥ 80（{mq.qsize()}/{mq.maxsize}），搜索暂停")
         while mq.qsize() >= 20:
             if self._runtime_exceeded():
                 self._search_resume.set()
                 return False
             self._search_resume.wait(timeout=30)
-        print(f"[{now_str()}] ▶️ 主队列 < 20（{mq.qsize()}/{mq.maxsize}），搜索恢复", flush=True)
+        self._wlog(f"▶️ 主队列 < 20（{mq.qsize()}/{mq.maxsize}），搜索恢复")
         self._search_resume.set()
         return True
 
@@ -322,7 +337,7 @@ class Collector:
                         self.blacklist_repos.add(line)
                         self._blacklist_order.append(line)
                         self._blacklist_loaded.add(line)
-            print(f"[{now_str()}] 已加载黑名单: {len(self.blacklist_repos)} 个", flush=True)
+            self._wlog(f"已加载黑名单: {len(self.blacklist_repos)} 个")
 
     def load_sha_cache(self):
         """加载 SHA 缓存（分片 pickle 目录）。"""
@@ -339,11 +354,11 @@ class Collector:
                         self.sha_cache.update(chunk)
                         total += len(chunk)
         except Exception as e:
-            print(f"[{now_str()}] 加载 SHA 缓存失败: {e}", flush=True)
+            self._wlog(f"加载 SHA 缓存失败: {e}")
             self.sha_cache = {}
             return
-        print(f"[{now_str()}] 加载 SHA 缓存 {total} 条 "
-              f"({len(os.listdir(SHA_CACHE_DIR))} 分片)", flush=True)
+        self._wlog(f"加载 SHA 缓存 {total} 条 "
+              f"({len(os.listdir(SHA_CACHE_DIR))} 分片)")
 
     def save_sha_cache(self):
         """保存 SHA 缓存到分片目录。每片 ≤ SHA_CACHE_MAX_BYTES。
@@ -383,7 +398,7 @@ class Collector:
                 self._write_sha_chunk(seq, chunk)
 
             total_files = seq + (1 if chunk else 0)
-            print(f"[{now_str()}] SHA 缓存已保存: {len(self.sha_cache)} 条, {total_files} 分片", flush=True)
+            self._wlog(f"SHA 缓存已保存: {len(self.sha_cache)} 条, {total_files} 分片")
 
     @staticmethod
     def _write_sha_chunk(seq: int, chunk: dict):
@@ -393,7 +408,7 @@ class Collector:
             with open(path, 'wb') as f:
                 pickle.dump(chunk, f)
         except Exception as e:
-            print(f"[{now_str()}] SHA 分片写入失败: {e}", flush=True)
+            self._wlog(f"SHA 分片写入失败: {e}")
 
     def _sha_in_cache(self, sha: str) -> bool:
         """检查文件 SHA 是否已在持久化缓存中（只读，不写入）。
@@ -446,9 +461,9 @@ class Collector:
         dq = getattr(self, '_disc_queue', None)
         mq_sz = mq.qsize() if mq else 0
         dq_sz = dq.qsize() if dq else 0
-        print(f"[{now_str()}] 📦 批次 {seq:04d} 已持久化: "
+        self._wlog(f"📦 批次 {seq:04d} 已持久化: "
               f"{filepath} ({node_count} 个节点, 累计 {len(self.unique_nodes)} 个)"
-              f" | 主队列 {mq_sz}/{MAIN_QUEUE_SIZE}, 发现队列 {dq_sz}/{DISCOVERY_QUEUE_SIZE}", flush=True)
+              f" | {self._qs()}")
         # 批次刷盘时顺带保存持久化状态，防止中途崩溃丢失
         self.save_sha_cache()
         self.save_seen_cache()
@@ -478,7 +493,7 @@ class Collector:
             try:
                 self.on_batch_flush(seq, filepath, node_count)
             except Exception as e:
-                print(f"[{now_str()}] ⚠️ 批次回调异常: {e}", flush=True)
+                self._wlog(f"⚠️ 批次回调异常: {e}")
 
     def _add_node(self, node_uri: str, proxy=None):
         """添加节点到当前批次 buffer。
@@ -628,7 +643,7 @@ class Collector:
         每个线程持有独立 HttpClient，共享去重/缓存/批次状态。
         所有共享操作通过 _state_lock 保护。
         """
-        print(f"[{now_str()}] 🚀 程序启动 | 配额上限 {QUOTA_MAX_PER_HOUR}/小时", flush=True)
+        self._wlog(f"🚀 程序启动 | 配额上限 {QUOTA_MAX_PER_HOUR}/小时")
         self._start_time = time.time()
 
         # 加载 + 持有种子文件（让 process_repo 内部也能更新）
@@ -667,7 +682,7 @@ class Collector:
         # 阶段 1: 种子仓库
         # ═══════════════════════════════════════════
         if SEED_STAGE_ENABLED and not self._runtime_exceeded():
-            print(f"[{now_str()}] 🔵 阶段 1: 种子仓库 ({len(repo_seeds)} 个)", flush=True)
+            self._wlog(f"🔵 阶段 1: 种子仓库 ({len(repo_seeds)} 个)")
             t0 = time.time()
             _repos_before = self.checked_count
             _files_before = len(self.processed_file_shas)
@@ -684,7 +699,7 @@ class Collector:
         # 阶段 2: Code 文件搜索
         # ═══════════════════════════════════════════
         if CODE_STAGE_ENABLED and not self._runtime_exceeded():
-            print(f"[{now_str()}] 🔵 阶段 2: Code Search ({len(CODE_QUERIES)} 个词)", flush=True)
+            self._wlog(f"🔵 阶段 2: Code Search ({len(CODE_QUERIES)} 个词)")
             t0 = time.time()
             self._collect_code(main_queue)
             cn = self._channel_new_nodes.get("Code", 0)
@@ -700,7 +715,7 @@ class Collector:
         # 阶段 3: 关键词搜索
         # ═══════════════════════════════════════════
         if KEYWORD_STAGE_ENABLED and not self._runtime_exceeded():
-            print(f"[{now_str()}] 🔵 阶段 3: 关键词搜索", flush=True)
+            self._wlog(f"🔵 阶段 3: 关键词搜索")
             t0 = time.time()
             _repos_before = self.checked_count
             _files_before = len(self.processed_file_shas)
@@ -731,19 +746,18 @@ class Collector:
 
     def _wait_queue_drain(self, main_queue, disc_queue):
         """等待主队列 + 发现队列全清空（配额耗尽则等待恢复）。"""
-        print(f"[{now_str()}] ⏳ 等待队列清空 (主队列 {main_queue.qsize()}, "
-              f"发现队列 {disc_queue.qsize()})...", flush=True)
+        self._wlog(f"⏳ 等待队列清空 ({self._qs()})...")
         wait_logged = 0
         heartbeat_time = time.time()
         while main_queue.qsize() > 0 or disc_queue.qsize() > 0:
             if self.limiter.should_stop() or self._runtime_exceeded():
-                print(f"[{now_str()}] ⚠️ 停止信号，放弃剩余任务", flush=True)
+                self._wlog(f"⚠️ 停止信号，放弃剩余任务")
                 break
             if self.quota_mgr.exceeded:
-                print(f"[{now_str()}] ⏳ 配额耗尽，等待重置", flush=True)
+                self._wlog(f"⏳ 配额耗尽，等待重置")
                 if not self.quota_mgr.wait_for_reset(self._runtime_exceeded):
                     break
-                print(f"[{now_str()}] 🔄 配额恢复，继续处理", flush=True)
+                self._wlog(f"🔄 配额恢复，继续处理")
                 continue
             # 10分钟心跳
             if time.time() - heartbeat_time > 600:
@@ -751,17 +765,16 @@ class Collector:
                 elapsed = time.time() - self._start_time
                 wc = ", ".join(f"{k} {v}" for k, v in
                                sorted(self._worker_repo_count.items()))
-                print(f"[{now_str()}] ⏱️ 运行 {elapsed:.0f}s | "
+                self._wlog(f"⏱️ 运行 {elapsed:.0f}s | "
                       f"节点 {len(self.unique_nodes)} | "
                       f"已发现 {self._main_queue_total} 仓库 | "
-                      f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
-                      f"主队列 {main_queue.qsize()}/{MAIN_QUEUE_SIZE} "
-                      f"发现队列 {disc_queue.qsize()}/{DISCOVERY_QUEUE_SIZE} | "
-                      f"Worker: {wc}", flush=True)
+                      f"{self._qt()} | "
+                      f"{self._qs()} | "
+                      f"Worker: {wc}")
             if time.time() - wait_logged > 120:
                 wait_logged = time.time()
             time.sleep(3)
-        print(f"[{now_str()}] 队列处理完毕", flush=True)
+        self._wlog(f"队列处理完毕")
 
     # ── 搜集实现 ──
 
@@ -771,26 +784,25 @@ class Collector:
         seed_list = list(repo_seeds.keys())
         if not seed_list:
             return
-        self._worker_local.prefix = "W-种子"
-        print(f"[{now_str()}] 🔵 种子仓库: {len(seed_list)} 个 → 队列", flush=True)
+        self._worker_local.prefix = "种子"
+        self._wlog(f"🔵 种子仓库: {len(seed_list)} 个 → 队列")
         for _idx, repo in enumerate(seed_list, 1):
             if self._should_stop(): break
             if not self._wait_queue_slot(task_queue): break
             _prefix = f"🔵 [种子 {_idx}/{len(seed_list)}] {repo}"
-            _qt = f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}"
             try:
                 ri = self.http.get_json(
                     f"https://api.github.com/repos/{repo}",
                     timeout=FILE_DOWNLOAD_TIMEOUT,
                     operation_name=f"repo info ({repo})")
                 if not ri:
-                    self._wlog(f"❌ {_prefix} 404 | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
+                    self._wlog(f"❌ {_prefix} 404 | {self._qt()} | {self._qs()}")
                     continue
                 if ri.get('disabled'):
-                    self._wlog(f"❌ {_prefix} 已禁用 | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
+                    self._wlog(f"❌ {_prefix} 已禁用 | {self._qt()} | {self._qs()}")
                     continue
                 if ri.get('size', 0) == 0:
-                    self._wlog(f"❌ {_prefix} 大小为0 | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
+                    self._wlog(f"❌ {_prefix} 大小为0 | {self._qt()} | {self._qs()}")
                     continue
                 br = ri.get("default_branch", "main")
                 self._branch_cache[repo] = br
@@ -801,16 +813,16 @@ class Collector:
                                  "disabled": False, "pushed_at": ri.get("pushed_at", ""),
                                  "seed_key": repo}),
                                timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-                self._wlog(f"{_prefix} | {_qt} | 主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}")
+                self._wlog(f"{_prefix} | {self._qt()} | {self._qs()}")
             except Exception as e:
-                self._wlog(f"⚠️ {_prefix}: {e} | {_qt}")
+                self._wlog(f"⚠️ {_prefix}: {e} | {self._qt()}")
             self._update_seed_entry(repo_seeds, repo, 0)
             time.sleep(REPO_SLEEP_SECONDS)
         self._worker_local.prefix = ""
 
     def _collect_keywords(self, task_queue: Queue):
         """关键词搜索阶段：Topic + README + BASE_QUERIES 全部关键词。"""
-        self._worker_local.prefix = "W-关键词"
+        self._worker_local.prefix = "关键词"
         _time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
             '%Y-%m-%dT%H:%M:%SZ')
 
@@ -827,7 +839,7 @@ class Collector:
                 if SEARCH_FORK: q += " fork:true"
                 all_queries.append(q)
 
-        print(f"[{now_str()}] 🔵 关键词: {len(all_queries)} 个", flush=True)
+        self._wlog(f"🔵 关键词: {len(all_queries)} 个")
         for idx, query in enumerate(all_queries, 1):
             nb = len(self.unique_nodes)
             qs = time.time()
@@ -836,10 +848,10 @@ class Collector:
                 self._search_query_to_queue(query, task_queue)
             except RuntimeError:
                 break
-            print(f"[{now_str()}] ⏱️ [{idx}/{len(all_queries)}] "
+            self._wlog(f"⏱️ [{idx}/{len(all_queries)}] "
                   f"{query[:60]} | {time.time()-qs:.0f}s | "
                   f"+{len(self.unique_nodes)-nb} | "
-                  f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
+                  f"{self._qt()}")
 
         # 保存统计
         self._worker_local.prefix = ""
@@ -869,7 +881,7 @@ class Collector:
                     last = self._worker_idle_since.get(tn, 0)
                     if time.time() - last > 120:
                         self._worker_idle_since[tn] = time.time()
-                        print(f"[{now_str()}] ⏳ {tn} 等待任务中...", flush=True)
+                        self._wlog(f"⏳ {tn} 等待任务中...")
                     continue
             try:
                 if item is None:
@@ -885,14 +897,12 @@ class Collector:
                 self.http = HttpClient(token=self.token, rate_limiter=None,
                                        quota_manager=self.quota_mgr)
                 before = len(self.unique_nodes)
-                self._worker_local.prefix = threading.current_thread().name
                 self._wlog(f"🔧 开始处理 {repo}")
                 self.process_repo(repo, **kwargs)
                 new_nodes = len(self.unique_nodes) - before
                 self._wlog(f"✅ 完成 {repo} (+{new_nodes} 节点)")
                 tn = threading.current_thread().name
                 self._worker_repo_count[tn] = self._worker_repo_count.get(tn, 0) + 1
-                self._worker_local.prefix = ""
                 ch = self._channel_new_nodes
                 ch[source] = ch.get(source, 0) + new_nodes
                 # 种子仓库产出也更新对应种子条目
@@ -902,7 +912,7 @@ class Collector:
             except Exception as e:
                 import traceback
                 traceback.print_exc()
-                print(f"[{now_str()}] ⚠️ Worker 异常: {repo}: {e}", flush=True)
+                self._wlog(f"⚠️ Worker 异常: {repo}: {e}")
             finally:
                 if from_queue is not None:
                     from_queue.task_done()
@@ -926,9 +936,7 @@ class Collector:
             items = data.get("items", [])
             if not items:
                 break
-            _qt = f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}"
-            _qz = f"主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}"
-            print(f"[{now_str()}]   第{page}页 items:{len(items)} | {_qt} | {_qz}", flush=True)
+            self._wlog(f"  第{page}页 items:{len(items)} | {self._qt()} | {self._qs()}")
             for item in items:
                 repo = item.get("full_name")
                 if not repo: continue
@@ -963,7 +971,7 @@ class Collector:
         if not CODE_QUERIES:
             return
 
-        self._worker_local.prefix = "W-Code"
+        self._worker_local.prefix = "Code"
         time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
             '%Y-%m-%dT%H:%M:%SZ')
 
@@ -994,9 +1002,7 @@ class Collector:
                 if not items:
                     break
 
-                _qt = f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}"
-                _qz = f"主队列 {task_queue.qsize()}/{MAIN_QUEUE_SIZE}"
-                print(f"[{now_str()}]   Code第{page}页 items:{len(items)} | {_qt} | {_qz}", flush=True)
+                self._wlog(f"  Code第{page}页 items:{len(items)} | {self._qt()} | {self._qs()}")
                 for item in items:
                     if self.limiter.should_stop():
                         break
@@ -1055,10 +1061,10 @@ class Collector:
 
                 time.sleep(PAGE_SLEEP_SECONDS)
 
-            print(f"[{now_str()}] ⏱️ Code [{idx}/{len(CODE_QUERIES)}] "
+            self._wlog(f"⏱️ Code [{idx}/{len(CODE_QUERIES)}] "
                   f"{query[:60]} | {time.time() - qs:.0f}s | "
                   f"+{len(self.unique_nodes) - nb} 节点 | "
-                  f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR}", flush=True)
+                  f"{self._qt()}")
 
         # 记录统计
         with self._state_lock:
@@ -1072,20 +1078,20 @@ class Collector:
     def _finalize(self, elapsed_seconds: float = 0):
         """最终保存和统计。即使之前发生错误也能安全调用。"""
         if self._max_runtime and elapsed_seconds > self._max_runtime:
-            print(f"[{now_str()}] ⚠️ 运行时间 {elapsed_seconds:.0f}s 超出上限 "
-                  f"{self._max_runtime}s（已提前停止搜集）", flush=True)
+            self._wlog(f"⚠️ 运行时间 {elapsed_seconds:.0f}s 超出上限 "
+                  f"{self._max_runtime}s（已提前停止搜集）")
         try:
             self._flush_batch()
         except Exception as e:
-            print(f"[{now_str()}] ⚠️ buffer 刷盘异常: {e}", flush=True)
+            self._wlog(f"⚠️ buffer 刷盘异常: {e}")
         try:
             self.save_results()
         except Exception as e:
-            print(f"[{now_str()}] ⚠️ save_results 异常: {e}", flush=True)
+            self._wlog(f"⚠️ save_results 异常: {e}")
         try:
             self.save_sha_cache()
         except Exception as e:
-            print(f"[{now_str()}] ⚠️ SHA 缓存保存异常: {e}", flush=True)
+            self._wlog(f"⚠️ SHA 缓存保存异常: {e}")
 
         # ── 分渠道统计 ──
         print(f"\n{'='*60}")
@@ -1164,8 +1170,7 @@ class Collector:
             for url in current_order:
                 f.write(url + "\n")
         if evict > 0:
-            print(f"[{now_str()}] 黑名单淘汰 {evict} 条（保留 {len(current_order)} 条）",
-                  flush=True)
+            self._wlog(f"黑名单淘汰 {evict} 条（保留 {len(current_order)} 条）")
 
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
@@ -1193,9 +1198,9 @@ class Collector:
 
             data = resp.json()
             items = data.get("items", [])
-            print(f"[{now_str()}] 第{page}页 "
+            self._wlog(f"第{page}页 "
                   f"total_count={data.get('total_count', 0)}, "
-                  f"items={len(items)}", flush=True)
+                  f"items={len(items)}")
 
             if not items:
                 break
@@ -1209,18 +1214,18 @@ class Collector:
                     continue
 
                 github_url = f"https://github.com/{repo}"
-                print(f"[{now_str()}] 检查仓库 #{idx}: {github_url}", flush=True)
+                self._wlog(f"检查仓库 #{idx}: {github_url}")
 
                 # 去重检查
                 if not self._check_and_add_seen(repo):
-                    print(f"[{now_str()}] ⏭️ 跳过已处理仓库 {github_url}", flush=True)
+                    self._wlog(f"⏭️ 跳过已处理仓库 {github_url}")
                     continue
                 if self._check_blacklist(github_url):
-                    print(f"[{now_str()}] ⏭️ 跳过黑名单仓库 {github_url}", flush=True)
+                    self._wlog(f"⏭️ 跳过黑名单仓库 {github_url}")
                     continue
 
                 self.checked_count += 1
-                print(f"[{now_str()}] 开始处理仓库 {github_url}", flush=True)
+                self._wlog(f"开始处理仓库 {github_url}")
 
                 before_repo = len(self.unique_nodes)
                 try:
@@ -1233,10 +1238,10 @@ class Collector:
                         pushed_at=item.get("pushed_at", ""),
                     )
                 except RuntimeError:
-                    print(f"[{now_str()}] ⚠️ 限流超限，停止处理仓库", flush=True)
+                    self._wlog(f"⚠️ 限流超限，停止处理仓库")
                     return
                 except Exception as e:
-                    print(f"[{now_str()}] ⚠️ 处理仓库异常 {github_url}: {e}", flush=True)
+                    self._wlog(f"⚠️ 处理仓库异常 {github_url}: {e}")
 
                 # 自动种子追踪：搜索发现的仓库也记录产出
                 if AUTO_SEED_ENABLED:
@@ -1270,20 +1275,20 @@ class Collector:
 
         # 已处理仓库缓存检查（pushed_at 未变→跳过）
         if self._check_seen_cache(repo, pushed_at):
-            print(f"[{now_str()}] ⏭️ 仓库 {github_url} 未更新，跳过", flush=True)
+            self._wlog(f"⏭️ 仓库 {github_url} 未更新，跳过")
             return
 
         # 黑名单检查
         if self._check_blacklist(github_url):
-            print(f"[{now_str()}] 仓库在黑名单中: {github_url}", flush=True)
+            self._wlog(f"仓库在黑名单中: {github_url}")
             return
 
         # 有效性检查
         if size == 0:
-            print(f"[{now_str()}] ⚠️ 仓库 {github_url} 大小为 0，跳过", flush=True)
+            self._wlog(f"⚠️ 仓库 {github_url} 大小为 0，跳过")
             return
         if disabled:
-            print(f"[{now_str()}] ⚠️ 仓库 {github_url} 已禁用，跳过", flush=True)
+            self._wlog(f"⚠️ 仓库 {github_url} 已禁用，跳过")
             return
 
         # 仓库年龄过滤（统一入口：搜索结果、fork链、用户仓库、raw递归）
@@ -1295,8 +1300,8 @@ class Collector:
 
                 # 废弃仓库 → 永久黑名单
                 if REPO_MAX_AGE_HOURS > 0 and age_hours > REPO_MAX_AGE_HOURS:
-                    print(f"[{now_str()}] ⚠️ 仓库 {github_url} "
-                          f"{age_hours:.0f}h 未更新，废弃 → 加入黑名单", flush=True)
+                    self._wlog(f"⚠️ 仓库 {github_url} "
+                          f"{age_hours:.0f}h 未更新，废弃 → 加入黑名单")
                     self.blacklist_repos.add(github_url)
                     self._blacklist_order.append(github_url)
                     with open(BLACKLIST_FILE, "a", encoding="utf-8") as bf:
@@ -1305,8 +1310,8 @@ class Collector:
 
                 # 超过跳过阈值 → 不解析文件，但仍追踪 fork 链（fork 可能活跃）
                 if SKIP_PROCESSING_AGE_HOURS > 0 and age_hours > SKIP_PROCESSING_AGE_HOURS:
-                    print(f"[{now_str()}] ⏭️ 仓库 {github_url} "
-                          f"{age_hours:.0f}h 未更新，跳过解析（追踪 fork 链）", flush=True)
+                    self._wlog(f"⏭️ 仓库 {github_url} "
+                          f"{age_hours:.0f}h 未更新，跳过解析（追踪 fork 链）")
                     # 追踪 fork/用户仓库，但不解析本仓库文件
                     if FORK_CHAIN_ENABLED and raw_depth < MAX_PARENT_TRACE_DEPTH:
                         if FORK_CHAIN_CHILD_DEPTH > 0:
@@ -1323,7 +1328,7 @@ class Collector:
             branch = self._branch_cache[repo]
 
         self._wlog(f"仓库 {github_url} (分支: {branch}, "
-              f"size: {size}KB, pushed: {pushed_at})", flush=True)
+              f"size: {size}KB, pushed: {pushed_at})")
 
         has_nodes_flag = [False]
 
@@ -1336,12 +1341,12 @@ class Collector:
                 # 懒查真实分支名，只消耗 1 次 API 调用，然后重试
                 actual_branch = self._resolve_branch(repo, branch)
                 if actual_branch and actual_branch != branch:
-                    print(f"[{now_str()}]   分支名修正: {branch} → {actual_branch}", flush=True)
+                    self._wlog(f"  分支名修正: {branch} → {actual_branch}")
                     success = self._process_with_recursive_tree(
                         repo, actual_branch, has_nodes_flag, raw_depth)
 
             if not success:
-                print(f"[{now_str()}] 树 API 失败，回退到 Contents API", flush=True)
+                self._wlog(f"树 API 失败，回退到 Contents API")
                 try:
                     if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
                         with ThreadPoolExecutor(max_workers=1) as _exec2:
@@ -1351,7 +1356,7 @@ class Collector:
                     else:
                         self.process_file_tree(repo, "", branch, has_nodes_flag)
                 except FutureTimeoutError:
-                    print(f"[{now_str()}] ⚠️ Contents API 处理超时，跳过", flush=True)
+                    self._wlog(f"⚠️ Contents API 处理超时，跳过")
                 except RuntimeError:
                     raise
         else:
@@ -1366,7 +1371,7 @@ class Collector:
                 else:
                     self.process_file_tree(repo, "", branch, has_nodes_flag)
             except FutureTimeoutError:
-                print(f"[{now_str()}] ⚠️ Contents API 处理超时，跳过", flush=True)
+                self._wlog(f"⚠️ Contents API 处理超时，跳过")
             except RuntimeError:
                 raise
 
@@ -1374,13 +1379,13 @@ class Collector:
         if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
             # 配额耗尽或限流期间 → 不确定是否真的无节点 → 不拉黑
             if self.quota_mgr.exceeded or self.limiter.should_stop():
-                print(f"[{now_str()}] ⚠️ 配额/限流期间跳过黑名单: {github_url}", flush=True)
+                self._wlog(f"⚠️ 配额/限流期间跳过黑名单: {github_url}")
             else:
                 is_spam = self._check_readme_spam(repo, branch)
                 if is_spam:
-                    print(f"[{now_str()}] 仓库 {github_url} README 含广告词，加入黑名单", flush=True)
+                    self._wlog(f"仓库 {github_url} README 含广告词，加入黑名单")
                 else:
-                    print(f"[{now_str()}] 仓库 {github_url} 未提取到节点，加入黑名单", flush=True)
+                    self._wlog(f"仓库 {github_url} 未提取到节点，加入黑名单")
                 self.blacklist_repos.add(github_url)
                 self._blacklist_order.append(github_url)
                 with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
@@ -1418,7 +1423,7 @@ class Collector:
           2. 获取父仓库的 fork 列表
           3. 逐个处理未在 seen_repos 中的 fork 仓库
         """
-        print(f"[{now_str()}] 🔗 开始 Fork 链追踪 ({repo})", flush=True)
+        self._wlog(f"🔗 开始 Fork 链追踪 ({repo})")
 
         # 1. 查父仓库
         repo_data = self.http.get_json(
@@ -1433,7 +1438,7 @@ class Collector:
         parent_name = parent.get("full_name")
         if not parent_name:
             return
-        print(f"[{now_str()}]   父仓库: {parent_name}", flush=True)
+        self._wlog(f"  父仓库: {parent_name}")
 
         # 2. 如果父仓库还没处理过，先处理父仓库
         if not self._is_seen(parent_name):
@@ -1446,9 +1451,9 @@ class Collector:
                                   pushed_at=parent.get("pushed_at", ""),
                                   raw_depth=raw_depth + 1)
             except Exception as e:
-                print(f"[{now_str()}]   ⚠️ 父仓库 {parent_name}: {e}", flush=True)
+                self._wlog(f"  ⚠️ 父仓库 {parent_name}: {e}")
             new_parent = len(self.unique_nodes) - before_parent
-            print(f"[{now_str()}]   父仓库 +{new_parent} 个节点", flush=True)
+            self._wlog(f"  父仓库 +{new_parent} 个节点")
 
         # 3. 遍历父仓库的 fork 列表
         qualified = []
@@ -1485,13 +1490,13 @@ class Collector:
                               pushed_at=fork.get("pushed_at", ""),
                               raw_depth=raw_depth + 1)
         except Exception as e:
-            print(f"[{now_str()}]   ⚠️ {fork_name}: {e}", flush=True)
+            self._wlog(f"  ⚠️ {fork_name}: {e}")
         new_nodes = len(self.unique_nodes) - before
         return (fork_name, new_nodes)
 
     def _trace_child_forks(self, repo: str, branch: str, raw_depth: int):
         """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
-        print(f"[{now_str()}] 🔗 查子仓库: {repo}", flush=True)
+        self._wlog(f"🔗 查子仓库: {repo}")
         qualified = []
         for page in range(1, 3):
             forks = self.http.get_json(
@@ -1518,14 +1523,15 @@ class Collector:
         if not tq:  # 降级：无共用池时串行
             for fork in forks:
                 fn, nn = self._process_fork_repo(fork, branch, raw_depth)
-                if nn > 0: print(f"[{now_str()}]   {label}: {fn} +{nn}", flush=True)
+                if nn > 0: self._wlog(f"  {label}: {fn} +{nn}")
                 time.sleep(REPO_SLEEP_SECONDS)
             return
 
         # 有共用池 → 全部提交到发现队列
+        # 注意：调用方已通过 _check_and_add_seen 过滤，这里直接 put
         for fork in forks:
             fn = fork.get("full_name")
-            if not fn or not self._check_and_add_seen(fn): continue
+            if not fn: continue
             try:
                 tq.put(("GitHub", fn,
                         {"branch": fork.get("default_branch", branch),
@@ -1534,10 +1540,8 @@ class Collector:
                          "pushed_at": fork.get("pushed_at", "")}),
                        timeout=QUEUE_PUT_TIMEOUT_SECONDS)
             except Exception:
-                print(f"[{now_str()}] 🗑️  发现队列满，丢弃 {fn}", flush=True)
-        dq = getattr(self, '_disc_queue', None)
-        dq_sz = dq.qsize() if dq else 0
-        print(f"[{now_str()}]   {label}: {len(forks)} 个 → 发现队列 (队列: {dq_sz}/{DISCOVERY_QUEUE_SIZE})", flush=True)
+                self._wlog(f"🗑️  发现队列满，丢弃 {fn}")
+        self._wlog(f"  {label}: {len(forks)} 个 → {self._qs()}")
 
     def _trace_user_repos(self, repo: str, branch: str, raw_depth: int):
         """遍历同用户名下的所有公开仓库，查是否有节点产出。
@@ -1551,7 +1555,7 @@ class Collector:
             depth: 当前递归深度
         """
         owner = repo.split("/")[0]
-        print(f"[{now_str()}] 👤 遍历用户仓库: {owner}", flush=True)
+        self._wlog(f"👤 遍历用户仓库: {owner}")
 
         repo_pattern = re.compile(
             r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
@@ -1568,20 +1572,19 @@ class Collector:
                 break
             for r in repos_data:
                 fn = r.get("full_name")
-                if (not fn or self._is_seen(fn)
-                        or self._check_blacklist(f"https://github.com/{fn}")):
+                if not fn or self._check_blacklist(f"https://github.com/{fn}"):
                     continue
                 if fn in found: continue
                 found.add(fn)
-                if USER_REPOS_MAX_PER_USER and len(qualified) >= USER_REPOS_MAX_PER_USER:
-                    break
                 if not self._check_and_add_seen(fn):
                     continue
+                if USER_REPOS_MAX_PER_USER and len(qualified) >= USER_REPOS_MAX_PER_USER:
+                    break
                 qualified.append(r)
 
         if qualified:
             self._run_fork_batch(qualified, branch, raw_depth, "👤 用户仓库")
-        print(f"[{now_str()}]   用户 {owner} 共查 {len(qualified)} 个仓库", flush=True)
+        self._wlog(f"  用户 {owner} 共查 {len(qualified)} 个仓库")
 
     def _check_readme_spam(self, repo: str, branch: str) -> bool:
         """下载仓库 README 并检查广告关键词。只在无节点时调用。
@@ -1621,7 +1624,7 @@ class Collector:
 
         data = resp.json()
         if data.get('truncated', False):
-            print(f"[{now_str()}] 树数据被截断，回退到 Contents API", flush=True)
+            self._wlog(f"树数据被截断，回退到 Contents API")
             return False
 
         entries = data.get('tree', [])
@@ -1652,11 +1655,11 @@ class Collector:
             files_to_check.append((path, sha, e.get('size', 0)))
 
         if not files_to_check:
-            print(f"[{now_str()}] 仓库 https://github.com/{repo} 无候选文件 "
+            self._wlog(f"仓库 https://github.com/{repo} 无候选文件 "
                   f"(总计 {len([e for e in entries if e.get('type')=='blob'])} blob"
                   f", 扩展名过滤 {skipped_by_ext}"
                   f", processed_shas 跳过 {skipped_by_processed}"
-                  f", SHA 缓存跳过 {skipped_by_cache})", flush=True)
+                  f", SHA 缓存跳过 {skipped_by_cache})")
             # 如果有被 SHA 缓存或 processed_shas 跳过的文件，说明已处理过
             if skipped_by_cache > 0 or skipped_by_processed > 0:
                 has_nodes[0] = True  # 避免已处理过的仓库被加入黑名单
@@ -1667,33 +1670,33 @@ class Collector:
         # 少量候选文件 → 直接下载（零 API 成本）。
         # 大量候选文件 → 先通过 commits API 确定 24h 内变更的文件，再下载。
         if len(files_to_check) > MAX_RAW_DOWNLOADS_PER_REPO:
-            print(f"[{now_str()}] 仓库 https://github.com/{repo} "
+            self._wlog(f"仓库 https://github.com/{repo} "
                   f"候选文件较多 ({len(files_to_check)} 个)，"
-                  f"先通过 commits API 过滤", flush=True)
+                  f"先通过 commits API 过滤")
             changed = self._get_recently_changed_file_set(repo, branch)
             if changed is not None:
                 before = len(files_to_check)
                 files_to_check = [(p, s, sz) for p, s, sz in files_to_check if p in changed]
-                print(f"[{now_str()}]   commits 过滤: {before} → {len(files_to_check)} "
-                      f"(变更文件 {len(changed)} 个)", flush=True)
+                self._wlog(f"  commits 过滤: {before} → {len(files_to_check)} "
+                      f"(变更文件 {len(changed)} 个)")
             else:
                 # commits API 失败 → 降级为直接下载（宁可多下不可漏掉）
-                print(f"[{now_str()}]   commits API 失败，降级为直接下载", flush=True)
+                self._wlog(f"  commits API 失败，降级为直接下载")
 
         if not files_to_check:
-            print(f"[{now_str()}] 仓库 https://github.com/{repo} "
-                  f"候选文件经时间过滤后为空", flush=True)
+            self._wlog(f"仓库 https://github.com/{repo} "
+                  f"候选文件经时间过滤后为空")
             has_nodes[0] = True  # 24h 无新文件 ≠ 无节点，避免误加入黑名单
             return True
 
         # 限制处理数量（安全闸，防止极端情况）
         if MAX_COMMITS_PER_REPO is not None and len(files_to_check) > MAX_COMMITS_PER_REPO:
-            print(f"[{now_str()}] ⚠️ 候选文件过多 ({len(files_to_check)} 个)，"
-                  f"仅处理前 {MAX_COMMITS_PER_REPO} 个", flush=True)
+            self._wlog(f"⚠️ 候选文件过多 ({len(files_to_check)} 个)，"
+                  f"仅处理前 {MAX_COMMITS_PER_REPO} 个")
             files_to_check = files_to_check[:MAX_COMMITS_PER_REPO]
 
-        print(f"[{now_str()}] 仓库 https://github.com/{repo} "
-              f"候选文件 {len(files_to_check)} 个", flush=True)
+        self._wlog(f"仓库 https://github.com/{repo} "
+              f"候选文件 {len(files_to_check)} 个")
 
         # ---- 并行下载处理 ----
         # 小量文件串行（省线程开销），大量文件用线程池并发下载
@@ -1723,8 +1726,8 @@ class Collector:
                     try:
                         future.result()
                     except Exception as e:
-                        print(f"[{now_str()}] ⚠️ 并行下载异常: "
-                              f"{futures[future]}: {e}", flush=True)
+                        self._wlog(f"⚠️ 并行下载异常: "
+                              f"{futures[future]}: {e}")
 
         return True
 
@@ -1821,8 +1824,8 @@ class Collector:
         if not old_data:
             # 空列表 = 仓库在 24h 前没有 commit（新仓库或新分支）
             # 无法确定基准点，所有候选文件都视为"可能变更过"
-            print(f"[{now_str()}]   仓库无 24h 前 commit（新仓库/新分支），"
-                  f"不跳过任何文件", flush=True)
+            self._wlog(f"  仓库无 24h 前 commit（新仓库/新分支），"
+                  f"不跳过任何文件")
             return None  # 降级：全量下载
 
         old_sha = old_data[0].get("sha", "")
@@ -1845,8 +1848,8 @@ class Collector:
             if filename:
                 changed_files.add(filename)
 
-        print(f"[{now_str()}]   Compare API 返回 {len(changed_files)} 个变更文件 "
-              f"(3 次 API 调用)", flush=True)
+        self._wlog(f"  Compare API 返回 {len(changed_files)} 个变更文件 "
+              f"(3 次 API 调用)")
         return changed_files
 
     # ==================== 文件处理 ====================
@@ -1888,8 +1891,8 @@ class Collector:
 
         content_size_mb = len(content) / 1024 / 1024
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
-            print(f"[{now_str()}] 📄 {raw_url} ⚠️ 文件过大 "
-                  f"({content_size_mb:.1f}MB)，跳过", flush=True)
+            self._wlog(f"📄 {raw_url} ⚠️ 文件过大 "
+                  f"({content_size_mb:.1f}MB)，跳过")
             return  # 跳过但可能是间歇性问题 → 不标记
 
         # 提取节点（使用新的协议解析层）
@@ -1904,7 +1907,7 @@ class Collector:
             else:
                 proxies = extract()
         except FutureTimeoutError:
-            print(f"[{now_str()}] ⚠️ 文件处理超时，跳过 {raw_url}", flush=True)
+            self._wlog(f"⚠️ 文件处理超时，跳过 {raw_url}")
             return
         except Exception:
             return
@@ -1964,14 +1967,14 @@ class Collector:
 
         if VERBOSE_LOG:
             if valid_count == 0:
-                print(f"[{now_str()}] 📄 {raw_url} ❌ 未提取出节点 "
-                      f"(原始 {raw_count} 个候选全部验证失败)", flush=True)
+                self._wlog(f"📄 {raw_url} ❌ 未提取出节点 "
+                      f"(原始 {raw_count} 个候选全部验证失败)")
             elif new_count > 0:
-                print(f"[{now_str()}] 📄 {raw_url} ✅ 解析 {raw_count} 候选 → "
-                      f"{valid_count} 个有效节点 → 去重后新增 {new_count} 个", flush=True)
+                self._wlog(f"📄 {raw_url} ✅ 解析 {raw_count} 候选 → "
+                      f"{valid_count} 个有效节点 → 去重后新增 {new_count} 个")
             else:
-                print(f"[{now_str()}] 📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
-                      f"{valid_count} 个有效节点，全部重复", flush=True)
+                self._wlog(f"📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
+                      f"{valid_count} 个有效节点，全部重复")
 
         # ---- 自动刷盘 ----
         if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:
@@ -2053,7 +2056,7 @@ class Collector:
 
             if ext not in ALLOWED_EXTENSIONS:
                 continue
-            if self._is_seen(full_name) or \
+            if not self._check_and_add_seen(full_name) or \
                self._check_blacklist(f"https://github.com/{full_name}") or \
                self._is_repo_dead(full_name):
                 continue
@@ -2064,8 +2067,8 @@ class Collector:
             if self.recursive_count >= MAX_RECURSIVE_REPOS:
                 break
 
-            print(f"[{now_str()}] 🔗 递归发现仓库 {full_name} "
-                  f"(来源 {source_url})", flush=True)
+            self._wlog(f"🔗 递归发现仓库 {full_name} "
+                  f"(来源 {source_url})")
             self.recursive_count += 1
             time.sleep(REPO_SLEEP_SECONDS)
             # 并发保护：其他线程可能同时在查同一个 404 仓库
@@ -2120,8 +2123,8 @@ class Collector:
             if self.recursive_count >= MAX_RECURSIVE_REPOS:
                 break
 
-            print(f"[{now_str()}] 🔗 发现仓库链接 {full_name} "
-                  f"(来源 {source_url})", flush=True)
+            self._wlog(f"🔗 发现仓库链接 {full_name} "
+                  f"(来源 {source_url})")
             self.recursive_count += 1
             time.sleep(REPO_SLEEP_SECONDS)
             # 并发保护：其他线程可能同时在查同一个 404 仓库
@@ -2268,4 +2271,4 @@ class Collector:
         self.all_links = list(dict.fromkeys(self.all_links))
         with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(self.all_links))
-        print(f"[{now_str()}] 保存 no_li.txt ({len(self.all_links)} 条)", flush=True)
+        self._wlog(f"保存 no_li.txt ({len(self.all_links)} 条)")
