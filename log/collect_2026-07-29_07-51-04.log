@@ -1,0 +1,917 @@
+[2026-07-29 15:51:04] 🚀 程序启动
+[2026-07-29 15:51:04] 关键词: 105 个
+[2026-07-29 15:51:04] [MainThread] 已加载黑名单: 10047 个
+[2026-07-29 15:51:04] [MainThread] 加载 SHA 缓存 206114 条 (1 分片)
+[2026-07-29 15:51:04] [MainThread] 🚀 程序启动 | 配额上限 4800/小时
+[2026-07-29 15:51:04] [MainThread] 🔵 阶段 1: 种子仓库 (592 个)
+[2026-07-29 15:51:04] [种子] 🔵 种子仓库: 592 个 → 队列
+[2026-07-29 15:51:04] [种子] 🔵 [种子 1/592] mahdibland/V2RayAggregator | 配额 4799/4800 07:51 UTC | 主队列 1/200 发现队列 0/600[2026-07-29 15:51:04] [W-0] 🔧 开始处理 mahdibland/V2RayAggregator
+
+[2026-07-29 15:51:04] [W-0] 仓库 https://github.com/mahdibland/V2RayAggregator (分支: master, size: 4520045KB, pushed: 2026-07-29T04:01:29Z)
+[2026-07-29 15:51:05] [种子] 🔵 [种子 2/592] gfpcom/free-proxy-list | 配额 4798/4800 07:51 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-29 15:51:05] [W-1] 🔧 开始处理 gfpcom/free-proxy-list
+[2026-07-29 15:51:05] [W-1] 仓库 https://github.com/gfpcom/free-proxy-list (分支: main, size: 37110KB, pushed: 2026-07-29T04:10:46Z)
+[2026-07-29 15:51:06] [W-0] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件较多 (1527 个)，先通过 commits API 过滤
+[2026-07-29 15:51:06] [W-1] 仓库 https://github.com/gfpcom/free-proxy-list 候选文件 1 个
+[2026-07-29 15:51:06] [W-1] 🔗 递归发现仓库 wiki/gfpcom (来源 https://raw.githubusercontent.com/gfpcom/free-proxy-list/main/README.md)
+[2026-07-29 15:51:08] [W-2] 🔧 开始处理 ninjastrikers/nexus-nodes
+[2026-07-29 15:51:08] [种子] 🔵 [种子 3/592] ninjastrikers/nexus-nodes | 配额 4794/4800 07:51 UTC | 主队列 0/200 发现队列 0/600
+[2026-07-29 15:51:08] [W-2] 仓库 https://github.com/ninjastrikers/nexus-nodes (分支: main, size: 1013357KB, pushed: 2026-07-29T06:44:32Z)
+[2026-07-29 15:51:08] repo info (wiki/gfpcom) 404，跳过
+[2026-07-29 15:51:08] [W-1] 🔗 查子仓库: gfpcom/free-proxy-list
+[2026-07-29 15:51:09] [W-2] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件较多 (518 个)，先通过 commits API 过滤
+[2026-07-29 15:51:11] [种子] 🔵 [种子 4/592] ermaozi/get_subscribe | 配额 4788/4800 07:51 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-29 15:51:11] [W-3] 🔧 开始处理 ermaozi/get_subscribe
+[2026-07-29 15:51:11] [W-3] 仓库 https://github.com/ermaozi/get_subscribe (分支: main, size: 136KB, pushed: 2026-07-29T00:40:28Z)
+[2026-07-29 15:51:13] [W-1]   🍴 子仓库: 30 个 → 主队列 0/200 发现队列 30/600
+[2026-07-29 15:51:13] [W-1] 🔗 开始 Fork 链追踪 (gfpcom/free-proxy-list)
+[2026-07-29 15:51:13] [W-0]   Compare API 返回 26 个变更文件 (3 次 API 调用)
+[2026-07-29 15:51:13] [W-0]   commits 过滤: 1527 → 22 (变更文件 26 个)
+[2026-07-29 15:51:13] [W-0] 仓库 https://github.com/mahdibland/V2RayAggregator 候选文件 22 个
+[2026-07-29 15:51:13] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 mianfeifq/share (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:14] [ThreadPoolExecutor-1_13] 🔗 递归发现仓库 mahdibland/ShadowsocksAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:15] [W-3] 仓库 https://github.com/ermaozi/get_subscribe 无候选文件 (总计 73 blob, 扩展名过滤 64, processed_shas 跳过 0, SHA 缓存跳过 9)
+[2026-07-29 15:51:15] [W-3] 🔗 查子仓库: ermaozi/get_subscribe
+[2026-07-29 15:51:15] [种子] 🔵 [种子 5/592] pawdroid/Free-servers | 配额 4783/4800 07:51 UTC | 主队列 1/200 发现队列 30/600
+[2026-07-29 15:51:16] [W-1] 👤 遍历用户仓库: gfpcom
+[2026-07-29 15:51:16] repo info (mianfeifq/share) 404，跳过
+[2026-07-29 15:51:16] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 vpei/Free-Node-Merge (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:16] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 mahdibland/SSAggregator (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:16] [种子] 🔵 [种子 6/592] sevcator/5ubscrpt10n | 配额 4779/4800 07:51 UTC | 主队列 2/200 发现队列 31/600
+[2026-07-29 15:51:18] [ThreadPoolExecutor-1_2] 📦 批次 0001 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0001.txt (5021 个节点, 累计 5021 个) | 主队列 2/200 发现队列 31/600
+[2026-07-29 15:51:19] repo info (vpei/Free-Node-Merge) 返回 403 (尝试 1/2)
+[2026-07-29 15:51:19] repo info (vpei/Free-Node-Merge) 403（访问被拒，配额剩余 4921），跳过[2026-07-29 15:51:19] [W-1]   👤 用户仓库: 4 个 → 主队列 2/200 发现队列 35/600
+
+[2026-07-29 15:51:19] [W-1]   用户 gfpcom 共查 4 个仓库
+[2026-07-29 15:51:19] [W-1] ✅ 完成 gfpcom/free-proxy-list (+5021 节点)
+[2026-07-29 15:51:19] [W-1] 🔧 开始处理 josephGuo/free-proxy-list
+[2026-07-29 15:51:19] [W-1] 仓库 https://github.com/josephGuo/free-proxy-list (分支: main, size: 37163KB, pushed: 2026-07-29T02:24:51Z)
+[2026-07-29 15:51:23] [W-2]   Compare API 返回 300 个变更文件 (3 次 API 调用)
+[2026-07-29 15:51:23] [W-2]   commits 过滤: 518 → 280 (变更文件 300 个)
+[2026-07-29 15:51:23] [W-2] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件 280 个
+[2026-07-29 15:51:25] [ThreadPoolExecutor-1_2] SHA 缓存已保存: 206131 条, 1 分片
+[2026-07-29 15:51:25] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 ssrsub/ssr (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:25] [种子] 🔵 [种子 7/592] roosterkid/openproxylist | 配额 4771/4800 07:51 UTC | 主队列 3/200 发现队列 35/600
+[2026-07-29 15:51:26] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 ldir92664/Vmess-Actions (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:26] [种子] 🔵 [种子 8/592] V2RayRoot/V2RayConfig | 配额 4769/4800 07:51 UTC | 主队列 4/200 发现队列 36/600
+[2026-07-29 15:51:26] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 anaer/Sub (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:26] [W-1] 仓库 https://github.com/josephGuo/free-proxy-list 候选文件 1 个
+[2026-07-29 15:51:26] [W-1] 仓库 https://github.com/josephGuo/free-proxy-list 未提取到节点，加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 josephGuo/free-proxy-list (+49 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 shouma1/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/shouma1/free-proxy-list 3546h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 shouma1/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 a414166402/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/a414166402/free-proxy-list 3519h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 a414166402/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 y-chell/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/y-chell/free-proxy-list 3510h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 y-chell/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 akaryc1b/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/akaryc1b/free-proxy-list 3454h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 akaryc1b/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 jokerbug8/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/jokerbug8/free-proxy-list 3452h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 jokerbug8/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 shuaibibi11/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/shuaibibi11/free-proxy-list 3406h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 shuaibibi11/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 martinpeng123/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/martinpeng123/free-proxy-list 3390h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 martinpeng123/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 shahramdll/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/shahramdll/free-proxy-list 3346h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 shahramdll/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 lw9726/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/lw9726/free-proxy-list 3312h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 lw9726/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 JiwaniZakir/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/JiwaniZakir/free-proxy-list 3152h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 JiwaniZakir/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 schinnermark/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/schinnermark/free-proxy-list 3054h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 schinnermark/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 ddbon-calvin/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/ddbon-calvin/free-proxy-list 2995h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 ddbon-calvin/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 sunqiso/free-proxy-list2
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/sunqiso/free-proxy-list2 2956h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 sunqiso/free-proxy-list2 (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 fanren112233/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/fanren112233/free-proxy-list 3547h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 fanren112233/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 jeffrichman01/gfpcom_free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/jeffrichman01/gfpcom_free-proxy-list 2176h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 jeffrichman01/gfpcom_free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 saeed6394/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/saeed6394/free-proxy-list 1931h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 saeed6394/free-proxy-list (+1 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 1999FordFocus/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/1999FordFocus/free-proxy-list 1897h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 1999FordFocus/free-proxy-list (+1 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 kimjune01/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/kimjune01/free-proxy-list 1848h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 kimjune01/free-proxy-list (+1 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 mojtaba-aloevera/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/mojtaba-aloevera/free-proxy-list 1679h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 mojtaba-aloevera/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 luobikang1/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/luobikang1/free-proxy-list 1217h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 luobikang1/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 sanmaxdev/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/sanmaxdev/free-proxy-list 671h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 sanmaxdev/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 DeimosDeployed/Proxy-List
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/DeimosDeployed/Proxy-List 188h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 DeimosDeployed/Proxy-List (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 allanjoshuaf/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⚠️ 仓库 https://github.com/allanjoshuaf/free-proxy-list 463h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:26] [W-1] ✅ 完成 allanjoshuaf/free-proxy-list (+0 节点)
+[2026-07-29 15:51:26] [W-1] 🔧 开始处理 amir-rezaei/free-proxy-list
+[2026-07-29 15:51:26] [W-1] ⏭️ 仓库 https://github.com/amir-rezaei/free-proxy-list 81h 未更新，跳过解析（追踪 fork 链）
+[2026-07-29 15:51:26] [W-1] 🔗 查子仓库: amir-rezaei/free-proxy-list
+[2026-07-29 15:51:27] repo info (ldir92664/Vmess-Actions) 404，跳过
+[2026-07-29 15:51:27] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 mfuu/v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:27] [W-3]   🍴 子仓库: 30 个 → 主队列 4/200 发现队列 42/600
+[2026-07-29 15:51:27] [W-3] 🔗 开始 Fork 链追踪 (ermaozi/get_subscribe)
+[2026-07-29 15:51:27] [W-1] 🔗 开始 Fork 链追踪 (amir-rezaei/free-proxy-list)
+[2026-07-29 15:51:27] [W-3] 👤 遍历用户仓库: ermaozi
+[2026-07-29 15:51:27] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 aiboboxx/v2rayfree (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:27] [种子] 🔵 [种子 9/592] Farid-Karimi/Config-Collector | 配额 4763/4800 07:51 UTC | 主队列 5/200 发现队列 43/600
+[2026-07-29 15:51:27] [W-1]   父仓库: gfpcom/free-proxy-list
+[2026-07-29 15:51:29] [W-3]   👤 用户仓库: 21 个 → 主队列 5/200 发现队列 64/600
+[2026-07-29 15:51:29] [W-3]   用户 ermaozi 共查 21 个仓库[2026-07-29 15:51:29] [种子] 🔵 [种子 10/592] ehsanghaffar/config-sub-platform | 配额 4759/4800 07:51 UTC | 主队列 6/200 发现队列 64/600
+[2026-07-29 15:51:29] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 peasoft/NoMoreWalls (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:29] [W-3] ✅ 完成 ermaozi/get_subscribe (+5921 节点)
+
+[2026-07-29 15:51:30] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 kxswa/k (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:30] [W-3] 🔧 开始处理 AtenaPV/PL4
+[2026-07-29 15:51:30] [W-3] ⏭️ 仓库 https://github.com/AtenaPV/PL4 63h 未更新，跳过解析（追踪 fork 链）
+[2026-07-29 15:51:30] [W-3] 🔗 查子仓库: AtenaPV/PL4
+[2026-07-29 15:51:33] [种子] 🔵 [种子 11/592] Airuop/config-fetcher | 配额 4755/4800 07:51 UTC | 主队列 7/200 发现队列 65/600
+[2026-07-29 15:51:33] [W-3] 🔗 开始 Fork 链追踪 (AtenaPV/PL4)[2026-07-29 15:51:33] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 Rokate/Proxy-Sub (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)[2026-07-29 15:51:33] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 mahdibland/get_v2 (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+
+
+[2026-07-29 15:51:35] [W-1]   🍴 兄弟仓库: 22 个 → 主队列 7/200 发现队列 89/600
+[2026-07-29 15:51:35] [W-1] 👤 遍历用户仓库: amir-rezaei
+[2026-07-29 15:51:36] repo info (Rokate/Proxy-Sub) 404，跳过[2026-07-29 15:51:36] [种子] 🔵 [种子 12/592] free-nodes/v2rayfree | 配额 4749/4800 07:51 UTC | 主队列 8/200 发现队列 89/600
+
+[2026-07-29 15:51:36] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 vveg26/SubAutoConv (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:37] [W-2] 🔗 查子仓库: ninjastrikers/nexus-nodes
+[2026-07-29 15:51:38] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 SnapdragonLee/SystemProxy (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:38] [W-3]   父仓库: gfpcom/free-proxy-list
+[2026-07-29 15:51:38] repo info (vveg26/SubAutoConv) 404，跳过
+[2026-07-29 15:51:38] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 tbbatbb/Proxy (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:38] [种子] 🔵 [种子 13/592] crashgfw/free-airport-nodes | 配额 4745/4800 07:51 UTC | 主队列 9/200 发现队列 90/600
+[2026-07-29 15:51:42] [W-2]   🍴 子仓库: 7 个 → 主队列 9/200 发现队列 97/600
+[2026-07-29 15:51:42] [W-2] 🔗 开始 Fork 链追踪 (ninjastrikers/nexus-nodes)[2026-07-29 15:51:42] repo info (tbbatbb/Proxy) 404，跳过
+[2026-07-29 15:51:42] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)[2026-07-29 15:51:42] [种子] 🔵 [种子 14/592] lza6/free-VPN | 配额 4738/4800 07:51 UTC | 主队列 10/200 发现队列 98/600
+[2026-07-29 15:51:42] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 paimonhub/Paimonnode (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+
+
+[2026-07-29 15:51:44] [W-3] 👤 遍历用户仓库: AtenaPV
+[2026-07-29 15:51:46] repo info (Fndroid/clash_for_windows_pk) 404，跳过[2026-07-29 15:51:46] repo info (paimonhub/Paimonnode) 返回 403 (尝试 1/2)[2026-07-29 15:51:46] [W-2] 👤 遍历用户仓库: ninjastrikers
+
+[2026-07-29 15:51:46] [种子] 🔵 [种子 15/592] guying23/AutoMergePublicNodes | 配额 4732/4800 07:51 UTC | 主队列 11/200 发现队列 98/600
+[2026-07-29 15:51:46] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 Qv2ray/Qv2ra (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+
+[2026-07-29 15:51:46] repo info (paimonhub/Paimonnode) 403（访问被拒，配额剩余 4890），跳过
+[2026-07-29 15:51:46] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 vveg26/get_proxy (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:48] [W-1]   👤 用户仓库: 30 个 → 主队列 11/200 发现队列 128/600
+[2026-07-29 15:51:48] [W-1]   用户 amir-rezaei 共查 30 个仓库
+[2026-07-29 15:51:48] [W-1] ✅ 完成 amir-rezaei/free-proxy-list (+2830 节点)
+[2026-07-29 15:51:48] [W-1] 🔧 开始处理 BLYLMS/PL-DN
+[2026-07-29 15:51:48] [W-1] ⏭️ 仓库 https://github.com/BLYLMS/PL-DN 51h 未更新，跳过解析（追踪 fork 链）
+[2026-07-29 15:51:48] [W-1] 🔗 查子仓库: BLYLMS/PL-DN
+[2026-07-29 15:51:48] [W-3]   👤 用户仓库: 30 个 → 主队列 11/200 发现队列 157/600
+[2026-07-29 15:51:48] [W-3]   用户 AtenaPV 共查 30 个仓库
+[2026-07-29 15:51:48] [W-3] ✅ 完成 AtenaPV/PL4 (+1812 节点)
+[2026-07-29 15:51:48] [W-3] 🔧 开始处理 yangzhijun0325/free-proxy-list
+[2026-07-29 15:51:48] [W-3] ⚠️ 仓库 https://github.com/yangzhijun0325/free-proxy-list 6018h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:48] [W-3] ✅ 完成 yangzhijun0325/free-proxy-list (+0 节点)
+[2026-07-29 15:51:48] [W-3] 🔧 开始处理 johne-parker/free-proxy-list
+[2026-07-29 15:51:48] [W-3] ⚠️ 仓库 https://github.com/johne-parker/free-proxy-list 6631h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:48] [W-3] ✅ 完成 johne-parker/free-proxy-list (+0 节点)
+[2026-07-29 15:51:48] [W-3] 🔧 开始处理 devacius/free-proxy-list
+[2026-07-29 15:51:48] [W-3] ⚠️ 仓库 https://github.com/devacius/free-proxy-list 7725h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:48] [W-3] ✅ 完成 devacius/free-proxy-list (+0 节点)
+[2026-07-29 15:51:48] [W-3] 🔧 开始处理 mahdibland/ShadowsocksAggregator
+[2026-07-29 15:51:48] [W-3] 仓库 https://github.com/mahdibland/ShadowsocksAggregator (分支: master, size: 4520045KB, pushed: 2026-07-29T04:01:29Z)
+[2026-07-29 15:51:50] repo info (vveg26/get_proxy) 404，跳过
+[2026-07-29 15:51:50] repo info (Qv2ray/Qv2ra) 404，跳过[2026-07-29 15:51:50] [W-1] 🔗 开始 Fork 链追踪 (BLYLMS/PL-DN)
+
+[2026-07-29 15:51:50] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 ew732e8d8h1hi/q832yqwdu21u (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)[2026-07-29 15:51:50] [种子] 🔵 [种子 16/592] rtwo2/FastNodes | 配额 4724/4800 07:51 UTC | 主队列 12/200 发现队列 153/600
+[2026-07-29 15:51:50] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 2dust/v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+
+[2026-07-29 15:51:52] [W-3] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件较多 (1505 个)，先通过 commits API 过滤
+[2026-07-29 15:51:54] [W-2]   👤 用户仓库: 30 个 → 主队列 12/200 发现队列 183/600
+[2026-07-29 15:51:54] [W-2]   用户 ninjastrikers 共查 30 个仓库
+[2026-07-29 15:51:54] [W-2] ✅ 完成 ninjastrikers/nexus-nodes (+7902 节点)
+[2026-07-29 15:51:54] [W-1]   父仓库: gfpcom/free-proxy-list
+[2026-07-29 15:51:54] [W-2] 🔧 开始处理 gfpcom/freeproxy-php
+[2026-07-29 15:51:54] [W-2] ⚠️ 仓库 https://github.com/gfpcom/freeproxy-php 5687h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:54] [W-2] ✅ 完成 gfpcom/freeproxy-php (+0 节点)
+[2026-07-29 15:51:54] [W-2] 🔧 开始处理 gfpcom/freeproxy-node
+[2026-07-29 15:51:54] [W-2] ⚠️ 仓库 https://github.com/gfpcom/freeproxy-node 5767h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:54] [W-2] ✅ 完成 gfpcom/freeproxy-node (+0 节点)
+[2026-07-29 15:51:54] [W-2] 🔧 开始处理 gfpcom/freeproxy-go
+[2026-07-29 15:51:54] [W-2] ⚠️ 仓库 https://github.com/gfpcom/freeproxy-go 6055h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:54] [W-2] ✅ 完成 gfpcom/freeproxy-go (+0 节点)
+[2026-07-29 15:51:54] [W-2] 🔧 开始处理 gfpcom/freeproxy-python
+[2026-07-29 15:51:54] [W-2] ⚠️ 仓库 https://github.com/gfpcom/freeproxy-python 6052h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:51:54] [W-2] ✅ 完成 gfpcom/freeproxy-python (+0 节点)
+[2026-07-29 15:51:54] [W-2] 🔧 开始处理 mahdibland/SSAggregator
+[2026-07-29 15:51:54] [W-2] 仓库 https://github.com/mahdibland/SSAggregator (分支: master, size: 4520045KB, pushed: 2026-07-29T04:01:29Z)
+[2026-07-29 15:51:54] repo info (ew732e8d8h1hi/q832yqwdu21u) 404，跳过
+[2026-07-29 15:51:54] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 lisylva-lee/v2dyku (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:54] repo info (2dust/v2ray) 404，跳过
+[2026-07-29 15:51:54] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 TheMRLL/winxra (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:54] [种子] 🔵 [种子 17/592] wzdnzd/aggregator | 配额 4718/4800 07:51 UTC | 主队列 13/200 发现队列 178/600
+[2026-07-29 15:51:56] [W-2] 仓库 https://github.com/mahdibland/SSAggregator 候选文件较多 (1505 个)，先通过 commits API 过滤
+[2026-07-29 15:51:58] repo info (lisylva-lee/v2dyku) 404，跳过
+[2026-07-29 15:51:58] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 budamu/clashconfig (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:51:58] repo info (TheMRLL/winxra) 404，跳过
+[2026-07-29 15:51:58] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 shadowsocks/shadowsocks-window (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:51:58] [W-1] 👤 遍历用户仓库: BLYLMS
+[2026-07-29 15:52:02] [W-3]   Compare API 返回 26 个变更文件 (3 次 API 调用)
+[2026-07-29 15:52:02] [W-3]   commits 过滤: 1505 → 0 (变更文件 26 个)[2026-07-29 15:52:02] [种子] 🔵 [种子 18/592] aiboboxx/v2rayfree | 配额 4708/4800 07:52 UTC | 主队列 14/200 发现队列 178/600
+
+[2026-07-29 15:52:02] [W-3] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 候选文件经时间过滤后为空
+[2026-07-29 15:52:02] [W-3] 🔗 查子仓库: mahdibland/ShadowsocksAggregator
+[2026-07-29 15:52:03] [W-1]   👤 用户仓库: 6 个 → 主队列 14/200 发现队列 184/600
+[2026-07-29 15:52:03] [W-1]   用户 BLYLMS 共查 6 个仓库
+[2026-07-29 15:52:03] [W-1] ✅ 完成 BLYLMS/PL-DN (+0 节点)
+[2026-07-29 15:52:03] [W-1] 🔧 开始处理 ssrsub/ssr
+[2026-07-29 15:52:03] [W-1] 仓库 https://github.com/ssrsub/ssr (分支: master, size: 23078KB, pushed: 2026-07-29T02:43:10Z)
+[2026-07-29 15:52:05] repo info (shadowsocks/shadowsocks-window) 404，跳过[2026-07-29 15:52:05] repo info (budamu/clashconfig) 404，跳过
+[2026-07-29 15:52:05] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 HMBSbige/ShadowsocksR-Window (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+
+[2026-07-29 15:52:05] [ThreadPoolExecutor-1_6] 🔗 递归发现仓库 songtao1873/clash (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:52:07] [W-1] 仓库 https://github.com/ssrsub/ssr 候选文件 3 个
+[2026-07-29 15:52:07] repo info (HMBSbige/ShadowsocksR-Window) 404，跳过
+[2026-07-29 15:52:07] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 yichengchen/clash (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:52:07] repo info (songtao1873/clash) 404，跳过
+[2026-07-29 15:52:07] [ThreadPoolExecutor-1_6] 🔗 发现仓库链接 Fukki-Z/nodefree (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:52:07] [种子] 🔵 [种子 19/592] awesome-vpn/awesome-vpn | 配额 4698/4800 07:52 UTC | 主队列 15/200 发现队列 183/600
+[2026-07-29 15:52:07] [W-1] 🔗 查子仓库: ssrsub/ssr
+[2026-07-29 15:52:09] [W-3]   🍴 子仓库: 30 个 → 主队列 15/200 发现队列 213/600
+[2026-07-29 15:52:09] [W-3] 🔗 开始 Fork 链追踪 (mahdibland/ShadowsocksAggregator)[2026-07-29 15:52:09] [W-2]   Compare API 返回 26 个变更文件 (3 次 API 调用)
+
+[2026-07-29 15:52:09] [W-2]   commits 过滤: 1505 → 0 (变更文件 26 个)
+[2026-07-29 15:52:09] [W-2] 仓库 https://github.com/mahdibland/SSAggregator 候选文件经时间过滤后为空
+[2026-07-29 15:52:09] [W-2] 🔗 查子仓库: mahdibland/SSAggregator
+[2026-07-29 15:52:09] repo info (yichengchen/clash) 404，跳过
+[2026-07-29 15:52:09] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 yanue/V2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:52:09] repo info (Fukki-Z/nodefree) 404，跳过
+[2026-07-29 15:52:09] [ThreadPoolExecutor-1_6] 🔗 发现仓库链接 FiFier/v2rayShare (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:52:09] [种子] 🔵 [种子 20/592] bruceblink/free-v2ray | 配额 4693/4800 07:52 UTC | 主队列 16/200 发现队列 213/600
+[2026-07-29 15:52:11] [W-3] 👤 遍历用户仓库: mahdibland
+[2026-07-29 15:52:14] [W-1]   🍴 子仓库: 30 个 → 主队列 16/200 发现队列 243/600
+[2026-07-29 15:52:14] [W-1] 🔗 开始 Fork 链追踪 (ssrsub/ssr)
+[2026-07-29 15:52:14] repo info (FiFier/v2rayShare) 404，跳过
+[2026-07-29 15:52:14] [ThreadPoolExecutor-1_6] 🔗 发现仓库链接 RenaLio/Mux2sub (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:52:14] repo info (yanue/V2ray) 404，跳过
+[2026-07-29 15:52:14] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 v2rayA/v2ray (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:52:14] [W-1] 👤 遍历用户仓库: ssrsub
+[2026-07-29 15:52:16] [W-2]   🍴 子仓库: 24 个 → 主队列 17/200 发现队列 267/600
+[2026-07-29 15:52:16] [W-2] 🔗 开始 Fork 链追踪 (mahdibland/SSAggregator)
+[2026-07-29 15:52:18] [种子] 🔵 [种子 21/592] Mr-Meshky/vify | 配额 4683/4800 07:52 UTC | 主队列 17/200 发现队列 267/600
+[2026-07-29 15:52:20] [W-3]   👤 用户仓库: 18 个 → 主队列 17/200 发现队列 285/600[2026-07-29 15:52:20] repo info (v2rayA/v2ray) 404，跳过[2026-07-29 15:52:20] repo info (RenaLio/Mux2sub) 返回 403 (尝试 1/2)[2026-07-29 15:52:20] [W-2] 👤 遍历用户仓库: mahdibland
+
+
+
+[2026-07-29 15:52:20] repo info (RenaLio/Mux2sub) 403（访问被拒，配额剩余 4848），跳过[2026-07-29 15:52:20] [W-3]   用户 mahdibland 共查 18 个仓库[2026-07-29 15:52:20] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 Kr328/ClashForAndroi (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:52:20] [ThreadPoolExecutor-1_6] 🔗 发现仓库链接 colatiger/v2ray-nodes (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+
+
+[2026-07-29 15:52:20] [W-3] ✅ 完成 mahdibland/ShadowsocksAggregator (+49 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 yaney01/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/yaney01/get_subscribe 5190h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 yaney01/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 Dong-learn9/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/Dong-learn9/get_subscribe 12258h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 Dong-learn9/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 yelangmao/emzclash
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/yelangmao/emzclash 33931h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 yelangmao/emzclash (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 fantaiying7/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/fantaiying7/get_subscribe 34201h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 fantaiying7/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 lkmvip/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/lkmvip/get_subscribe 24164h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 lkmvip/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 tvbw/clash4
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/tvbw/clash4 18188h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 tvbw/clash4 (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 syly315531/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/syly315531/get_subscribe 24164h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 syly315531/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 MizunaRei/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/MizunaRei/get_subscribe 20204h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 MizunaRei/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 iyear/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/iyear/get_subscribe 40219h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 iyear/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 liaoduoduo/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/liaoduoduo/get_subscribe 42967h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 liaoduoduo/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 SeasonAndSun/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/SeasonAndSun/get_subscribe 42962h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 SeasonAndSun/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 jocelin110/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/jocelin110/get_subscribe 42722h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 jocelin110/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 Pyer-At-Gh/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/Pyer-At-Gh/get_subscribe 35035h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 Pyer-At-Gh/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 Liliie1/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/Liliie1/get_subscribe 29057h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 Liliie1/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 supreparhelia/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/supreparhelia/get_subscribe 34647h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 supreparhelia/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 chargeduck/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/chargeduck/get_subscribe 22640h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 chargeduck/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 hello-world-1989/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/hello-world-1989/get_subscribe 21656h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 hello-world-1989/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 my-tv1/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/my-tv1/get_subscribe 1388h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 my-tv1/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 cyl804987443/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/cyl804987443/get_subscribe 33571h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 cyl804987443/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 davidguo2012/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/davidguo2012/get_subscribe 8863h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 davidguo2012/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 jacobsikombe/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/jacobsikombe/get_subscribe 29057h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 jacobsikombe/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 yjx1804/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/yjx1804/get_subscribe 25458h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 yjx1804/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 1595113689/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/1595113689/get_subscribe 36739h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 1595113689/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 springxian163/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/springxian163/get_subscribe 28591h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 springxian163/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 clashv2ray-hub/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/clashv2ray-hub/get_subscribe 21727h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 clashv2ray-hub/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 vpei/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/vpei/get_subscribe 15626h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 vpei/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 dhui68/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/dhui68/get_subscribe 28687h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 dhui68/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 zhm9888/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/zhm9888/get_subscribe 15535h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 zhm9888/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 wulishuhan/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/wulishuhan/get_subscribe 41695h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 wulishuhan/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 gang-GitHub/get_subscribe
+[2026-07-29 15:52:20] [W-3] ⚠️ 仓库 https://github.com/gang-GitHub/get_subscribe 16181h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:20] [W-3] ✅ 完成 gang-GitHub/get_subscribe (+0 节点)
+[2026-07-29 15:52:20] [W-3] 🔧 开始处理 anaer/Sub
+[2026-07-29 15:52:20] [W-3] 仓库 https://github.com/anaer/Sub (分支: main, size: 102KB, pushed: 2026-07-28T11:58:31Z)
+[2026-07-29 15:52:22] [W-1]   👤 用户仓库: 4 个 → 主队列 17/200 发现队列 258/600
+[2026-07-29 15:52:22] [W-1]   用户 ssrsub 共查 4 个仓库
+[2026-07-29 15:52:22] [W-1] ✅ 完成 ssrsub/ssr (+49 节点)
+[2026-07-29 15:52:22] [W-1] 🔧 开始处理 ermaozi/trojan-go-panel
+[2026-07-29 15:52:22] [W-1] ⚠️ 仓库 https://github.com/ermaozi/trojan-go-panel 27918h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:22] [W-1] ✅ 完成 ermaozi/trojan-go-panel (+0 节点)
+[2026-07-29 15:52:22] [W-1] 🔧 开始处理 ermaozi/ermaozi.org
+[2026-07-29 15:52:22] [W-1] 仓库 https://github.com/ermaozi/ermaozi.org (分支: main, size: 22535KB, pushed: 2026-07-28T21:42:50Z)
+[2026-07-29 15:52:22] repo info (colatiger/v2ray-nodes) 404，跳过
+[2026-07-29 15:52:22] [ThreadPoolExecutor-1_6] 🔗 发现仓库链接 GreenFishStudio/GreenFish (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:52:22] repo info (Kr328/ClashForAndroi) 404，跳过
+[2026-07-29 15:52:22] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 SagerNet/SagerNe (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:52:22] [种子] 🔵 [种子 22/592] pog7x/vpn-configs | 配额 4674/4800 07:52 UTC | 主队列 18/200 发现队列 256/600
+[2026-07-29 15:52:24] [W-3] 仓库 https://github.com/anaer/Sub 无候选文件 (总计 3 blob, 扩展名过滤 0, processed_shas 跳过 0, SHA 缓存跳过 3)
+[2026-07-29 15:52:24] [W-3] 🔗 查子仓库: anaer/Sub
+[2026-07-29 15:52:24] [W-1] 仓库 https://github.com/ermaozi/ermaozi.org 候选文件 100 个
+[2026-07-29 15:52:24] [ThreadPoolExecutor-309_14] 🔗 发现仓库链接 satnaing/astro-paper (来源 https://raw.githubusercontent.com/ermaozi/ermaozi.org/main/README.md)
+[2026-07-29 15:52:24] [ThreadPoolExecutor-309_7] 🔗 发现仓库链接 unredacted/freesocks-control-plan (来源 https://raw.githubusercontent.com/ermaozi/ermaozi.org/main/src/data/blog/freesocks-v2-free-vpn-guide.md)
+[2026-07-29 15:52:26] [W-2]   用户 mahdibland 共查 0 个仓库
+[2026-07-29 15:52:26] [W-2] ✅ 完成 mahdibland/SSAggregator (+49 节点)
+[2026-07-29 15:52:26] [W-2] 🔧 开始处理 ermaozi/ermao.net
+[2026-07-29 15:52:26] [W-2] 仓库 https://github.com/ermaozi/ermao.net (分支: main, size: 163731KB, pushed: 2026-07-28T14:50:46Z)
+[2026-07-29 15:52:26] repo info (GreenFishStudio/GreenFish) 404，跳过
+[2026-07-29 15:52:26] [ThreadPoolExecutor-1_6] 🔗 发现仓库链接 songtao1873/providers (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_list.json)
+[2026-07-29 15:52:26] repo info (SagerNet/SagerNe) 404，跳过
+[2026-07-29 15:52:26] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 shadowsocks/shadowsocks-androi (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+[2026-07-29 15:52:26] [种子] 🔵 [种子 23/592] mheidari98/.proxy | 配额 4667/4800 07:52 UTC | 主队列 19/200 发现队列 255/600
+[2026-07-29 15:52:26] repo info (unredacted/freesocks-control-plan) 404，跳过
+[2026-07-29 15:52:26] [W-1] 仓库 https://github.com/ermaozi/ermaozi.org 未提取到节点，加入黑名单
+[2026-07-29 15:52:26] [W-1] ✅ 完成 ermaozi/ermaozi.org (+0 节点)
+[2026-07-29 15:52:26] [W-1] 🔧 开始处理 ermaozi/pyjichang.com
+[2026-07-29 15:52:26] [W-1] 仓库 https://github.com/ermaozi/pyjichang.com (分支: main, size: 89461KB, pushed: 2026-07-28T14:50:19Z)
+[2026-07-29 15:52:28] [W-2] 仓库 https://github.com/ermaozi/ermao.net 候选文件较多 (176 个)，先通过 commits API 过滤
+[2026-07-29 15:52:30] [W-1] 仓库 https://github.com/ermaozi/pyjichang.com 候选文件较多 (102 个)，先通过 commits API 过滤
+[2026-07-29 15:52:32] repo info (shadowsocks/shadowsocks-androi) 404，跳过
+[2026-07-29 15:52:32] repo info (songtao1873/providers) 404，跳过[2026-07-29 15:52:32] [ThreadPoolExecutor-1_13] 🔗 发现仓库链接 HMBSbige/ShadowsocksR-Androi (来源 https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/README.md)
+
+[2026-07-29 15:52:34] [种子] 🔵 [种子 24/592] yitong2333/proxy-minging | 配额 4658/4800 07:52 UTC | 主队列 20/200 发现队列 255/600
+[2026-07-29 15:52:34] [W-3]   🍴 子仓库: 30 个 → 主队列 20/200 发现队列 285/600
+[2026-07-29 15:52:34] [W-3] 🔗 开始 Fork 链追踪 (anaer/Sub)
+[2026-07-29 15:52:34] repo info (HMBSbige/ShadowsocksR-Androi) 404，跳过
+[2026-07-29 15:52:34] [W-0] 🔗 查子仓库: mahdibland/V2RayAggregator
+[2026-07-29 15:52:36] [W-3] 👤 遍历用户仓库: anaer
+[2026-07-29 15:52:39] [种子] 🔵 [种子 25/592] MhdiTaheri/V2rayCollector_Py | 配额 4650/4800 07:52 UTC | 主队列 21/200 发现队列 285/600
+[2026-07-29 15:52:39] [W-1]   Compare API 返回 2 个变更文件 (3 次 API 调用)
+[2026-07-29 15:52:39] [W-1]   commits 过滤: 102 → 2 (变更文件 2 个)
+[2026-07-29 15:52:39] [W-1] 仓库 https://github.com/ermaozi/pyjichang.com 候选文件 2 个
+[2026-07-29 15:52:39] [W-2]   Compare API 返回 4 个变更文件 (3 次 API 调用)
+[2026-07-29 15:52:39] [W-2]   commits 过滤: 176 → 2 (变更文件 4 个)
+[2026-07-29 15:52:39] [W-2] 仓库 https://github.com/ermaozi/ermao.net 候选文件 2 个
+[2026-07-29 15:52:39] [W-0] 🔗 开始 Fork 链追踪 (mahdibland/V2RayAggregator)
+[2026-07-29 15:52:39] [W-2] 仓库 https://github.com/ermaozi/ermao.net README 含广告词，加入黑名单
+[2026-07-29 15:52:39] [W-2] ✅ 完成 ermaozi/ermao.net (+0 节点)
+[2026-07-29 15:52:39] [W-2] 🔧 开始处理 ermaozi/ermao.org
+[2026-07-29 15:52:39] [W-2] 仓库 https://github.com/ermaozi/ermao.org (分支: master, size: 3079KB, pushed: 2026-07-28T14:50:19Z)
+[2026-07-29 15:52:39] README (ermaozi/pyjichang.com) 404，跳过
+[2026-07-29 15:52:39] [W-1] 仓库 https://github.com/ermaozi/pyjichang.com 未提取到节点，加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/pyjichang.com (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/oibot
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/oibot 986h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/oibot (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/ermaozi
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/ermaozi 2273h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/ermaozi (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/vuepress-theme-plume
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/vuepress-theme-plume 3678h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/vuepress-theme-plume (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/blog
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/blog 31892h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/blog (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/config
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/config 13157h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/config (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/OpenSourceNovel
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/OpenSourceNovel 大小为 0，跳过
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/OpenSourceNovel (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/django_songs
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/django_songs 44987h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/django_songs (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/sample-database
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/sample-database 24467h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/sample-database (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/liar
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/liar 大小为 0，跳过
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/liar (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/python
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/python 34302h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/python (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/meme
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/meme 39412h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/meme (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/docker-go-cqhttp
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/docker-go-cqhttp 39583h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/docker-go-cqhttp (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/repository_info
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/repository_info 大小为 0，跳过
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/repository_info (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/trojan-go-web
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/trojan-go-web 44258h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/trojan-go-web (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/linux-sleep
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/linux-sleep 49828h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/linux-sleep (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 ermaozi/blog-web
+[2026-07-29 15:52:39] [W-1] ⚠️ 仓库 https://github.com/ermaozi/blog-web 51071h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:39] [W-1] ✅ 完成 ermaozi/blog-web (+0 节点)
+[2026-07-29 15:52:39] [W-1] 🔧 开始处理 mfuu/v2ray
+[2026-07-29 15:52:39] [W-1] 仓库 https://github.com/mfuu/v2ray (分支: master, size: 23KB, pushed: 2026-07-29T07:37:17Z)
+[2026-07-29 15:52:41] [W-3]   👤 用户仓库: 30 个 → 主队列 21/200 发现队列 297/600
+[2026-07-29 15:52:41] [W-3]   用户 anaer 共查 30 个仓库
+[2026-07-29 15:52:41] [W-3] ✅ 完成 anaer/Sub (+0 节点)
+[2026-07-29 15:52:41] [W-3] 🔧 开始处理 aiboboxx/v2rayfree
+[2026-07-29 15:52:41] [W-3] 仓库 https://github.com/aiboboxx/v2rayfree (分支: main, size: 22432KB, pushed: 2026-07-29T06:34:52Z)
+[2026-07-29 15:52:41] [W-0] 👤 遍历用户仓库: mahdibland
+[2026-07-29 15:52:43] [W-1] 仓库 https://github.com/mfuu/v2ray 候选文件 2 个[2026-07-29 15:52:43] [W-2] 仓库 https://github.com/ermaozi/ermao.org 候选文件 86 个
+
+[2026-07-29 15:52:43] [W-3] 仓库 https://github.com/aiboboxx/v2rayfree 候选文件 3 个[2026-07-29 15:52:43] [种子] 🔵 [种子 26/592] mohamadfg-dev/telegram-v2ray-configs-collector | 配额 4640/4800 07:52 UTC | 主队列 22/200 发现队列 296/600
+
+[2026-07-29 15:52:44] [W-1] 🔗 查子仓库: mfuu/v2ray
+[2026-07-29 15:52:44] [W-3] 🔗 发现仓库链接 clashbk/clas (来源 https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/README.md)
+[2026-07-29 15:52:44] [ThreadPoolExecutor-414_13] 🔗 发现仓库链接 devgelo-labs/astro-starter-pro (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/README.md)
+[2026-07-29 15:52:46] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/antfu (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:52:46] [W-0]   用户 mahdibland 共查 0 个仓库
+[2026-07-29 15:52:46] [W-0] ✅ 完成 mahdibland/V2RayAggregator (+8485 节点)
+[2026-07-29 15:52:46] [W-0] 🔧 开始处理 kxswa/k
+[2026-07-29 15:52:46] [W-0] ⚠️ 仓库 https://github.com/kxswa/k 大小为 0，跳过
+[2026-07-29 15:52:46] [W-0] ✅ 完成 kxswa/k (+0 节点)
+[2026-07-29 15:52:46] [W-0] 🔧 开始处理 peasoft/NoMoreWalls
+[2026-07-29 15:52:46] [W-0] 仓库 https://github.com/peasoft/NoMoreWalls (分支: master, size: 5046437KB, pushed: 2026-07-29T05:52:47Z)
+[2026-07-29 15:52:46] repo info (clashbk/clas) 404，跳过
+[2026-07-29 15:52:46] [W-3] 🔗 发现仓库链接 free-nodes/clashfree (来源 https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/README.md)
+[2026-07-29 15:52:46] [种子] 🔵 [种子 27/592] free18/v2ray | 配额 4636/4800 07:52 UTC | 主队列 23/200 发现队列 294/600
+[2026-07-29 15:52:46] [ThreadPoolExecutor-414_13] 🔗 发现仓库链接 devgelo-labs/astro-starter-pro.git (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/README.md)
+[2026-07-29 15:52:46] [W-0] 仓库 https://github.com/peasoft/NoMoreWalls 候选文件 25 个
+[2026-07-29 15:52:48] [W-0] 🔗 查子仓库: peasoft/NoMoreWalls
+[2026-07-29 15:52:50] repo info (devgelo-labs/astro-starter-pro.git) 404，跳过[2026-07-29 15:52:50] repo info (sponsors/antfu) 404，跳过
+
+[2026-07-29 15:52:50] [ThreadPoolExecutor-414_13] 🔗 发现仓库链接 user-attachments/assets (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/README.md)[2026-07-29 15:52:50] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/sindresorhus (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+
+[2026-07-29 15:52:51] [W-3] 🔗 查子仓库: aiboboxx/v2rayfree
+[2026-07-29 15:52:52] [种子] 🔵 [种子 28/592] Epodonios/v2ray-configs | 配额 4629/4800 07:52 UTC | 主队列 24/200 发现队列 296/600
+[2026-07-29 15:52:52] [W-1]   🍴 子仓库: 30 个 → 主队列 24/200 发现队列 326/600
+[2026-07-29 15:52:52] [W-1] 🔗 开始 Fork 链追踪 (mfuu/v2ray)
+[2026-07-29 15:52:52] repo info (sponsors/sindresorhus) 404，跳过
+[2026-07-29 15:52:52] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/nzakas (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:52:52] repo info (user-attachments/assets) 404，跳过
+[2026-07-29 15:52:52] [W-1] 👤 遍历用户仓库: mfuu
+[2026-07-29 15:52:56] repo info (sponsors/nzakas) 404，跳过
+[2026-07-29 15:52:56] [种子] 🔵 [种子 29/592] acymz/AutoVPN | 配额 4620/4800 07:52 UTC | 主队列 25/200 发现队列 326/600[2026-07-29 15:52:56] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/isaacs (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+
+[2026-07-29 15:52:58] [W-0]   🍴 子仓库: 30 个 → 主队列 25/200 发现队列 356/600[2026-07-29 15:52:58] [W-3]   🍴 子仓库: 30 个 → 主队列 25/200 发现队列 386/600
+
+[2026-07-29 15:52:58] [W-3] 🔗 开始 Fork 链追踪 (aiboboxx/v2rayfree)
+[2026-07-29 15:52:58] [W-0] 🔗 开始 Fork 链追踪 (peasoft/NoMoreWalls)
+[2026-07-29 15:52:58] [W-1]   👤 用户仓库: 30 个 → 主队列 25/200 发现队列 416/600
+[2026-07-29 15:52:58] [W-1]   用户 mfuu 共查 30 个仓库
+[2026-07-29 15:52:58] [W-1] ✅ 完成 mfuu/v2ray (+621 节点)
+[2026-07-29 15:52:58] [W-1] 🔧 开始处理 KeJi1/free-proxy
+[2026-07-29 15:52:58] [W-1] ⚠️ 仓库 https://github.com/KeJi1/free-proxy 3741h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:52:58] [W-1] ✅ 完成 KeJi1/free-proxy (+0 节点)
+[2026-07-29 15:52:58] [W-1] 🔧 开始处理 fenwehome/free-proxy-list
+[2026-07-29 15:52:58] [W-1] 仓库 https://github.com/fenwehome/free-proxy-list (分支: main, size: 37045KB, pushed: 2026-07-29T07:43:22Z)
+[2026-07-29 15:53:00] repo info (sponsors/isaacs) 404，跳过
+[2026-07-29 15:53:00] [W-0] 👤 遍历用户仓库: peasoft[2026-07-29 15:53:00] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/epoberezkin (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+
+[2026-07-29 15:53:00] [W-3] 👤 遍历用户仓库: aiboboxx
+[2026-07-29 15:53:00] [种子] 🔵 [种子 30/592] snakem982/proxypool | 配额 4613/4800 07:53 UTC | 主队列 26/200 发现队列 414/600
+[2026-07-29 15:53:02] [W-1] 仓库 https://github.com/fenwehome/free-proxy-list 候选文件 1 个
+[2026-07-29 15:53:02] [W-3]   用户 aiboboxx 共查 0 个仓库
+[2026-07-29 15:53:02] [W-3] ✅ 完成 aiboboxx/v2rayfree (+621 节点)
+[2026-07-29 15:53:02] [W-3] 🔧 开始处理 apolo2024a/free-proxy-list
+[2026-07-29 15:53:02] [W-3] ⚠️ 仓库 https://github.com/apolo2024a/free-proxy-list 6814h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:02] [W-3] ✅ 完成 apolo2024a/free-proxy-list (+0 节点)
+[2026-07-29 15:53:02] [W-3] 🔧 开始处理 GenAibd/free-proxy-list
+[2026-07-29 15:53:02] [W-3] ⚠️ 仓库 https://github.com/GenAibd/free-proxy-list 6615h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:02] [W-3] ✅ 完成 GenAibd/free-proxy-list (+0 节点)
+[2026-07-29 15:53:02] [W-3] 🔧 开始处理 Cuarentas/free-proxy-list
+[2026-07-29 15:53:02] [W-3] 仓库 https://github.com/Cuarentas/free-proxy-list (分支: main, size: 36936KB, pushed: 2026-07-29T07:18:25Z)
+[2026-07-29 15:53:02] repo info (sponsors/epoberezkin) 404，跳过
+[2026-07-29 15:53:02] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 chalk/ansi-regex (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:03] [种子] 🔵 [种子 31/592] Leon406/SubCrawler | 配额 4609/4800 07:53 UTC | 主队列 27/200 发现队列 411/600
+[2026-07-29 15:53:03] [W-1] 🔗 查子仓库: fenwehome/free-proxy-list
+[2026-07-29 15:53:05] [W-3] 仓库 https://github.com/Cuarentas/free-proxy-list 候选文件 1 个
+[2026-07-29 15:53:05] [W-0]   👤 用户仓库: 30 个 → 主队列 27/200 发现队列 441/600
+[2026-07-29 15:53:05] [W-0]   用户 peasoft 共查 30 个仓库
+[2026-07-29 15:53:05] [W-0] ✅ 完成 peasoft/NoMoreWalls (+89 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 hackwuyue/free-proxy-list
+[2026-07-29 15:53:05] [W-0] ⚠️ 仓库 https://github.com/hackwuyue/free-proxy-list 6435h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:05] [W-0] ✅ 完成 hackwuyue/free-proxy-list (+0 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 Alway4/free-proxy-list2
+[2026-07-29 15:53:05] [W-0] ⚠️ 仓库 https://github.com/Alway4/free-proxy-list2 6410h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:05] [W-0] ✅ 完成 Alway4/free-proxy-list2 (+0 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 Nate2018/free-proxy-list
+[2026-07-29 15:53:05] [W-0] ⚠️ 仓库 https://github.com/Nate2018/free-proxy-list 6175h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:05] [W-0] ✅ 完成 Nate2018/free-proxy-list (+0 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 tiendung-c/free-proxy-list
+[2026-07-29 15:53:05] [W-0] ⚠️ 仓库 https://github.com/tiendung-c/free-proxy-list 6021h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:05] [W-0] ✅ 完成 tiendung-c/free-proxy-list (+0 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 ElonFutu/free-proxy-list
+[2026-07-29 15:53:05] [W-1] 🔗 开始 Fork 链追踪 (fenwehome/free-proxy-list)[2026-07-29 15:53:05] [W-0] ⚠️ 仓库 https://github.com/ElonFutu/free-proxy-list 10487h 未更新，废弃 → 加入黑名单
+
+[2026-07-29 15:53:05] [W-0] ✅ 完成 ElonFutu/free-proxy-list (+0 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 Alibodama/free-proxy-list
+[2026-07-29 15:53:05] [W-0] ⚠️ 仓库 https://github.com/Alibodama/free-proxy-list 5773h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:05] [W-0] ✅ 完成 Alibodama/free-proxy-list (+0 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 Ernest12287/free-proxy-list
+[2026-07-29 15:53:05] [W-0] ⚠️ 仓库 https://github.com/Ernest12287/free-proxy-list 5707h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:05] [W-0] ✅ 完成 Ernest12287/free-proxy-list (+0 节点)
+[2026-07-29 15:53:05] [W-0] 🔧 开始处理 changsongyang/free-proxy-list
+[2026-07-29 15:53:05] [W-0] 仓库 https://github.com/changsongyang/free-proxy-list (分支: main, size: 37092KB, pushed: 2026-07-29T06:21:28Z)
+[2026-07-29 15:53:05] [W-3] 🔗 查子仓库: Cuarentas/free-proxy-list
+[2026-07-29 15:53:07] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 chalk/ansi-styles (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:07] [种子] 🔵 [种子 32/592] 603711936/SmartSub | 配额 4603/4800 07:53 UTC | 主队列 28/200 发现队列 434/600
+[2026-07-29 15:53:07] [W-3] 🔗 开始 Fork 链追踪 (Cuarentas/free-proxy-list)
+[2026-07-29 15:53:09] [W-1]   父仓库: gfpcom/free-proxy-list[2026-07-29 15:53:09] [W-0] 仓库 https://github.com/changsongyang/free-proxy-list 候选文件 1 个
+
+[2026-07-29 15:53:09] [W-0] 🔗 查子仓库: changsongyang/free-proxy-list
+[2026-07-29 15:53:11] [W-3]   父仓库: gfpcom/free-proxy-list
+[2026-07-29 15:53:11] [W-0] 🔗 开始 Fork 链追踪 (changsongyang/free-proxy-list)
+[2026-07-29 15:53:11] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/jonschlinkert (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:11] [种子] 🔵 [种子 33/592] Triton-ix/v2ray-Finder | 配额 4596/4800 07:53 UTC | 主队列 29/200 发现队列 435/600
+[2026-07-29 15:53:11] [W-0]   父仓库: gfpcom/free-proxy-list
+[2026-07-29 15:53:15] repo info (sponsors/jonschlinkert) 404，跳过
+[2026-07-29 15:53:15] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/ljharb (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:16] repo info (alanbobs999/TopFreeProxies) 返回 403 (尝试 1/2)
+[2026-07-29 15:53:16] repo info (alanbobs999/TopFreeProxies) 403（访问被拒，配额剩余 4783），跳过
+[2026-07-29 15:53:16] [种子] ❌ 🔵 [种子 34/592] alanbobs999/TopFreeProxies 404 | 配额 4590/4800 07:53 UTC | 主队列 29/200 发现队列 435/600
+[2026-07-29 15:53:16] [种子] 🔵 [种子 35/592] wrfree/free | 配额 4589/4800 07:53 UTC | 主队列 30/200 发现队列 435/600
+[2026-07-29 15:53:16] [W-3] 👤 遍历用户仓库: Cuarentas
+[2026-07-29 15:53:18] [W-0] 👤 遍历用户仓库: changsongyang[2026-07-29 15:53:18] [W-1] 👤 遍历用户仓库: fenwehome
+
+[2026-07-29 15:53:20] [W-3]   👤 用户仓库: 30 个 → 主队列 30/200 发现队列 465/600
+[2026-07-29 15:53:20] [W-3]   用户 Cuarentas 共查 30 个仓库
+[2026-07-29 15:53:20] [W-3] ✅ 完成 Cuarentas/free-proxy-list (+0 节点)
+[2026-07-29 15:53:20] [W-3] 🔧 开始处理 gavinhomework/free-proxy-list
+[2026-07-29 15:53:20] [W-3] 仓库 https://github.com/gavinhomework/free-proxy-list (分支: main, size: 37107KB, pushed: 2026-07-29T05:25:04Z)
+[2026-07-29 15:53:20] repo info (sponsors/ljharb) 404，跳过
+[2026-07-29 15:53:20] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/wooorm (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:20] [种子] 🔵 [种子 36/592] barry-far/V2ray-Config | 配额 4582/4800 07:53 UTC | 主队列 31/200 发现队列 464/600
+[2026-07-29 15:53:20] [W-3] 仓库 https://github.com/gavinhomework/free-proxy-list 候选文件 1 个
+[2026-07-29 15:53:20] [W-3] 🔗 查子仓库: gavinhomework/free-proxy-list
+[2026-07-29 15:53:22] [W-3] 🔗 开始 Fork 链追踪 (gavinhomework/free-proxy-list)
+[2026-07-29 15:53:24] repo info (sponsors/wooorm) 404，跳过
+[2026-07-29 15:53:24] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/ota-meshi (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)[2026-07-29 15:53:24] [种子] 🔵 [种子 37/592] Ruk1ng001/freeSub | 配额 4575/4800 07:53 UTC | 主队列 32/200 发现队列 464/600
+
+[2026-07-29 15:53:26] [W-3]   父仓库: gfpcom/free-proxy-list
+[2026-07-29 15:53:27] repo info (sponsors/ota-meshi) 404，跳过
+[2026-07-29 15:53:27] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 chalk/chalk (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:29] [种子] 🔵 [种子 38/592] learnhard-cn/free_proxy_ss | 配额 4569/4800 07:53 UTC | 主队列 33/200 发现队列 464/600
+[2026-07-29 15:53:29] [W-1]   👤 用户仓库: 30 个 → 主队列 33/200 发现队列 494/600
+[2026-07-29 15:53:29] [W-1]   用户 fenwehome 共查 30 个仓库
+[2026-07-29 15:53:29] [W-1] ✅ 完成 fenwehome/free-proxy-list (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 mengtaotao27/free-proxy-list
+[2026-07-29 15:53:29] [W-1] ⚠️ 仓库 https://github.com/mengtaotao27/free-proxy-list 5111h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:29] [W-1] ✅ 完成 mengtaotao27/free-proxy-list (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 a97083435/free-proxy-list
+[2026-07-29 15:53:29] [W-1] ⚠️ 仓库 https://github.com/a97083435/free-proxy-list 4984h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:29] [W-1] ✅ 完成 a97083435/free-proxy-list (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 davidensky/free-proxy-list
+[2026-07-29 15:53:29] [W-1] ⚠️ 仓库 https://github.com/davidensky/free-proxy-list 4942h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:29] [W-1] ✅ 完成 davidensky/free-proxy-list (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 gocvuive/free-proxy-list
+[2026-07-29 15:53:29] [W-1] ⚠️ 仓库 https://github.com/gocvuive/free-proxy-list 4753h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:29] [W-1] ✅ 完成 gocvuive/free-proxy-list (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 duyouguo-svg/free-proxy
+[2026-07-29 15:53:29] [W-1] ⚠️ 仓库 https://github.com/duyouguo-svg/free-proxy 4709h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:29] [W-1] ✅ 完成 duyouguo-svg/free-proxy (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 dexterresurrection/free-proxy-list3
+[2026-07-29 15:53:29] [W-1] ⚠️ 仓库 https://github.com/dexterresurrection/free-proxy-list3 4330h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:29] [W-1] ✅ 完成 dexterresurrection/free-proxy-list3 (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 feitianyul/free-proxy-list
+[2026-07-29 15:53:29] [W-1] 仓库在黑名单中: https://github.com/feitianyul/free-proxy-list
+[2026-07-29 15:53:29] [W-1] ✅ 完成 feitianyul/free-proxy-list (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 MaraNoor/free-proxy-list
+[2026-07-29 15:53:29] [W-1] ⚠️ 仓库 https://github.com/MaraNoor/free-proxy-list 3913h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:29] [W-1] ✅ 完成 MaraNoor/free-proxy-list (+0 节点)
+[2026-07-29 15:53:29] [W-1] 🔧 开始处理 mahdibland/get_v2
+[2026-07-29 15:53:29] [W-1] 仓库 https://github.com/mahdibland/get_v2 (分支: main, size: 659784KB, pushed: 2026-07-29T01:59:54Z)
+[2026-07-29 15:53:31] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 cheeriojs/cheerio (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)[2026-07-29 15:53:31] [W-3] 👤 遍历用户仓库: gavinhomework
+
+[2026-07-29 15:53:33] [W-1] 仓库 https://github.com/mahdibland/get_v2 无候选文件 (总计 61 blob, 扩展名过滤 13, processed_shas 跳过 0, SHA 缓存跳过 48)
+[2026-07-29 15:53:33] [W-1] 🔗 查子仓库: mahdibland/get_v2
+[2026-07-29 15:53:33] [种子] 🔵 [种子 39/592] ssrsub/ssr | 配额 4563/4800 07:53 UTC | 主队列 34/200 发现队列 486/600
+[2026-07-29 15:53:33] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/fb55 (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:35] [W-0]   👤 用户仓库: 30 个 → 主队列 34/200 发现队列 517/600
+[2026-07-29 15:53:35] [W-0]   用户 changsongyang 共查 30 个仓库
+[2026-07-29 15:53:35] [W-0] ✅ 完成 changsongyang/free-proxy-list (+0 节点)
+[2026-07-29 15:53:35] [W-0] 🔧 开始处理 5n2n4jcy2h-spec/nexus-nodes
+[2026-07-29 15:53:35] [W-0] ⚠️ 仓库 https://github.com/5n2n4jcy2h-spec/nexus-nodes 2522h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:35] [W-0] ✅ 完成 5n2n4jcy2h-spec/nexus-nodes (+0 节点)
+[2026-07-29 15:53:35] [W-0] 🔧 开始处理 Nightthunderbird/nexus-nodes
+[2026-07-29 15:53:35] [W-0] ⚠️ 仓库 https://github.com/Nightthunderbird/nexus-nodes 2514h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:35] [W-0] ✅ 完成 Nightthunderbird/nexus-nodes (+0 节点)
+[2026-07-29 15:53:35] [W-0] 🔧 开始处理 aungthuoo87/nexus-nodes
+[2026-07-29 15:53:35] [W-0] ⚠️ 仓库 https://github.com/aungthuoo87/nexus-nodes 2498h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:35] [W-0] ✅ 完成 aungthuoo87/nexus-nodes (+0 节点)
+[2026-07-29 15:53:35] [W-0] 🔧 开始处理 azazill078/azazill078.github.io
+[2026-07-29 15:53:35] [W-0] ⚠️ 仓库 https://github.com/azazill078/azazill078.github.io 1251h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:35] [W-0] ✅ 完成 azazill078/azazill078.github.io (+0 节点)
+[2026-07-29 15:53:35] [W-0] 🔧 开始处理 DeimosDeployed/Nexus-Nodes
+[2026-07-29 15:53:35] [W-0] ⚠️ 仓库 https://github.com/DeimosDeployed/Nexus-Nodes 190h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:35] [W-0] ✅ 完成 DeimosDeployed/Nexus-Nodes (+0 节点)
+[2026-07-29 15:53:35] [W-0] 🔧 开始处理 parsakarimi7697-design/nexus-nodes
+[2026-07-29 15:53:35] [W-0] ⚠️ 仓库 https://github.com/parsakarimi7697-design/nexus-nodes 395h 未更新，废弃 → 加入黑名单
+[2026-07-29 15:53:35] [W-0] ✅ 完成 parsakarimi7697-design/nexus-nodes (+0 节点)
+[2026-07-29 15:53:35] [W-0] 🔧 开始处理 doubleadd111/nexus-nodes
+[2026-07-29 15:53:35] [W-0] ⏭️ 仓库 https://github.com/doubleadd111/nexus-nodes 52h 未更新，跳过解析（追踪 fork 链）
+[2026-07-29 15:53:35] [W-0] 🔗 查子仓库: doubleadd111/nexus-nodes
+[2026-07-29 15:53:35] repo info (sponsors/fb55) 404，跳过
+[2026-07-29 15:53:35] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/sibiraj-s (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:35] [W-1]   🍴 子仓库: 15 个 → 主队列 34/200 发现队列 525/600
+[2026-07-29 15:53:35] [W-1] 🔗 开始 Fork 链追踪 (mahdibland/get_v2)
+[2026-07-29 15:53:37] [W-0] 🔗 开始 Fork 链追踪 (doubleadd111/nexus-nodes)
+[2026-07-29 15:53:37] [种子] 🔵 [种子 40/592] mahdibland/ShadowsocksAggregator | 配额 4554/4800 07:53 UTC | 主队列 35/200 发现队列 525/600
+[2026-07-29 15:53:39] repo info (sponsors/sibiraj-s) 404，跳过
+[2026-07-29 15:53:39] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/inspect-js (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:39] [W-1]   父仓库: 1857112/get_v2
+[2026-07-29 15:53:39] [W-1] 仓库在黑名单中: https://github.com/1857112/get_v2
+[2026-07-29 15:53:39] [W-1]   父仓库 +0 个节点
+[2026-07-29 15:53:39] forks of 1857112/get_v2 (p1) 404，跳过
+[2026-07-29 15:53:39] [W-1] 👤 遍历用户仓库: mahdibland
+[2026-07-29 15:53:41] [W-3]   👤 用户仓库: 30 个 → 主队列 35/200 发现队列 555/600[2026-07-29 15:53:41] [W-0]   父仓库: ninjastrikers/nexus-nodes
+
+[2026-07-29 15:53:41] [W-3]   用户 gavinhomework 共查 30 个仓库
+[2026-07-29 15:53:41] [W-3] ✅ 完成 gavinhomework/free-proxy-list (+0 节点)
+[2026-07-29 15:53:41] [W-3] 🔧 开始处理 SnapdragonLee/SystemProxy
+[2026-07-29 15:53:41] [W-3] 仓库 https://github.com/SnapdragonLee/SystemProxy (分支: master, size: 10061KB, pushed: 2026-07-29T02:49:54Z)
+[2026-07-29 15:53:43] [种子] 🔵 [种子 41/592] mahdibland/SSAggregator | 配额 4548/4800 07:53 UTC | 主队列 36/200 发现队列 554/600
+[2026-07-29 15:53:44] [W-1]   用户 mahdibland 共查 0 个仓库
+[2026-07-29 15:53:44] [W-1] ✅ 完成 mahdibland/get_v2 (+0 节点)
+[2026-07-29 15:53:44] [W-1] 🔧 开始处理 amir-rezaei/genchan-v2
+[2026-07-29 15:53:44] [W-1] 仓库 https://github.com/amir-rezaei/genchan-v2 (分支: main, size: 4768KB, pushed: 2026-07-28T14:22:15Z)
+[2026-07-29 15:53:44] repo info (sponsors/inspect-js) 404，跳过
+[2026-07-29 15:53:44] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 cheeriojs/dom-serializer (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:44] [W-3] 仓库 https://github.com/SnapdragonLee/SystemProxy 候选文件 2 个
+[2026-07-29 15:53:44] [W-3] 🔗 查子仓库: SnapdragonLee/SystemProxy
+[2026-07-29 15:53:46] [W-1] 仓库 https://github.com/amir-rezaei/genchan-v2 候选文件 4 个
+[2026-07-29 15:53:46] [W-0] 👤 遍历用户仓库: doubleadd111
+[2026-07-29 15:53:46] [W-1] 仓库 https://github.com/amir-rezaei/genchan-v2 未提取到节点，加入黑名单
+[2026-07-29 15:53:46] [W-1] ✅ 完成 amir-rezaei/genchan-v2 (+0 节点)
+[2026-07-29 15:53:46] [W-1] 🔧 开始处理 amir-rezaei/Chat2DB
+[2026-07-29 15:53:46] [W-1] 仓库 https://github.com/amir-rezaei/Chat2DB (分支: main, size: 46825KB, pushed: 2026-07-28T13:25:31Z)
+[2026-07-29 15:53:48] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 fb55/entities (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:48] [种子] 🔵 [种子 42/592] anaer/Sub | 配额 4538/4800 07:53 UTC | 主队列 37/200 发现队列 553/600
+[2026-07-29 15:53:48] [W-3]   🍴 子仓库: 17 个 → 主队列 37/200 发现队列 570/600
+[2026-07-29 15:53:48] [W-3] 🔗 开始 Fork 链追踪 (SnapdragonLee/SystemProxy)
+[2026-07-29 15:53:50] [W-1] 仓库 https://github.com/amir-rezaei/Chat2DB 候选文件较多 (129 个)，先通过 commits API 过滤
+[2026-07-29 15:53:50] [W-0]   👤 用户仓库: 3 个 → 主队列 37/200 发现队列 573/600
+[2026-07-29 15:53:50] [W-0]   用户 doubleadd111 共查 3 个仓库
+[2026-07-29 15:53:50] [W-0] ✅ 完成 doubleadd111/nexus-nodes (+0 节点)
+[2026-07-29 15:53:50] [W-0] 🔧 开始处理 amir-rezaei/saleor
+[2026-07-29 15:53:50] [W-0] 仓库 https://github.com/amir-rezaei/saleor (分支: main, size: 244655KB, pushed: 2026-07-28T13:25:05Z)
+[2026-07-29 15:53:52] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 fb55/domhandler (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:52] [W-3] 👤 遍历用户仓库: SnapdragonLee
+[2026-07-29 15:53:54] [种子] 🔵 [种子 43/592] peasoft/NoMoreWalls | 配额 4530/4800 07:53 UTC | 主队列 38/200 发现队列 573/600
+[2026-07-29 15:53:54] [W-0] 仓库 https://github.com/amir-rezaei/saleor 候选文件较多 (223 个)，先通过 commits API 过滤
+[2026-07-29 15:53:54] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 fb55/domutils (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:58] [W-3]   👤 用户仓库: 22 个 → 主队列 38/200 发现队列 596/600
+[2026-07-29 15:53:58] [W-3]   用户 SnapdragonLee 共查 22 个仓库
+[2026-07-29 15:53:58] [W-3] ✅ 完成 SnapdragonLee/SystemProxy (+0 节点)
+[2026-07-29 15:53:58] [W-3] 🔧 开始处理 amir-rezaei/rustfs
+[2026-07-29 15:53:58] [W-3] 仓库 https://github.com/amir-rezaei/rustfs (分支: main, size: 47122KB, pushed: 2026-07-29T01:58:36Z)
+[2026-07-29 15:53:58] [种子] 🔵 [种子 44/592] SnapdragonLee/SystemProxy | 配额 4522/4800 07:53 UTC | 主队列 39/200 发现队列 595/600
+[2026-07-29 15:53:59] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 fb55/encoding-sniffer (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:53:59] [W-3] 仓库 https://github.com/amir-rezaei/rustfs 候选文件较多 (344 个)，先通过 commits API 过滤
+[2026-07-29 15:54:01] [W-0]   Compare API 返回 57 个变更文件 (3 次 API 调用)[2026-07-29 15:54:01] [W-1]   Compare API 返回 72 个变更文件 (3 次 API 调用)
+
+[2026-07-29 15:54:01] [W-0]   commits 过滤: 223 → 2 (变更文件 57 个)[2026-07-29 15:54:01] [W-1]   commits 过滤: 129 → 4 (变更文件 72 个)
+[2026-07-29 15:54:01] [W-0] 仓库 https://github.com/amir-rezaei/saleor 候选文件 2 个
+
+[2026-07-29 15:54:01] [W-1] 仓库 https://github.com/amir-rezaei/Chat2DB 候选文件 4 个
+[2026-07-29 15:54:01] [W-0] 🔗 发现仓库链接 saleor/saleo (来源 https://raw.githubusercontent.com/amir-rezaei/saleor/main/CHANGELOG.md)
+[2026-07-29 15:54:01] [W-1] 🔗 发现仓库链接 OtterMind/Chat2DB (来源 https://raw.githubusercontent.com/amir-rezaei/Chat2DB/main/chat2db-community-client/package.json)
+[2026-07-29 15:54:03] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/remcohaszing (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:54:03] [种子] 🔵 [种子 45/592] mfuu/v2ray | 配额 4515/4800 07:54 UTC | 主队列 40/200 发现队列 597/600
+[2026-07-29 15:54:03] repo info (saleor/saleo) 404，跳过
+[2026-07-29 15:54:04] [W-0] 🔗 发现仓库链接 saleor/saleor-app-template (来源 https://raw.githubusercontent.com/amir-rezaei/saleor/main/saleor/static/populatedb_data.json)
+[2026-07-29 15:54:05] repo info (sponsors/remcohaszing) 404，跳过
+[2026-07-29 15:54:05] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/fastify (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:54:05] [种子] 🔵 [种子 46/592] mahdibland/get_v2 | 配额 4509/4800 07:54 UTC | 主队列 41/200 发现队列 599/600
+[2026-07-29 15:54:05] [W-1] 仓库 https://github.com/amir-rezaei/Chat2DB 未提取到节点，加入黑名单
+[2026-07-29 15:54:05] [W-1] ✅ 完成 amir-rezaei/Chat2DB (+0 节点)
+[2026-07-29 15:54:05] [W-1] 🔧 开始处理 amir-rezaei/postcss
+[2026-07-29 15:54:05] [W-1] 仓库 https://github.com/amir-rezaei/postcss (分支: main, size: 11322KB, pushed: 2026-07-28T13:24:08Z)
+[2026-07-29 15:54:05] [W-0] 仓库 https://github.com/amir-rezaei/saleor 未提取到节点，加入黑名单
+[2026-07-29 15:54:05] [W-0] ✅ 完成 amir-rezaei/saleor (+0 节点)
+[2026-07-29 15:54:05] [W-0] 🔧 开始处理 amir-rezaei/remotion
+[2026-07-29 15:54:05] [W-0] 仓库 https://github.com/amir-rezaei/remotion (分支: main, size: 4117483KB, pushed: 2026-07-29T07:26:59Z)
+[2026-07-29 15:54:07] [W-3]   Compare API 返回 70 个变更文件 (3 次 API 调用)
+[2026-07-29 15:54:07] [W-3]   commits 过滤: 344 → 3 (变更文件 70 个)
+[2026-07-29 15:54:07] [W-3] 仓库 https://github.com/amir-rezaei/rustfs 候选文件 3 个
+[2026-07-29 15:54:07] repo info (sponsors/fastify) 404，跳过
+[2026-07-29 15:54:07] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 sponsors/NaturalIntelligence (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:54:08] [种子] 🔵 [种子 47/592] Misaka-blog/chromego_merge | 配额 4506/4800 07:54 UTC | 主队列 42/200 发现队列 597/600
+[2026-07-29 15:54:08] [W-1] 仓库 https://github.com/amir-rezaei/postcss 候选文件 26 个
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_12] 🔗 发现仓库链接 postcss/postcs (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/.github/CONTRIBUTING.md)
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_15] 🔗 发现仓库链接 sindresorhus/gulp-autoprefixer (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/guidelines/runner.md)
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_1] 🔗 发现仓库链接 postcss/postcss-scss (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/syntax.md)
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_5] 🔗 发现仓库链接 postcss/autoprefixer (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/guidelines/plugin.md)
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_14] 🔗 发现仓库链接 sponsors/ai (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/package.json)
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_2] 🔗 发现仓库链接 reworkcss/cs (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/architecture.md)
+[2026-07-29 15:54:08] [W-3] 仓库 https://github.com/amir-rezaei/rustfs 未提取到节点，加入黑名单
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_4] 🔗 发现仓库链接 postcss/postcss-plugin-boilerplate (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/writing-a-plugin.md)
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_9] 🔗 发现仓库链接 TrySound/postcss-inline-svg (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/README-cn.md)[2026-07-29 15:54:08] [W-3] ✅ 完成 amir-rezaei/rustfs (+0 节点)
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_10] 🔗 发现仓库链接 postcss/postcss-plugin-context (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/plugins.md)
+
+[2026-07-29 15:54:08] [ThreadPoolExecutor-549_3] 🔗 发现仓库链接 postcss/postcss (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/README.md)
+[2026-07-29 15:54:08] [W-3] 🔧 开始处理 amir-rezaei/composio
+[2026-07-29 15:54:08] [W-3] 仓库 https://github.com/amir-rezaei/composio (分支: next, size: 350762KB, pushed: 2026-07-28T13:23:00Z)
+[2026-07-29 15:54:10] [W-0] 仓库 https://github.com/amir-rezaei/remotion 候选文件较多 (850 个)，先通过 commits API 过滤
+[2026-07-29 15:54:10] repo info (sponsors/NaturalIntelligence) 404，跳过
+[2026-07-29 15:54:10] [ThreadPoolExecutor-414_8] 🔗 发现仓库链接 fb55/htmlparser2 (来源 https://raw.githubusercontent.com/ermaozi/ermao.org/master/package-lock.json)
+[2026-07-29 15:54:12] repo info (postcss/postcs) 404，跳过[2026-07-29 15:54:12] repo info (sponsors/ai) 404，跳过
+
+[2026-07-29 15:54:12] repo info (reworkcss/cs) 404，跳过
+[2026-07-29 15:54:12] [ThreadPoolExecutor-549_15] 🔗 发现仓库链接 w0rm/gulp-postcss (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/guidelines/runner.md)[2026-07-29 15:54:12] [ThreadPoolExecutor-549_5] 🔗 发现仓库链接 cssnano/cssnano (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/guidelines/plugin.md)[2026-07-29 15:54:12] [W-3] 仓库 https://github.com/amir-rezaei/composio 候选文件较多 (573 个)，先通过 commits API 过滤[2026-07-29 15:54:12] [ThreadPoolExecutor-549_10] 🔗 发现仓库链接 postcss/postcss-use (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/plugins.md)
+[2026-07-29 15:54:12] [ThreadPoolExecutor-549_3] 🔗 发现仓库链接 csstools/postcss-plugin (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/README.md)
+
+
+
+[2026-07-29 15:54:12] [ThreadPoolExecutor-549_2] 🔗 发现仓库链接 babel/babe (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/architecture.md)
+[2026-07-29 15:54:14] [种子] 🔵 [种子 48/592] ripaojiedian/freenode | 配额 4490/4800 07:54 UTC | 主队列 43/200 发现队列 600/600
+[2026-07-29 15:54:22] repo info (csstools/postcss-plugin) 404，跳过[2026-07-29 15:54:22] repo info (babel/babe) 404，跳过
+
+[2026-07-29 15:54:22] [ThreadPoolExecutor-549_2] 🔗 发现仓库链接 csstree/csstree (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/architecture.md)[2026-07-29 15:54:22] [ThreadPoolExecutor-549_3] 🔗 发现仓库链接 gajus/react-css-modules (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/README.md)
+[2026-07-29 15:54:22] [W-0]   Compare API 返回 156 个变更文件 (3 次 API 调用)
+[2026-07-29 15:54:22] [种子] 🔵 [种子 49/592] free-nodes/clashfree | 配额 4480/4800 07:54 UTC | 主队列 44/200 发现队列 600/600
+
+[2026-07-29 15:54:22] [W-0]   commits 过滤: 850 → 13 (变更文件 156 个)
+[2026-07-29 15:54:22] [W-0] 仓库 https://github.com/amir-rezaei/remotion 候选文件 13 个
+[2026-07-29 15:54:22] [ThreadPoolExecutor-578_9] 🔗 发现仓库链接 remotion-dev/remotio (来源 https://raw.githubusercontent.com/amir-rezaei/remotion/main/.agents/skills/visual-mode/SKILL.md)
+[2026-07-29 15:54:26] [W-3]   Compare API 返回 63 个变更文件 (3 次 API 调用)
+[2026-07-29 15:54:26] [W-3]   commits 过滤: 573 → 19 (变更文件 63 个)
+[2026-07-29 15:54:26] [W-3] 仓库 https://github.com/amir-rezaei/composio 候选文件 19 个
+[2026-07-29 15:54:26] repo info (remotion-dev/remotio) 404，跳过
+[2026-07-29 15:54:27] [ThreadPoolExecutor-592_8] 🔗 发现仓库链接 ComposioHQ/composi (来源 https://raw.githubusercontent.com/amir-rezaei/composio/next/ts/examples/session-management/README.md)
+[2026-07-29 15:54:27] [种子] 🔵 [种子 50/592] MrAbolfazlNorouzi/iran-configs | 配额 4476/4800 07:54 UTC | 主队列 45/200 发现队列 600/600
+[2026-07-29 15:54:27] [W-0] 仓库 https://github.com/amir-rezaei/remotion 未提取到节点，加入黑名单
+[2026-07-29 15:54:27] [W-0] ✅ 完成 amir-rezaei/remotion (+0 节点)
+[2026-07-29 15:54:27] [ThreadPoolExecutor-549_1] 🔗 发现仓库链接 postcss/postcss-safe-parser (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/syntax.md)
+[2026-07-29 15:54:27] [W-0] 🔧 开始处理 amir-rezaei/open-design
+[2026-07-29 15:54:27] [W-0] 仓库 https://github.com/amir-rezaei/open-design (分支: main, size: 1726237KB, pushed: 2026-07-28T13:22:26Z)
+[2026-07-29 15:54:29] repo info (ComposioHQ/composi) 404，跳过
+[2026-07-29 15:54:29] [种子] 🔵 [种子 51/592] miladtahanian/Config-Collector | 配额 4472/4800 07:54 UTC | 主队列 46/200 发现队列 600/600
+[2026-07-29 15:54:29] [W-3] 仓库 https://github.com/amir-rezaei/composio 未提取到节点，加入黑名单
+[2026-07-29 15:54:29] [W-3] ✅ 完成 amir-rezaei/composio (+0 节点)
+[2026-07-29 15:54:29] [ThreadPoolExecutor-549_9] 🔗 发现仓库链接 jonathantneal/postcss-preset-env (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/README-cn.md)
+[2026-07-29 15:54:29] [W-3] 🔧 开始处理 amir-rezaei/opencode
+[2026-07-29 15:54:29] [W-3] 仓库 https://github.com/amir-rezaei/opencode (分支: dev, size: 430174KB, pushed: 2026-07-28T09:45:06Z)
+[2026-07-29 15:54:31] [W-0] 仓库 https://github.com/amir-rezaei/open-design 候选文件较多 (4262 个)，先通过 commits API 过滤
+[2026-07-29 15:54:31] [种子] 🔵 [种子 52/592] miladtahanian/V2RayCFGDumper | 配额 4468/4800 07:54 UTC | 主队列 47/200 发现队列 600/600
+[2026-07-29 15:54:33] [W-3] 仓库 https://github.com/amir-rezaei/opencode 候选文件较多 (595 个)，先通过 commits API 过滤
+[2026-07-29 15:54:35] [W-0]   Compare API 返回 3 个变更文件 (3 次 API 调用)
+[2026-07-29 15:54:35] [W-0]   commits 过滤: 4262 → 0 (变更文件 3 个)
+[2026-07-29 15:54:35] [W-0] 仓库 https://github.com/amir-rezaei/open-design 候选文件经时间过滤后为空
+[2026-07-29 15:54:35] [W-0] 🔗 查子仓库: amir-rezaei/open-design
+[2026-07-29 15:54:35] [W-0] 🔗 开始 Fork 链追踪 (amir-rezaei/open-design)
+[2026-07-29 15:54:36] [种子] 🔵 [种子 53/592] mahsanet/MahsaFreeConfig | 配额 4461/4800 07:54 UTC | 主队列 48/200 发现队列 600/600
+[2026-07-29 15:54:36] [W-0]   父仓库: nexu-io/open-design
+[2026-07-29 15:54:36] [W-0] 仓库 https://github.com/nexu-io/open-design (分支: main, size: 1733715KB, pushed: 2026-07-29T07:52:30Z)
+[2026-07-29 15:54:38] [种子] 🔵 [种子 54/592] zieng2/wl | 配额 4458/4800 07:54 UTC | 主队列 49/200 发现队列 600/600
+[2026-07-29 15:54:38] [W-3]   Compare API 返回 15 个变更文件 (3 次 API 调用)
+[2026-07-29 15:54:38] [W-3]   commits 过滤: 595 → 1 (变更文件 15 个)
+[2026-07-29 15:54:38] [W-3] 仓库 https://github.com/amir-rezaei/opencode 候选文件 1 个
+[2026-07-29 15:54:38] [W-0] 仓库 https://github.com/nexu-io/open-design 候选文件较多 (4266 个)，先通过 commits API 过滤
+[2026-07-29 15:54:38] [W-3] 仓库 https://github.com/amir-rezaei/opencode 未提取到节点，加入黑名单
+[2026-07-29 15:54:38] [W-3] ✅ 完成 amir-rezaei/opencode (+0 节点)
+[2026-07-29 15:54:38] [ThreadPoolExecutor-549_4] 🔗 发现仓库链接 orgs/postcss (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/writing-a-plugin.md)
+[2026-07-29 15:54:38] [W-3] 🔧 开始处理 amir-rezaei/hyperframes
+[2026-07-29 15:54:38] [W-3] 仓库 https://github.com/amir-rezaei/hyperframes (分支: main, size: 365446KB, pushed: 2026-07-28T09:44:21Z)
+[2026-07-29 15:54:40] repo info (orgs/postcss) 404，跳过
+[2026-07-29 15:54:40] [ThreadPoolExecutor-549_4] 🔗 发现仓库链接 larsenwork/postcss-easing-gradients (来源 https://raw.githubusercontent.com/amir-rezaei/postcss/main/docs/writing-a-plugin.md)
+[2026-07-29 15:54:40] [种子] 🔵 [种子 55/592] Mahdi0024/ProxyCollector | 配额 4453/4800 07:54 UTC | 主队列 50/200 发现队列 600/600
+[2026-07-29 15:54:41] [W-3] 仓库 https://github.com/amir-rezaei/hyperframes 候选文件较多 (996 个)，先通过 commits API 过滤
+[2026-07-29 15:54:45] [W-0]   Compare API 返回 53 个变更文件 (3 次 API 调用)
+[2026-07-29 15:54:45] [W-0]   commits 过滤: 4266 → 7 (变更文件 53 个)
+[2026-07-29 15:54:45] [W-0] 仓库 https://github.com/nexu-io/open-design 候选文件 7 个
+[2026-07-29 15:54:45] [种子] 🔵 [种子 56/592] 4n0nymou3/multi-proxy-config-fetcher | 配额 4447/4800 07:54 UTC | 主队列 51/200 发现队列 600/600
+[2026-07-29 15:54:45] [W-3]   commits 过滤: 996 → 0 (变更文件 0 个)
+[2026-07-29 15:54:45] [W-3] 仓库 https://github.com/amir-rezaei/hyperframes 候选文件经时间过滤后为空
+[2026-07-29 15:54:45] [W-3] 🔗 查子仓库: amir-rezaei/hyperframes
+[2026-07-29 15:54:46] [W-0] 仓库 https://github.com/nexu-io/open-design 未提取到节点，加入黑名单
+[2026-07-29 15:54:46] [W-0]   父仓库 +0 个节点
+[2026-07-29 15:54:47] [W-3] 🔗 开始 Fork 链追踪 (amir-rezaei/hyperframes)
+[2026-07-29 15:54:47] [种子] 🔵 [种子 57/592] Ashkan-m/v2ray | 配额 4444/4800 07:54 UTC | 主队列 52/200 发现队列 600/600
+[2026-07-29 15:54:47] [W-3]   父仓库: heygen-com/hyperframes
+[2026-07-29 15:54:47] [W-3] 仓库 https://github.com/heygen-com/hyperframes (分支: main, size: 366652KB, pushed: 2026-07-29T07:48:44Z)
+[2026-07-29 15:54:48] [W-3] 仓库 https://github.com/heygen-com/hyperframes 候选文件较多 (1001 个)，先通过 commits API 过滤
+[2026-07-29 15:54:50] [种子] 🔵 [种子 58/592] iampedii/whitedns-sub | 配额 4439/4800 07:54 UTC | 主队列 53/200 发现队列 600/600
+[2026-07-29 15:54:52] [种子] 🔵 [种子 59/592] Diversan313/apex-parser | 配额 4436/4800 07:54 UTC | 主队列 54/200 发现队列 600/600
+[2026-07-29 15:54:53] [种子] 🔵 [种子 60/592] Kamyar19/configMs | 配额 4435/4800 07:54 UTC | 主队列 55/200 发现队列 600/600
+[2026-07-29 15:54:53] [W-3]   Compare API 返回 200 个变更文件 (3 次 API 调用)
+[2026-07-29 15:54:53] [W-3]   commits 过滤: 1001 → 38 (变更文件 200 个)
+[2026-07-29 15:54:53] [W-3] 仓库 https://github.com/heygen-com/hyperframes 候选文件 38 个
+[2026-07-29 15:54:54] [种子] 🔵 [种子 61/592] shabane/kamaji | 配额 4433/4800 07:54 UTC | 主队列 56/200 发现队列 600/600
+[2026-07-29 15:54:54] [W-3] 仓库 https://github.com/heygen-com/hyperframes 未提取到节点，加入黑名单
+[2026-07-29 15:54:54] [W-3]   父仓库 +0 个节点
+[2026-07-29 15:54:54] [种子] 🔵 [种子 62/592] sakha1370/OpenRay | 配额 4432/4800 07:54 UTC | 主队列 57/200 发现队列 600/600
+[2026-07-29 15:54:55] [种子] 🔵 [种子 63/592] noxenys/SmartSub | 配额 4430/4800 07:54 UTC | 主队列 58/200 发现队列 600/600
+[2026-07-29 15:54:56] [种子] 🔵 [种子 64/592] FreeFolksOn/abc-configs-free-vpn-proxy-list | 配额 4428/4800 07:54 UTC | 主队列 59/200 发现队列 600/600
+[2026-07-29 15:54:58] [种子] 🔵 [种子 65/592] way-fu/free-nodes-auto | 配额 4427/4800 07:54 UTC | 主队列 60/200 发现队列 600/600
+[2026-07-29 15:54:59] [种子] 🔵 [种子 66/592] xcai413/fanqiang-navigation | 配额 4426/4800 07:54 UTC | 主队列 61/200 发现队列 600/600
+[2026-07-29 15:55:00] [种子] 🔵 [种子 67/592] junjun266/FreeProxyGo | 配额 4425/4800 07:55 UTC | 主队列 62/200 发现队列 600/600
+[2026-07-29 15:55:01] [种子] 🔵 [种子 68/592] imalyzer/mihomo-node-checker | 配额 4424/4800 07:55 UTC | 主队列 63/200 发现队列 600/600
+[2026-07-29 15:55:01] [种子] 🔵 [种子 69/592] lerjtl/Testfree | 配额 4423/4800 07:55 UTC | 主队列 64/200 发现队列 600/600
+[2026-07-29 15:55:02] [种子] 🔵 [种子 70/592] hansenlandun-prog/freeproxy-node-sub | 配额 4422/4800 07:55 UTC | 主队列 65/200 发现队列 600/600
+[2026-07-29 15:55:03] [种子] 🔵 [种子 71/592] wenxig/free-nodes-sub | 配额 4421/4800 07:55 UTC | 主队列 66/200 发现队列 600/600
+[2026-07-29 15:55:03] [种子] 🔵 [种子 72/592] LingQingOutAt11/free-vpn-subscriptions | 配额 4420/4800 07:55 UTC | 主队列 67/200 发现队列 600/600
+[2026-07-29 15:55:04] [种子] 🔵 [种子 73/592] superokde/free-nodes | 配额 4419/4800 07:55 UTC | 主队列 68/200 发现队列 600/600
+[2026-07-29 15:55:05] [种子] 🔵 [种子 74/592] XHegit/FreeNodes | 配额 4418/4800 07:55 UTC | 主队列 69/200 发现队列 600/600
+[2026-07-29 15:55:06] [种子] 🔵 [种子 75/592] Yannik666/nodes | 配额 4417/4800 07:55 UTC | 主队列 70/200 发现队列 600/600
+[2026-07-29 15:55:06] [种子] 🔵 [种子 76/592] wanvfx/FreeNodes | 配额 4416/4800 07:55 UTC | 主队列 71/200 发现队列 600/600
+[2026-07-29 15:55:07] [种子] 🔵 [种子 77/592] hzhimingyang12345-a11y/airport-free | 配额 4415/4800 07:55 UTC | 主队列 72/200 发现队列 600/600
+[2026-07-29 15:55:08] [种子] 🔵 [种子 78/592] luochen1975/FreeNodes | 配额 4414/4800 07:55 UTC | 主队列 73/200 发现队列 600/600
+[2026-07-29 15:55:09] [种子] 🔵 [种子 79/592] wang1680/proxypool | 配额 4413/4800 07:55 UTC | 主队列 74/200 发现队列 600/600
+[2026-07-29 15:55:09] [种子] 🔵 [种子 80/592] yangfh158/FreeNodes | 配额 4412/4800 07:55 UTC | 主队列 75/200 发现队列 600/600
+[2026-07-29 15:55:10] [种子] 🔵 [种子 81/592] chengege666/FreeNodes | 配额 4411/4800 07:55 UTC | 主队列 76/200 发现队列 600/600
+[2026-07-29 15:55:11] [种子] 🔵 [种子 82/592] gwcctv/FreeNodes | 配额 4410/4800 07:55 UTC | 主队列 77/200 发现队列 600/600
+[2026-07-29 15:55:11] [种子] 🔵 [种子 83/592] HakurouKen/free-node | 配额 4409/4800 07:55 UTC | 主队列 78/200 发现队列 600/600
+[2026-07-29 15:55:12] [种子] 🔵 [种子 84/592] PENZA84/free-node | 配额 4408/4800 07:55 UTC | 主队列 79/200 发现队列 600/600
+[2026-07-29 15:55:13] [种子] 🔵 [种子 85/592] soufranciscoescola-png/Criar-fonte-TTF---BR---draw-your-font | 配额 4407/4800 07:55 UTC | 主队列 80/200 发现队列 600/600
+[2026-07-29 15:55:13] [种子] ⏸️  主队列 ≥ 80（80/200），搜索暂停
+[2026-07-29 15:55:20] [W-2] 仓库 https://github.com/ermaozi/ermao.org 未提取到节点，加入黑名单
+[2026-07-29 15:55:20] [W-2] ✅ 完成 ermaozi/ermao.org (+621 节点)
+[2026-07-29 15:55:20] [W-2] 🔧 开始处理 amir-rezaei/nanobot
+[2026-07-29 15:55:20] [W-2] 仓库 https://github.com/amir-rezaei/nanobot (分支: main, size: 54031KB, pushed: 2026-07-28T09:43:40Z)
+[2026-07-29 15:55:21] [W-2] 仓库 https://github.com/amir-rezaei/nanobot 候选文件较多 (285 个)，先通过 commits API 过滤
+[2026-07-29 15:55:21] [W-2]   Compare API 返回 42 个变更文件 (3 次 API 调用)
+[2026-07-29 15:55:21] [W-2]   commits 过滤: 285 → 10 (变更文件 42 个)
+[2026-07-29 15:55:21] [W-2] 仓库 https://github.com/amir-rezaei/nanobot 候选文件 10 个
+[2026-07-29 15:55:24] [W-2] 仓库 https://github.com/amir-rezaei/nanobot 未提取到节点，加入黑名单
+[2026-07-29 15:55:24] [W-2] ✅ 完成 amir-rezaei/nanobot (+0 节点)
+[2026-07-29 15:55:24] [W-2] 🔧 开始处理 amir-rezaei/django
+[2026-07-29 15:55:24] [W-2] 仓库 https://github.com/amir-rezaei/django (分支: main, size: 281451KB, pushed: 2026-07-28T08:30:32Z)
+[2026-07-29 15:55:24] [W-2] 仓库 https://github.com/amir-rezaei/django 候选文件较多 (831 个)，先通过 commits API 过滤
+[2026-07-29 15:55:25] [W-2]   commits 过滤: 831 → 0 (变更文件 0 个)
+[2026-07-29 15:55:25] [W-2] 仓库 https://github.com/amir-rezaei/django 候选文件经时间过滤后为空
+[2026-07-29 15:55:25] [W-2] 🔗 查子仓库: amir-rezaei/django
