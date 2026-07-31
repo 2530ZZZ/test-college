@@ -10220,3 +10220,12 @@ https://github.com/vllm-project/vllm
 https://github.com/astral-sh/uv
 https://github.com/huggingface/transformers
 https://github.com/pallets/flask
+https://github.com/029danio/fly
+https://github.com/luochen1975/collect-txt
+https://github.com/luochen1975/clound-iptv-sources
+https://github.com/wang1680/webhtv
+https://github.com/rrzt/TV1_api
+https://github.com/superduke/ACL4SSR
+https://github.com/fenwehome/ACL4SSR
+https://github.com/lilikimi/daily_stock_analysis
+https://github.com/chris202010/lunatv-config
