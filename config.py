@@ -61,8 +61,9 @@ PAGE_SLEEP_SECONDS = 2.0
 # 默认 120，取值范围 30-300。超时后跳过该仓库继续处理下一个。
 REPO_TIMEOUT_SECONDS = 300
 
-# 仓库废弃年龄阈值（小时）。超过此值永久加入黑名单。
+# 仓库废弃年龄阈值（小时）。超过此值跳过处理。
 # 默认 168（7天），取值范围 0-720。设为 0 表示不限制。
+# 注意：不会再加入黑名单，仅跳过处理。无节点且 README 含广告词的才加黑名单。
 REPO_MAX_AGE_HOURS = 168
 
 # 仓库入口跳过年龄阈值（小时）。
@@ -115,19 +116,46 @@ MAX_COMMITS_PER_REPO = None
 # ==================== Fork 链追踪 ====================
 
 # 是否追踪 fork 链（发现 fork 仓库后追溯父仓库，再查父仓库的所有 fork）
-# 默认 False。可发现同一模板在不同 fork 中的不同节点。
+# 默认 True。可发现同一模板在不同 fork 中的不同节点。
+# 注意：受 TRACE_ONCE_ONLY 控制，设为 True 后只有源头仓库触发追踪。
 FORK_CHAIN_ENABLED = True
 
-# 每个仓库最多查几个 fork（分页，每页 30），用于子仓库和兄弟仓库遍历
-# 默认 30，取值范围 10-100。
+# --- 数量限制 ---
+
+# 每个仓库最多查几个子 fork（从本仓库 fork 出去的仓库）
+# 默认 30。子 fork 最直接相关，高产概率最高。
+# 取值范围 5-100。
+FORK_CHILD_MAX = 30
+
+# 每个仓库最多查几个兄弟 fork（同父仓库下的其他 fork）
+# 默认 20。兄弟 fork 相关度低于子 fork，配额省给子 fork。
+# 取值范围 5-100。
+FORK_SIBLING_MAX = 20
+
+# 每个仓库最多查几个 fork（总上限，兜底用）
+# 当单独限制未生效时使用此值。默认 30，取值范围 10-100。
 FORK_CHAIN_MAX_FORKS = 30
 
-# 往上追溯父仓库的层数。
-# 默认 2。追踪父仓库→父的父，扩大 fork 发现。
+# --- Fork 查询分页 ---
+
+# Fork API 每页返回数（GitHub 最大 100）
+# 默认 100。越大翻页越少、API 调用越省。
+# 取值范围 10-100。
+FORK_PER_PAGE = 100
+
+# --- 父仓库追溯 ---
+
+# 是否追溯父仓库（本仓库是从谁 fork 出来的）。
+# Git fork 模型保证最多 1 个父仓库。查到父仓库后遍历其所有 fork（兄弟仓库）。
+# 默认 True。
+FORK_PARENT_TRACE_ENABLED = True
+
+# 往上追溯父仓库的层数（父→父的父→...）
+# 默认 2。已废弃：TRACE_ONCE_ONLY 模式下只追一层。
 MAX_PARENT_TRACE_DEPTH = 2
 
-# Fork 链中本仓库的子仓库遍历层数。
-# 0 表示不查子仓库。1 表示查本仓库的直接 fork，2 表示还查 fork 的 fork。
+# Fork 链中本仓库的子仓库遍历层数（子→子的子→...）
+# 默认 2。已废弃：TRACE_ONCE_ONLY 模式下只追一层。
 FORK_CHAIN_CHILD_DEPTH = 2
 
 # ==================== 同用户仓库遍历 ====================
@@ -150,15 +178,31 @@ VERBOSE_LOG = False
 
 # 是否自动收录仓库到种子文件。
 # 默认 True。任何渠道只要提取到节点（不要求新节点），就加入。
+# 收录条件：has_nodes AND 节点数 ≥ AUTO_SEED_MIN_NODES_FOR_SEED
 AUTO_SEED_ENABLED = True
 
 # 种子仓库收录最少需要的节点产出数。0 = 有任何节点即收录。
 # 默认 0，取值范围 0-100。
 AUTO_SEED_MIN_NODES_FOR_SEED = 0
 
-# 种子仓库在运行结束后按产出重排序：
-#   - 24h 内更新 AND 产出节点 → 排最前
+# --- 种子排序 ---
+
+# 种子仓库按 pushed_at 降序排列（最近更新的在前）。
+# pushed_at 为空或解析失败的 → 排最后。
+# 每次运行结束时执行 _sort_seeds() 重排。
 AUTO_SEED_SORT_WINDOW_HOURS = 24
+
+# --- 种子淘汰 ---
+
+# 种子最大保留时间（小时）。pushed_at 超过此值的种子会被淘汰。
+# 默认 720（30天）。设为 0 表示不淘汰。
+# 注意：种子记录的是 pushed_at（GitHub 最后推送时间），不是收录时间。
+SEED_MAX_AGE_HOURS = 720
+
+# 每次运行最多淘汰种子的比例。从尾部（最旧）开始删，达到比例后停止。
+# 默认 0.05（5%）。设为 0 表示不限制。
+# 注意：只淘汰 pushed_at > SEED_MAX_AGE_HOURS 的种子。
+SEED_PRUNE_RATIO = 0.05
 
 # ==================== 搜索阶段开关 ====================
 
@@ -171,16 +215,35 @@ KEYWORD_STAGE_ENABLED = True
 
 # ==================== 已处理仓库持久化 ====================
 
-# 是否启用已处理仓库持久化（seen_repos）。
-# 持久化后，下次运行遇到同一个仓库且 pushed_at 未变 → 跳过处理，省 API 调用。
-# 默认 True。
-SEEN_REPOS_PERSIST_ENABLED = False
+# 是否启用已处理仓库持久化（seen_cache）。
+# 启用后：每次运行遇到同一个仓库且 pushed_at 未变 → 跳过整个 process_repo，
+#         省去 tree API、commits API、文件下载等所有后续步骤。
+# 持久化文件：{SEEN_REPOS_DIR}/seen_XXXX.pkl（分片 pickle）
+# 强烈建议开启。默认 True。
+SEEN_REPOS_PERSIST_ENABLED = True
 
 # 已处理仓库持久化目录（分片 pickle，和 sha_cache 相同格式）
 SEEN_REPOS_DIR = "seen_cache"
 
-# 已处理仓库每片最大字节数
+# 已处理仓库每片最大字节数。超过则分片写入。
+# 默认 45MB（远低于 GitHub 100MB 硬限制）
 SEEN_REPOS_MAX_BYTES = 45_000_000
+
+# --- 排序与淘汰 ---
+
+# 已处理仓库最大条目数。超过时从尾部淘汰低命中条目。
+# 默认 500,000。设为 0 表示不限制。
+SEEN_CACHE_MAX_ENTRIES = 0
+
+# 已处理仓库淘汰比例（1/N）。每次保存时淘汰末尾 1/N 的低命中条目。
+# 默认 20（即 1/20）。越小淘汰越激进。
+# 排序规则：命中次数(hits)降序 → last_hit 降序。高命中靠前，低命中靠后。
+SEEN_CACHE_EVICTION_RATIO = 20
+
+# 已处理仓库最大保留时间（小时）。last_hit 超过此值的条目会被淘汰。
+# 默认 30。因为 SKIP_PROCESSING_AGE_HOURS=24，>24h 的仓库本来就会跳过处理，
+# 多 6h 容错。设为 0 表示不按时间淘汰。
+SEEN_CACHE_MAX_AGE_HOURS = 30
 
 # ==================== 订阅链接发现 ====================
 
@@ -705,8 +768,17 @@ SEARCH_SUFFIX = " ".join(_SEARCH_SUFFIX_PARTS)
 # 清理内部变量，避免被外部 import 污染命名空间
 del _SEARCH_SUFFIX_PARTS
 
-# ==================== 队列控制 ====================
+# ==================== 追踪策略 ====================
 
+# 是否只追踪一层（源头仓库触发 fork/用户/raw 追踪，衍生仓库不再触发）。
+# 设为 True 后：
+#   - 种子仓库、关键词搜索、Code 搜索直接发现的仓库 → 正常触发追踪
+#   - fork 仓库、用户仓库、raw 递归发现的仓库 → 只解析文件，不触发追踪
+#   - 仓库数量从指数级降为线性级，大幅节省 API 配额
+# 默认 True。建议保持开启。
+TRACE_ONCE_ONLY = True
+
+# ==================== 队列控制 ====================
 
 # 队列满时等待超时（秒）。
 # fork 链/用户仓库往队列放任务时，队列满最多等这么久。
@@ -715,6 +787,10 @@ del _SEARCH_SUFFIX_PARTS
 QUEUE_PUT_TIMEOUT_SECONDS = 60
 
 # ==================== 黑名单管理 ====================
+
+# 黑名单加入条件（唯一）：无节点产出 AND README 包含广告关键词。
+# 持久化位置：{BLACKLIST_FILE}（ljck.txt），每行一个 GitHub URL。
+# 启动时加载，跨运行持久化。
 
 # 是否启用黑名单自动淘汰（LRU 冷热分离）。
 # True: 每次运行淘汰末尾冷门条目，热条目和本次新加入的条目不受影响。
