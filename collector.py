@@ -49,14 +49,14 @@ from config import (
     SHARED_POOL_WORKERS,
     MAIN_QUEUE_SIZE, DISCOVERY_QUEUE_SIZE,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
-    AUTO_SEED_SORT_WINDOW_HOURS, AUTO_SEED_MIN_NODES_FOR_SEED,
-    SEED_MAX_AGE_HOURS, SEED_PRUNE_RATIO,
+    AUTO_SEED_MIN_NODES_FOR_SEED,
+    SEED_MAX_AGE_HOURS, SEED_PRUNE_RATIO, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
     SEEN_REPOS_PERSIST_ENABLED, SEEN_REPOS_DIR, SEEN_REPOS_MAX_BYTES,
-    SEEN_CACHE_MAX_ENTRIES, SEEN_CACHE_EVICTION_RATIO, SEEN_CACHE_MAX_AGE_HOURS,
+    SEEN_CACHE_MAX_ENTRIES, SEEN_CACHE_EVICTION_RATIO,
     SUB_URL_MAX_PER_FILE, SAFE_WRITE_ENABLED,
     SEED_STAGE_ENABLED, CODE_STAGE_ENABLED, KEYWORD_STAGE_ENABLED,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
-    SOURCE_STALE_DAYS, MAX_RUNTIME_SECONDS,
+    MAX_RUNTIME_SECONDS,
     GITHUB_SEARCH_ENABLED, QUOTA_MAX_PER_HOUR,
     SKIP_PROCESSING_AGE_HOURS,
     QUEUE_PUT_TIMEOUT_SECONDS,
@@ -215,23 +215,9 @@ class Collector:
             if old.endswith('.pkl'):
                 os.remove(os.path.join(SEEN_REPOS_DIR, old))
 
-        # ── 淘汰过期条目 ──
-        if SEEN_CACHE_MAX_AGE_HOURS > 0:
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=SEEN_CACHE_MAX_AGE_HOURS)
-            stale = []
-            for repo, entry in self.seen_cache.items():
-                if isinstance(entry, str):
-                    continue  # 旧格式保留
-                last_hit = entry.get("last_hit", "")
-                try:
-                    if datetime.fromisoformat(last_hit) < cutoff:
-                        stale.append(repo)
-                except Exception:
-                    pass
-            for repo in stale:
-                del self.seen_cache[repo]
-
         # ── 按 (hits DESC, last_hit DESC) 排序 ──
+        # 不按时间淘汰：pushed_at 比较已是最精确的过期判断。
+        # 即使缓存半年的条目，只要 pushed_at 未变就正确跳过。
         def _sort_key(item):
             _repo, entry = item
             if isinstance(entry, str):
@@ -291,10 +277,13 @@ class Collector:
             existing = self.seen_cache.get(r, {})
             if isinstance(existing, str):
                 existing = {}
+            is_new = "pushed_at" not in existing
             existing["pushed_at"] = pushed_at
             existing.setdefault("hits", 1)
             existing["last_hit"] = datetime.now(timezone.utc).isoformat()
             self.seen_cache[r] = existing
+            if is_new:
+                self._wlog(f"📝 已处理缓存: {repo}")
 
     def _check_blacklist(self, github_url: str) -> bool:
         """检查 URL 是否在黑名单中，命中时标记为"热"条目。"""
@@ -615,7 +604,8 @@ class Collector:
         try:
             data = {container_key: seeds,
                     "updated_at": datetime.now(timezone.utc).isoformat(),
-                    "pruning_days": SOURCE_STALE_DAYS}
+                    "max_entries": SEED_MAX_ENTRIES,
+                    "max_age_hours": SEED_MAX_AGE_HOURS}
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
@@ -651,33 +641,50 @@ class Collector:
 
     @staticmethod
     def _prune_seeds(seeds: dict) -> dict:
-        """淘汰 pushed_at 超过 SEED_MAX_AGE_HOURS 的种子，最多淘汰 SEED_PRUNE_RATIO 比例。
+        """淘汰种子：先按 pushed_at 排序 → 超 SEED_MAX_ENTRIES 时淘汰末尾。
 
-        种子已按 pushed_at 降序排列（_sort_seeds），所以从末尾遍历即可。
-        只淘汰 pushed_at 超时的，新种子（无 pushed_at）保留。
+        优先级：先删 pushed_at > SEED_MAX_AGE_HOURS 的（超龄种子），
+        还不够则继续删最旧的（pushed_at 最小的）。
+        新种子（无 pushed_at）保留。
         """
-        if SEED_MAX_AGE_HOURS <= 0 or not seeds:
+        if not seeds:
             return seeds
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=SEED_MAX_AGE_HOURS)
-        max_prune = max(1, int(len(seeds) * SEED_PRUNE_RATIO)) if SEED_PRUNE_RATIO > 0 else 0
-        pruned = 0
-        # 从尾部（最旧）开始淘汰
-        for key in reversed(list(seeds.keys())):
-            if pruned >= max_prune:
-                break
-            meta = seeds.get(key, {})
-            pushed = meta.get("pushed_at", "")
-            if not pushed:
-                continue  # 无时间的保留
-            try:
-                dt = datetime.fromisoformat(pushed.replace("Z", "+00:00"))
-                if dt < cutoff:
-                    del seeds[key]
-                    pruned += 1
-            except Exception:
-                pass  # 解析失败保留
-        if pruned:
-            print(f"[{now_str()}] 淘汰 {pruned} 个过期种子", flush=True)
+
+        # ── 先排序（确保尾部是最旧的） ──
+        Collector._sort_seeds(seeds)
+
+        # ── 条数超限 → 淘汰 ──
+        if SEED_MAX_ENTRIES > 0 and len(seeds) > SEED_MAX_ENTRIES:
+            excess = len(seeds) - SEED_MAX_ENTRIES
+            evict_target = excess + max(1, len(seeds) // SEED_EVICTION_RATIO) if SEED_EVICTION_RATIO > 0 else excess
+            pruned = 0
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=SEED_MAX_AGE_HOURS) if SEED_MAX_AGE_HOURS > 0 else None
+
+            # 第一轮：删超龄种子
+            if cutoff:
+                for key in reversed(list(seeds.keys())):
+                    if pruned >= evict_target:
+                        break
+                    pushed = seeds[key].get("pushed_at", "")
+                    if not pushed:
+                        continue
+                    try:
+                        if datetime.fromisoformat(pushed.replace("Z", "+00:00")) < cutoff:
+                            del seeds[key]
+                            pruned += 1
+                    except Exception:
+                        pass
+
+            # 第二轮：还不够 → 删最旧的（从尾部）
+            for key in reversed(list(seeds.keys())):
+                if pruned >= evict_target:
+                    break
+                del seeds[key]
+                pruned += 1
+
+            if pruned:
+                print(f"[{now_str()}] 淘汰 {pruned} 个种子（超龄+超限）, 保留 {len(seeds)} 个", flush=True)
+
         return seeds
 
     # ==================== 主流程 ====================
@@ -1453,12 +1460,14 @@ class Collector:
 
                 # 废弃仓库 → 跳过（不加入黑名单）
                 if REPO_MAX_AGE_HOURS > 0 and age_hours > REPO_MAX_AGE_HOURS:
+                    self._mark_seen_cache(repo, pushed_at)
                     self._wlog(f"⚠️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，废弃 → 跳过")
                     return
 
                 # 超过跳过阈值 → 不解析文件，但仍追踪 fork 链（fork 可能活跃）
                 if SKIP_PROCESSING_AGE_HOURS > 0 and age_hours > SKIP_PROCESSING_AGE_HOURS:
+                    self._mark_seen_cache(repo, pushed_at)
                     self._wlog(f"⏭️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，跳过解析（追踪 fork 链）")
                     # TRACE_ONCE_ONLY 模式下，只有源头仓库触发追踪
@@ -1544,6 +1553,7 @@ class Collector:
             seeds = getattr(self, '_repo_seeds', {})
             if repo_nodes is not None and repo_nodes >= AUTO_SEED_MIN_NODES_FOR_SEED:
                 self._update_seed_entry(seeds, repo, repo_nodes, pushed_at)
+                self._wlog(f"🌱 加入种子: {repo} (+{repo_nodes} 节点)")
 
         # Fork 链追踪 + 用户仓库遍历
         # TRACE_ONCE_ONLY 模式下，只有源头仓库（is_source=True）触发追踪
@@ -2085,6 +2095,8 @@ class Collector:
                 has_nodes[0] = True
             self.processed_file_shas.add(sha)
             self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
+            if VERBOSE_LOG:
+                self._wlog(f"📄 SHA 缓存: {sha[:8]}... ({len(content)}B)")
 
         # 解析失败记录：有候选但全验证失败 → 可能是新格式/变体，值得复盘
         if LOG_FAILED_CANDIDATES and raw_count > 0 and valid_count == 0:
