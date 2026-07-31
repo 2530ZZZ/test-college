@@ -1396,7 +1396,7 @@ class Collector:
     def process_repo(self, repo: str, branch: str = "main",
                      size: int = -1, disabled: bool = False,
                      pushed_at: str = "", raw_depth: int = 0,
-                     seed_key: str = None):
+                     seed_key: str = None, is_source: bool = False):
         """处理单个仓库。
 
         使用搜索结果的字段代替 GET /repos/{repo} 调用，
@@ -1462,7 +1462,6 @@ class Collector:
                     self._wlog(f"⏭️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，跳过解析（追踪 fork 链）")
                     # TRACE_ONCE_ONLY 模式下，只有源头仓库触发追踪
-                    is_source = kwargs.get("is_source", False)
                     should_trace = (not TRACE_ONCE_ONLY) or is_source
                     if should_trace:
                         if FORK_CHAIN_ENABLED and FORK_CHAIN_CHILD_DEPTH > 0:
@@ -1548,7 +1547,6 @@ class Collector:
 
         # Fork 链追踪 + 用户仓库遍历
         # TRACE_ONCE_ONLY 模式下，只有源头仓库（is_source=True）触发追踪
-        is_source = kwargs.get("is_source", False)
         should_trace = (not TRACE_ONCE_ONLY) or is_source
         if should_trace:
             if FORK_CHAIN_ENABLED and has_nodes_flag[0]:
