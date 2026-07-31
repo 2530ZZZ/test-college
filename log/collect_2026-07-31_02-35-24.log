@@ -1,0 +1,230 @@
+[2026-07-31 10:35:24] 🚀 程序启动
+[2026-07-31 10:35:24] 关键词: 105 个
+[2026-07-31 10:35:24] [MainThread] 已加载黑名单: 10221 个
+[2026-07-31 10:35:24] [MainThread] 加载 SHA 缓存 208362 条 (1 分片)
+[2026-07-31 10:35:24] [MainThread] 🚀 程序启动 | 配额上限 4800/小时
+[2026-07-31 10:35:24] [MainThread] 🔵 阶段 1: 种子仓库 (607 个)
+[2026-07-31 10:35:24] [种子] 🔵 种子仓库: 607 个 → 队列
+[2026-07-31 10:35:24] [种子] 🔵 [种子 1/607] gfpcom/free-proxy-list | 配额 4799/4800 02:35 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-31 10:35:24] [W-0] 🔧 开始处理 gfpcom/free-proxy-list
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:24] [W-0] ⚠️ Worker 异常: gfpcom/free-proxy-list: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:25] [种子] 🔵 [种子 2/607] ermaozi/get_subscribe | 配额 4798/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:25] [W-0] 🔧 开始处理 ermaozi/get_subscribe
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:25] [W-0] ⚠️ Worker 异常: ermaozi/get_subscribe: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:25] [种子] 🔵 [种子 3/607] AtenaPV/PL4 | 配额 4797/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:25] [W-0] 🔧 开始处理 AtenaPV/PL4
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:25] [W-0] ⚠️ Worker 异常: AtenaPV/PL4: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:26] [种子] 🔵 [种子 4/607] ninjastrikers/nexus-nodes | 配额 4796/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:26] [W-0] 🔧 开始处理 ninjastrikers/nexus-nodes
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:26] [W-0] ⚠️ Worker 异常: ninjastrikers/nexus-nodes: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:27] [种子] 🔵 [种子 5/607] ssrsub/ssr | 配额 4795/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:27] [W-0] 🔧 开始处理 ssrsub/ssr
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:27] [W-0] ⚠️ Worker 异常: ssrsub/ssr: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:28] [种子] 🔵 [种子 6/607] mahdibland/SSAggregator | 配额 4794/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:28] [W-0] 🔧 开始处理 mahdibland/SSAggregator
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:28] [W-0] ⚠️ Worker 异常: mahdibland/SSAggregator: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:28] [种子] 🔵 [种子 7/607] AtenaPV/Main-DB | 配额 4793/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:28] [W-0] 🔧 开始处理 AtenaPV/Main-DB
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:28] [W-0] ⚠️ Worker 异常: AtenaPV/Main-DB: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:29] [W-1] ⏳ 等待任务中...[2026-07-31 10:35:29] [W-2] ⏳ 等待任务中...
+[2026-07-31 10:35:29] [W-3] ⏳ 等待任务中...
+
+[2026-07-31 10:35:29] [种子] 🔵 [种子 8/607] LoneKingCode/free-proxy-db | 配额 4792/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:29] [W-0] 🔧 开始处理 LoneKingCode/free-proxy-db
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:29] [W-0] ⚠️ Worker 异常: LoneKingCode/free-proxy-db: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:30] [种子] 🔵 [种子 9/607] mahdibland/ShadowsocksAggregator | 配额 4791/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:30] [W-0] 🔧 开始处理 mahdibland/ShadowsocksAggregator
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:30] [W-0] ⚠️ Worker 异常: mahdibland/ShadowsocksAggregator: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:30] [种子] 🔵 [种子 10/607] Pawdroid/Free-servers | 配额 4790/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:30] [W-0] 🔧 开始处理 Pawdroid/Free-servers
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:30] [W-0] ⚠️ Worker 异常: Pawdroid/Free-servers: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:31] [种子] 🔵 [种子 11/607] aiboboxx/v2rayfree | 配额 4789/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:31] [W-0] 🔧 开始处理 aiboboxx/v2rayfree
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:31] [W-0] ⚠️ Worker 异常: aiboboxx/v2rayfree: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:32] [种子] 🔵 [种子 12/607] AtenaPV/Sub-Sync | 配额 4788/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:32] [W-0] 🔧 开始处理 AtenaPV/Sub-Sync
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:32] [W-0] ⚠️ Worker 异常: AtenaPV/Sub-Sync: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:33] [种子] 🔵 [种子 13/607] sevcator/5ubscrpt10n | 配额 4787/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:33] [W-0] 🔧 开始处理 sevcator/5ubscrpt10n
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:33] [W-0] ⚠️ Worker 异常: sevcator/5ubscrpt10n: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:34] [种子] 🔵 [种子 14/607] V2RayRoot/V2RayConfig | 配额 4786/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:34] [W-0] 🔧 开始处理 V2RayRoot/V2RayConfig
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:34] [W-0] ⚠️ Worker 异常: V2RayRoot/V2RayConfig: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:34] [种子] 🔵 [种子 15/607] ehsanghaffar/config-sub-platform | 配额 4785/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:34] [W-0] 🔧 开始处理 ehsanghaffar/config-sub-platform
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:34] [W-0] ⚠️ Worker 异常: ehsanghaffar/config-sub-platform: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:36] [种子] 🔵 [种子 16/607] Airuop/config-fetcher | 配额 4784/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:36] [W-0] 🔧 开始处理 Airuop/config-fetcher
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:36] [W-0] ⚠️ Worker 异常: Airuop/config-fetcher: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:36] [种子] 🔵 [种子 17/607] free-nodes/v2rayfree | 配额 4783/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:36] [W-0] 🔧 开始处理 free-nodes/v2rayfree
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:36] [W-0] ⚠️ Worker 异常: free-nodes/v2rayfree: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:37] [种子] 🔵 [种子 18/607] crashgfw/free-airport-nodes | 配额 4782/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:37] [W-0] 🔧 开始处理 crashgfw/free-airport-nodes
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:37] [W-0] ⚠️ Worker 异常: crashgfw/free-airport-nodes: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:37] [种子] 🔵 [种子 19/607] lza6/free-VPN | 配额 4781/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:38] [W-0] 🔧 开始处理 lza6/free-VPN
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:38] [W-0] ⚠️ Worker 异常: lza6/free-VPN: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:38] [种子] 🔵 [种子 20/607] guying23/AutoMergePublicNodes | 配额 4780/4800 02:35 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-31 10:35:38] [W-0] 🔧 开始处理 guying23/AutoMergePublicNodes
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:38] [W-0] ⚠️ Worker 异常: guying23/AutoMergePublicNodes: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:39] [种子] 🔵 [种子 21/607] wzdnzd/aggregator | 配额 4779/4800 02:35 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-31 10:35:39] [W-0] 🔧 开始处理 wzdnzd/aggregator
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:39] [W-0] ⚠️ Worker 异常: wzdnzd/aggregator: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:40] [种子] 🔵 [种子 22/607] bruceblink/free-v2ray | 配额 4778/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:40] [W-0] 🔧 开始处理 bruceblink/free-v2ray
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:40] [W-0] ⚠️ Worker 异常: bruceblink/free-v2ray: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:40] [种子] 🔵 [种子 23/607] MhdiTaheri/V2rayCollector_Py | 配额 4777/4800 02:35 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-31 10:35:40] [W-0] 🔧 开始处理 MhdiTaheri/V2rayCollector_Py
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:40] [W-0] ⚠️ Worker 异常: MhdiTaheri/V2rayCollector_Py: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:41] [种子] 🔵 [种子 24/607] Leon406/SubCrawler | 配额 4776/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:41] [W-0] 🔧 开始处理 Leon406/SubCrawler
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:41] [W-0] ⚠️ Worker 异常: Leon406/SubCrawler: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:42] repo info (alanbobs999/TopFreeProxies) 返回 403 (尝试 1/2)
+[2026-07-31 10:35:42] repo info (alanbobs999/TopFreeProxies) 403（访问被拒，配额剩余 4874），跳过
+[2026-07-31 10:35:42] [种子] ❌ 🔵 [种子 25/607] alanbobs999/TopFreeProxies 404 | 配额 4775/4800 02:35 UTC | 主队列 0/200 发现队列 0/600
+[2026-07-31 10:35:42] [种子] 🔵 [种子 26/607] wrfree/free | 配额 4774/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:42] [W-0] 🔧 开始处理 wrfree/free
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:42] [W-0] ⚠️ Worker 异常: wrfree/free: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:43] [种子] 🔵 [种子 27/607] learnhard-cn/free_proxy_ss | 配额 4773/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:43] [W-0] 🔧 开始处理 learnhard-cn/free_proxy_ss
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:43] [W-0] ⚠️ Worker 异常: learnhard-cn/free_proxy_ss: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:43] [种子] 🔵 [种子 28/607] Misaka-blog/chromego_merge | 配额 4772/4800 02:35 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-31 10:35:43] [W-0] 🔧 开始处理 Misaka-blog/chromego_merge
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:43] [W-0] ⚠️ Worker 异常: Misaka-blog/chromego_merge: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:44] [种子] 🔵 [种子 29/607] mahsanet/MahsaFreeConfig | 配额 4771/4800 02:35 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-31 10:35:44] [W-0] 🔧 开始处理 mahsanet/MahsaFreeConfig
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:44] [W-0] ⚠️ Worker 异常: mahsanet/MahsaFreeConfig: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:45] [种子] 🔵 [种子 30/607] Ashkan-m/v2ray | 配额 4770/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:45] [W-0] 🔧 开始处理 Ashkan-m/v2ray
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:45] [W-0] ⚠️ Worker 异常: Ashkan-m/v2ray: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:46] [种子] 🔵 [种子 31/607] Kamyar19/configMs | 配额 4769/4800 02:35 UTC | 主队列 1/200 发现队列 0/600
+[2026-07-31 10:35:46] [W-0] 🔧 开始处理 Kamyar19/configMs
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:46] [W-0] ⚠️ Worker 异常: Kamyar19/configMs: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:46] [种子] 🔵 [种子 32/607] junjun266/FreeProxyGo | 配额 4768/4800 02:35 UTC | 主队列 1/200 发现队列 0/600[2026-07-31 10:35:46] [W-0] 🔧 开始处理 junjun266/FreeProxyGo
+
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 999, in _pool_worker
+    self.process_repo(repo, **kwargs)
+TypeError: Collector.process_repo() got an unexpected keyword argument 'is_source'
+[2026-07-31 10:35:46] [W-0] ⚠️ Worker 异常: junjun266/FreeProxyGo: Collector.process_repo() got an unexpected keyword argument 'is_source'
