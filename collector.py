@@ -20,7 +20,7 @@ import shutil
 import re
 import pickle
 import threading
-from queue import Queue
+from queue import Queue, PriorityQueue, Empty
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
@@ -48,6 +48,8 @@ from config import (
     VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
     SHARED_POOL_WORKERS,
     MAIN_QUEUE_SIZE, DISCOVERY_QUEUE_SIZE,
+    DISC_FORCE_CONSUME_AT, DISC_MAIN_OK_AT,
+    SECONDARY_RATE_LIMIT_DEGRADE, DEGRADE_WORKERS,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
     AUTO_SEED_MIN_NODES_FOR_SEED,
     SEED_MAX_AGE_HOURS, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
@@ -125,8 +127,10 @@ class Collector:
         self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
         self._search_resume = threading.Event()         # Worker 唤醒搜索的信号
         self._search_resume.set()                       # 初始允许搜索
-        self._main_gate = threading.Semaphore(1)         # 主队列闸门：同时最多 1 个活跃主仓库
+        self._log_lock = threading.Lock()                # 日志打印锁（防挤行）
+        self._reset_waiting = False                     # 配额等待去重标志
         self._worker_local = threading.local()          # 线程独立前缀
+        self._disc_seq = None                             # 发现队列 PriorityQueue 序号（分配在 run 中）
         self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
         self._worker_repo_count: Dict[str, int] = {}   # Worker 处理仓库计数
         self._main_queue_total: int = 0                # 主队列总计（不含 fork/raw/用户）
@@ -293,13 +297,17 @@ class Collector:
         return False
 
     def _wlog(self, msg: str, **kwargs):
-        """统一日志：优先用显式前缀，否则 fallback 到线程名。"""
+        """统一日志：优先用显式前缀，否则 fallback 到线程名。
+
+        加 _log_lock 保证多线程打印不挤行（print 非原子）。
+        """
         tn = getattr(getattr(self, '_worker_local', None), 'prefix', None)
         if tn is None:
             tn = threading.current_thread().name
         prefix = f"[{tn}] " if tn else ""
         kwargs.setdefault('flush', True)
-        print(f"[{now_str()}] {prefix}{msg}", **kwargs)
+        with self._log_lock:
+            print(f"[{now_str()}] {prefix}{msg}", **kwargs)
 
     def _qs(self) -> str:
         """队列状态：主队列 + 发现队列。"""
@@ -309,10 +317,55 @@ class Collector:
                 f"发现队列 {dq.qsize() if dq else 0}/{DISCOVERY_QUEUE_SIZE}")
 
     def _qt(self) -> str:
-        """配额状态：剩余/上限 + UTC 时间。"""
-        from datetime import datetime, timezone
-        utc = datetime.now(timezone.utc).strftime('%H:%M UTC')
-        return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {utc}"
+        """配额状态：剩余/上限 + 北京时间。"""
+        from datetime import datetime, timezone, timedelta
+        bj = datetime.now(timezone(timedelta(hours=8))).strftime('%H:%M')
+        return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {bj}北京时间"
+
+    def _disc_put(self, item: tuple, label: str = ""):
+        """放入发现队列（PriorityQueue，按入队时间排序，旧的优先）。"""
+        dq = getattr(self, '_disc_queue', None)
+        if not dq:
+            return False
+        try:
+            dq.put((time.time(), next(self._disc_seq), item),
+                   timeout=QUEUE_PUT_TIMEOUT_SECONDS)
+            return True
+        except Exception:
+            if label:
+                fn = item[1] if len(item) > 1 else "?"
+                self._wlog(f"🗑️ 发现队列满，丢弃{label} {fn}")
+            return False
+
+    def _main_put(self, item: tuple, timeout=None):
+        """放入主队列（PriorityQueue，按入队时间排序，旧的优先）。"""
+        mq = getattr(self, '_task_queue', None)
+        if not mq:
+            return False
+        try:
+            mq.put((time.time(), next(self._disc_seq), item),
+                   timeout=timeout if timeout is not None else QUEUE_PUT_TIMEOUT_SECONDS)
+            return True
+        except Exception:
+            return False
+
+    def _wait_reset(self):
+        """配额耗尽等待（多线程去重 + 队列上下文显示）。
+
+        多个 Worker 同时耗尽时，只有第一个打印日志，其余静默等待。
+        """
+        first = False
+        with self._state_lock:
+            if not self._reset_waiting:
+                self._reset_waiting = True
+                first = True
+        if first:
+            self._wlog(f"⏳ 配额耗尽 | {self._qs()}")
+        try:
+            return self.quota_mgr.wait_for_reset(self._runtime_exceeded)
+        finally:
+            with self._state_lock:
+                self._reset_waiting = False
 
     def _add_seen(self, repo: str):
         """标记仓库为已处理（大小写不敏感），线程安全。"""
@@ -696,7 +749,7 @@ class Collector:
         if self._runtime_exceeded():
             return True
         if self.quota_mgr.exceeded:
-            return not self.quota_mgr.wait_for_reset(self._runtime_exceeded)
+            return not self._wait_reset()
         return False
 
     def _runtime_exceeded(self) -> bool:
@@ -738,10 +791,11 @@ class Collector:
                 pass
 
         # ── 创建共用线程池 ──
-        main_queue = Queue(maxsize=MAIN_QUEUE_SIZE)
-        disc_queue = Queue(maxsize=DISCOVERY_QUEUE_SIZE)
+        main_queue = PriorityQueue(maxsize=MAIN_QUEUE_SIZE)
+        disc_queue = PriorityQueue(maxsize=DISCOVERY_QUEUE_SIZE)
         self._task_queue = main_queue
         self._disc_queue = disc_queue
+        self._disc_seq = __import__('itertools').count()  # 线程安全计数器
         workers = [threading.Thread(target=self._pool_worker,
                                     args=(main_queue, disc_queue),
                                     name=f"W-{i}", daemon=True)
@@ -807,8 +861,8 @@ class Collector:
             self._wait_queue_drain(main_queue, disc_queue)
 
         # ── 停止 Worker ──
-        for _ in workers: main_queue.put(None)
-        for _ in workers: disc_queue.put(None)
+        for _ in workers: main_queue.put((float('inf'), -1, None))
+        for _ in workers: disc_queue.put((float('inf'), -1, None))
         for w in workers: w.join()
         self._task_queue = None
 
@@ -823,32 +877,15 @@ class Collector:
     def _wait_queue_drain(self, main_queue, disc_queue):
         """等待主队列 + 发现队列全清空（配额耗尽则等待恢复）。"""
         self._wlog(f"⏳ 等待队列清空 ({self._qs()})...")
-        wait_logged = 0
-        heartbeat_time = time.time()
         while main_queue.qsize() > 0 or disc_queue.qsize() > 0:
             if self.limiter.should_stop() or self._runtime_exceeded():
                 self._wlog(f"⚠️ 停止信号，放弃剩余任务")
                 break
             if self.quota_mgr.exceeded:
-                self._wlog(f"⏳ 配额耗尽，等待重置")
-                if not self.quota_mgr.wait_for_reset(self._runtime_exceeded):
+                if not self._wait_reset():
                     break
-                self._wlog(f"🔄 配额恢复，继续处理")
+                self._wlog(f"🔄 配额恢复，继续处理 | {self._qs()}")
                 continue
-            # 10分钟心跳
-            if time.time() - heartbeat_time > 600:
-                heartbeat_time = time.time()
-                elapsed = time.time() - self._start_time
-                wc = ", ".join(f"{k} {v}" for k, v in
-                               sorted(self._worker_repo_count.items()))
-                self._wlog(f"⏱️ 运行 {elapsed:.0f}s | "
-                      f"节点 {len(self.unique_nodes)} | "
-                      f"已发现 {self._main_queue_total} 仓库 | "
-                      f"{self._qt()} | "
-                      f"{self._qs()} | "
-                      f"Worker: {wc}")
-            if time.time() - wait_logged > 120:
-                wait_logged = time.time()
             time.sleep(3)
         self._wlog(f"队列处理完毕")
 
@@ -886,13 +923,10 @@ class Collector:
                     self._wlog(f"⏭️ {_prefix} 已处理(pushed_at未变) | {self._qt()}")
                     continue
                 br = ri.get("default_branch", "main")
-                try:
-                    task_queue.put(("种子仓库", repo,
-                                    {"branch": br, "size": ri.get("size", -1),
-                                     "disabled": False, "pushed_at": pushed,
-                                     "seed_key": repo, "is_source": True}),
-                                   timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-                except Exception:
+                if not self._main_put(("种子仓库", repo,
+                                       {"branch": br, "size": ri.get("size", -1),
+                                        "disabled": False, "pushed_at": pushed,
+                                        "seed_key": repo, "is_source": True})):
                     self._wlog(f"🗑️ 主队列满，丢弃种子 {repo}")
                     continue
                 self._branch_cache[repo] = br
@@ -942,106 +976,100 @@ class Collector:
         self._worker_local.prefix = ""
         self._save_seed_file(SEED_REPOS_FILE, "repos", self._repo_seeds)
 
-    def _pool_worker(self, main_queue: Queue, disc_queue: Queue):
-        """共用线程池 Worker — 混合闸门模式。
+    def _pool_worker(self, main_queue: Queue, disc_queue: PriorityQueue):
+        """共用线程池 Worker — 阈值调度模式。
 
         策略：
-          1. 永远优先消费发现队列（fork/用户/raw 衍生仓库）
-          2. 发现队列 < 50 时，抢闸门从主队列取一个仓库
-          3. 闸门持有者处理完主仓库后帮助清空发现队列再释放
-          4. 没抢到闸门的 Worker 阻塞等待发现队列的新货
+          1. 永远优先消费发现队列（PriorityQueue，旧的优先处理）
+          2. 发现队列 ≥ DISC_FORCE_CONSUME_AT → 强制消费发现队列
+          3. 发现队列 ≤ DISC_MAIN_OK_AT → 可以取主队列
+          4. 中间地带自由竞争
+          5. 次级限流时自动降级等待
         """
         while True:
             item = None
             from_queue = None
-            gate_held = False
 
             # ═══ 阶段 1: 优先消费发现队列 ═══
             try:
-                item = disc_queue.get_nowait()
+                _, _, item = disc_queue.get_nowait()
                 from_queue = disc_queue
-            except Exception:
-                # ═══ 阶段 2: 尝试取主队列（需闸门 + 发现队列 < 50） ═══
-                if disc_queue.qsize() < 50 and self._main_gate.acquire(blocking=False):
-                    gate_held = True
+            except Empty:
+                # ═══ 阶段 2: 阈值调度 ═══
+                if disc_queue.qsize() >= DISC_FORCE_CONSUME_AT:
+                    # 发现队列积压 → 强制消费
                     try:
-                        item = main_queue.get(timeout=30)
+                        _, _, item = disc_queue.get(timeout=5)
+                        from_queue = disc_queue
+                    except Empty:
+                        continue
+                elif disc_queue.qsize() <= DISC_MAIN_OK_AT:
+                    # 发现队列少 → 可以取主队列
+                    try:
+                        _, _, item = main_queue.get(timeout=30)
                         from_queue = main_queue
                         if main_queue.qsize() < 20:
                             self._search_resume.set()
-                    except Exception:
-                        # 主队列超时无数据，释放闸门重新循环
-                        self._main_gate.release()
-                        gate_held = False
-                        continue
+                    except Empty:
+                        # 主队列也空 → 等发现队列
+                        try:
+                            _, _, item = disc_queue.get(timeout=5)
+                            from_queue = disc_queue
+                        except Empty:
+                            tn = threading.current_thread().name
+                            last = self._worker_idle_since.get(tn, 0)
+                            if time.time() - last > 120:
+                                self._worker_idle_since[tn] = time.time()
+                                self._wlog(f"⏳ 等待任务中...")
+                            continue
                 else:
-                    # 闸门被持有或发现队列 ≥ 50 → 等发现队列
+                    # 中间地带 → 优先取发现队列，超时后取主队列
                     try:
-                        item = disc_queue.get(timeout=5)
+                        _, _, item = disc_queue.get(timeout=5)
                         from_queue = disc_queue
-                    except Exception:
-                        tn = threading.current_thread().name
-                        last = self._worker_idle_since.get(tn, 0)
-                        if time.time() - last > 120:
-                            self._worker_idle_since[tn] = time.time()
-                            self._wlog(f"⏳ 等待任务中...")
-                        continue
+                    except Empty:
+                        try:
+                            _, _, item = main_queue.get(timeout=30)
+                            from_queue = main_queue
+                            if main_queue.qsize() < 20:
+                                self._search_resume.set()
+                        except Empty:
+                            continue
 
             # ═══ 阶段 3: 处理任务 ═══
             try:
                 if item is None:
                     break
+                # 次级限流降级检查
+                if SECONDARY_RATE_LIMIT_DEGRADE and self.quota_mgr.secondary_limited:
+                    time.sleep(10)
+                    continue
                 # 停止信号检查
                 if self.limiter.should_stop() or self._runtime_exceeded():
                     break
                 if self.quota_mgr.exceeded:
-                    if not self.quota_mgr.wait_for_reset(self._runtime_exceeded):
+                    if not self._wait_reset():
                         break
                     continue
                 source, repo, kwargs = item
                 self.http = HttpClient(token=self.token, rate_limiter=None,
                                        quota_manager=self.quota_mgr)
                 before = len(self.unique_nodes)
+                _t0 = time.time()
                 self._wlog(f"🔧 开始处理 {repo}")
                 self.process_repo(repo, **kwargs)
                 new_nodes = len(self.unique_nodes) - before
-                self._wlog(f"✅ 完成 {repo} (+{new_nodes} 节点)")
+                self._wlog(f"✅ 完成 {repo} (+{new_nodes} 节点) "
+                      f"| 耗时 {time.time()-_t0:.0f}s | {self._qt()} | {self._qs()}")
                 tn = threading.current_thread().name
                 self._worker_repo_count[tn] = self._worker_repo_count.get(tn, 0) + 1
                 ch = self._channel_new_nodes
                 ch[source] = ch.get(source, 0) + new_nodes
-
-                # 闸门持有者：帮助清空发现队列再释放闸门
-                if gate_held:
-                    while disc_queue.qsize() > 0:
-                        try:
-                            d_item = disc_queue.get(timeout=3)
-                            if d_item is None:
-                                disc_queue.task_done()
-                                break
-                            d_source, d_repo, d_kwargs = d_item
-                            self.http = HttpClient(token=self.token, rate_limiter=None,
-                                                   quota_manager=self.quota_mgr)
-                            d_before = len(self.unique_nodes)
-                            self._wlog(f"🔧 开始处理(扩展) {d_repo}")
-                            self.process_repo(d_repo, **d_kwargs)
-                            d_new = len(self.unique_nodes) - d_before
-                            self._wlog(f"✅ 完成(扩展) {d_repo} (+{d_new} 节点)")
-                            d_tn = threading.current_thread().name
-                            self._worker_repo_count[d_tn] = self._worker_repo_count.get(d_tn, 0) + 1
-                            ch[d_source] = ch.get(d_source, 0) + d_new
-                            disc_queue.task_done()
-                        except Exception:
-                            if disc_queue.qsize() == 0:
-                                break
-                            continue
             except Exception as e:
                 import traceback
                 traceback.print_exc()
                 self._wlog(f"⚠️ Worker 异常: {repo if 'repo' in dir() else '?'}: {e}")
             finally:
-                if gate_held:
-                    self._main_gate.release()
                 if from_queue is not None:
                     try:
                         from_queue.task_done()
@@ -1081,15 +1109,12 @@ class Collector:
                     continue
                 self.checked_count += 1
                 self._main_queue_total += 1
-                try:
-                    task_queue.put(("GitHub", repo,
-                                    {"branch": item.get("default_branch", "main"),
-                                     "size": item.get("size", 0),
-                                     "disabled": item.get("disabled", False),
-                                     "pushed_at": pushed,
-                                     "is_source": True}),
-                                   timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-                except Exception:
+                if not self._main_put(("GitHub", repo,
+                                       {"branch": item.get("default_branch", "main"),
+                                        "size": item.get("size", 0),
+                                        "disabled": item.get("disabled", False),
+                                        "pushed_at": pushed,
+                                        "is_source": True})):
                     self._wlog(f"🗑️ 主队列满，丢弃 {repo}")
             time.sleep(PAGE_SLEEP_SECONDS)
 
@@ -1193,17 +1218,15 @@ class Collector:
                             pushed = repo_data.get("pushed_at", "")
                             if self._check_seen_cache(repo_name, pushed):
                                 continue
-                            try:
-                                task_queue.put(("Code", repo_name,
-                                                {"branch": default_branch,
-                                                 "size": repo_data.get("size", -1),
-                                                 "disabled": False,
-                                                 "pushed_at": pushed,
-                                                 "is_source": True}),
-                                               timeout=QUEUE_PUT_TIMEOUT_SECONDS)
+                            if self._main_put(("Code", repo_name,
+                                               {"branch": default_branch,
+                                                "size": repo_data.get("size", -1),
+                                                "disabled": False,
+                                                "pushed_at": pushed,
+                                                "is_source": True})):
                                 self.checked_count += 1
                                 self._main_queue_total += 1
-                            except Exception:
+                            else:
                                 self._wlog(f"🗑️ 主队列满，丢弃 Code 仓库 {repo_name}")
 
                 time.sleep(PAGE_SLEEP_SECONDS)
@@ -1673,12 +1696,11 @@ class Collector:
             self._run_fork_batch(qualified, branch, "🍴 子仓库")
 
     def _run_fork_batch(self, forks: list, branch: str, label: str):
-        """提交 fork/用户仓库到发现队列（优先消费，超时可丢弃）。
+        """提交 fork/用户仓库到发现队列（PriorityQueue，旧的优先处理）。
 
         fork/用户仓库不传 is_source → TRACE_ONCE_ONLY 模式下不再触发追踪。
         """
-        tq = getattr(self, '_disc_queue', None)
-        if not tq:  # 降级：无共用池时串行
+        if not getattr(self, '_disc_queue', None):  # 降级：无共用池时串行
             for fork in forks:
                 fn, nn = self._process_fork_repo(fork, branch)
                 if nn > 0: self._wlog(f"  {label}: {fn} +{nn}")
@@ -1690,15 +1712,12 @@ class Collector:
         for fork in forks:
             fn = fork.get("full_name")
             if not fn: continue
-            try:
-                tq.put(("GitHub", fn,
-                        {"branch": fork.get("default_branch", branch),
-                         "size": fork.get("size", -1),
-                         "disabled": fork.get("disabled", False),
-                         "pushed_at": fork.get("pushed_at", "")}),
-                       timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-            except Exception:
-                self._wlog(f"🗑️  发现队列满，丢弃 {fn}")
+            self._disc_put(("GitHub", fn,
+                            {"branch": fork.get("default_branch", branch),
+                             "size": fork.get("size", -1),
+                             "disabled": fork.get("disabled", False),
+                             "pushed_at": fork.get("pushed_at", "")}),
+                           label=label)
         self._wlog(f"  {label}: {len(forks)} 个 → {self._qs()}")
 
     def _trace_user_repos(self, repo: str, branch: str):
@@ -2241,24 +2260,25 @@ class Collector:
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
                         self._mark_repo_not_found(full_name)
+                        # 仓库被删除 → 追踪该用户的其他仓库
+                        if USER_REPOS_ENABLED:
+                            owner = full_name.split("/")[0]
+                            self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户 {owner}")
+                            self._trace_user_repos(full_name, "main")
                     continue
             finally:
                 self._repo_checking.discard(rl)
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
             # 异步：放入发现队列，不阻塞当前 Worker
-            disc = getattr(self, '_disc_queue', None)
-            if disc:
-                try:
-                    disc.put(("GitHub", full_name,
-                              {"branch": branch,
-                               "size": repo_info.get("size", -1),
-                               "disabled": False,
-                               "pushed_at": repo_info.get("pushed_at", ""),
-                               "raw_depth": raw_depth + 1}),
-                             timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-                except Exception:
-                    self._wlog(f"🗑️ 发现队列满，丢弃 raw 递归仓库 {full_name}")
+            if getattr(self, '_disc_queue', None):
+                self._disc_put(("GitHub", full_name,
+                                {"branch": branch,
+                                 "size": repo_info.get("size", -1),
+                                 "disabled": False,
+                                 "pushed_at": repo_info.get("pushed_at", ""),
+                                 "raw_depth": raw_depth + 1}),
+                               label="raw 递归")
             else:
                 self.process_repo(full_name, branch=branch,
                                   size=repo_info.get("size", -1),
@@ -2297,24 +2317,24 @@ class Collector:
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
                         self._mark_repo_not_found(full_name)
+                        if USER_REPOS_ENABLED:
+                            owner = full_name.split("/")[0]
+                            self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户 {owner}")
+                            self._trace_user_repos(full_name, "main")
                     continue
             finally:
                 self._repo_checking.discard(rl)
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
             # 异步：放入发现队列，不阻塞当前 Worker
-            disc = getattr(self, '_disc_queue', None)
-            if disc:
-                try:
-                    disc.put(("GitHub", full_name,
-                              {"branch": branch,
-                               "size": repo_info.get("size", -1),
-                               "disabled": False,
-                               "pushed_at": repo_info.get("pushed_at", ""),
-                               "raw_depth": raw_depth + 1}),
-                             timeout=QUEUE_PUT_TIMEOUT_SECONDS)
-                except Exception:
-                    self._wlog(f"🗑️ 发现队列满，丢弃链接仓库 {full_name}")
+            if getattr(self, '_disc_queue', None):
+                self._disc_put(("GitHub", full_name,
+                                {"branch": branch,
+                                 "size": repo_info.get("size", -1),
+                                 "disabled": False,
+                                 "pushed_at": repo_info.get("pushed_at", ""),
+                                 "raw_depth": raw_depth + 1}),
+                               label="链接")
             else:
                 self.process_repo(full_name, branch=branch,
                                   size=repo_info.get("size", -1),

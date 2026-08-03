@@ -10,6 +10,7 @@ API 配额管理器 — 全局追踪、主动限速、停止信号。
 
 import time
 import threading
+from datetime import datetime, timezone, timedelta
 
 
 class QuotaManager:
@@ -40,9 +41,15 @@ class QuotaManager:
         self._reset_time = 0          # GitHub 返回的真实重置时间戳
         self._lock = threading.Lock()
         self.exceeded = False         # 配额耗尽标志（本窗口内不恢复）
+        self.secondary_limited = False  # 次级限流标志
         self.total_calls = 0          # 累计调用（统计用）
         self.throttle_count = 0       # 主动延迟次数（统计用）
         self.failed_calls = 0         # 失败调用次数（403/网络错误）
+
+    @staticmethod
+    def _bj_now() -> str:
+        """北京时间时间戳（与 collector 的 now_str 保持一致）。"""
+        return datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
 
     # ── 限速检查 ──
 
@@ -164,9 +171,7 @@ class QuotaManager:
                     self._reset_time = 0
                     self.exceeded = False
                     if _logged:
-                        from datetime import datetime, timezone
-                        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] "
-                              f"🔄 配额恢复，继续工作", flush=True)
+                        print(f"[{self._bj_now()}] 🔄 配额恢复，继续工作", flush=True)
                     return True
                 # 估算：window_start + 3600
                 if now - self.window_start >= 3600:
@@ -177,17 +182,16 @@ class QuotaManager:
             # 首次等待日志
             if not _logged:
                 _logged = True
-                from datetime import datetime, timezone
                 wait = 0
                 if self._reset_time:
                     wait = max(0, self._reset_time - time.time())
                 else:
                     wait = 3600 - (time.time() - self.window_start) + 10
-                reset_utc = datetime.fromtimestamp(
-                    time.time() + wait, tz=timezone.utc
-                ).strftime('%H:%M UTC')
-                print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] "
-                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait/60:.0f}min 至 {reset_utc}",
+                reset_bj = datetime.fromtimestamp(
+                    time.time() + wait, tz=timezone(timedelta(hours=8))
+                ).strftime('%H:%M')
+                print(f"[{self._bj_now()}] "
+                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait/60:.0f}min 至 {reset_bj} 北京时间",
                       flush=True)
             # 计算等待时长
             if self._reset_time:

@@ -90,8 +90,10 @@ REPO_SLEEP_SECONDS = 0.5
 PAGE_SLEEP_SECONDS = 2.0
 
 # 单仓库处理总超时（秒），None 表示不限制
-# 默认 120，取值范围 30-300。超时后跳过该仓库继续处理下一个。
-REPO_TIMEOUT_SECONDS = 300
+# 作用：包裹 process_file_tree 回退路径，超时后跳过该仓库继续处理下一个。
+# 默认 600（10 分钟）。取值范围 60-1200。
+# 论证：极端 100MB 仓库的 Contents API 逐层遍历可能需要数分钟。
+REPO_TIMEOUT_SECONDS = 600
 
 # 仓库废弃年龄阈值（小时）。超过此值跳过处理。
 # 默认 168（7天），取值范围 0-720。设为 0 表示不限制。
@@ -122,8 +124,11 @@ ALLOWED_EXTENSIONS = {
 MAX_FILE_SIZE = None
 
 # 单个文件内容正则提取超时（秒），None 表示不限制
-# 默认 120。对大文件可设为 60-300 避免单文件卡死 Worker。
-FILE_PROCESS_TIMEOUT = 120
+# 作用：包裹 extract_all_strategies 解析，超时后跳过该文件。
+# 默认 300（5 分钟）。
+# 论证：100MB 文件 ≈ 1 亿字符，10+ 正则模式全量扫描约 100-200s，
+#       再加 surrogate 清洗、订阅发现等，300s 是安全值。
+FILE_PROCESS_TIMEOUT = 300
 
 # 黑名单文件路径
 # 存储已验证无节点或广告仓库的 GitHub URL，每行一个。跨运行持久化。
@@ -222,7 +227,7 @@ AUTO_SEED_ENABLED = True
 # 默认值：0（有任何节点即收录）。
 # 建议值：0-10。设大可以过滤"碰巧有一个节点"的低价值仓库。
 # 设为 0：有任何产出即收录。
-AUTO_SEED_MIN_NODES_FOR_SEED = 0
+AUTO_SEED_MIN_NODES_FOR_SEED = 1
 
 # --- 种子排序 ---
 
@@ -537,18 +542,58 @@ PARALLEL_DOWNLOAD_WORKERS = 16
 
 # ==================== 共用线程池 ====================
 
-# 共用线程池 Worker 数（处理仓库/fork/用户仓库等所有类型任务）
-# 默认 4。降低并发峰值可避免触发 GitHub 次级限流。
-SHARED_POOL_WORKERS = 4
+# 共用线程池 Worker 数（处理仓库/fork/用户仓库等所有类型任务）。
+# 作用：控制并发处理仓库的线程数。每个 Worker 独立持有 HttpClient。
+# 原理：4 Worker 约 80-480 API 调用/分钟。次级限流上限 900/分钟/端点。
+#       8 Worker 约 160-960/分钟，仍在安全范围内。
+#       并发请求上限 100（REST+GraphQL 共享），raw 下载不计入。
+# 默认值：8。建议范围 4-16。增大加速消费，但需注意 GitHub 次级限流。
+# 次级限流保护：遇到 "secondary rate limit" 403 时自动降为 2 Worker。
+SHARED_POOL_WORKERS = 8
 
 # 主队列最大长度（搜索渠道：种子/关键词/Code Search）。
-# 默认 200。满时搜索线程阻塞（背压），防止搜索结果浪费 API 配额。
+# 作用：满时搜索线程阻塞（背压），防止搜索结果浪费 API 配额。
+# 默认值：200。取值范围 50-500。
 MAIN_QUEUE_SIZE = 200
 
 # 发现队列最大长度（fork 链/用户仓库/raw 递归）。
-# 默认 600。衍生仓库量大但可丢弃（下次运行可能再发现）。
-# Worker 优先消费发现队列，再消费主队列。
+# 作用：衍生仓库量大但可丢弃（下次运行可能再发现）。
+# 注意：使用 PriorityQueue（按入队时间戳排序，旧的优先处理）。
+# 默认值：600。取值范围 200-1000。
 DISCOVERY_QUEUE_SIZE = 600
+
+# ==================== 队列调度策略 ====================
+
+# 追踪策略：是否只追踪一层。
+# 作用：设为 True 后，只有源头仓库（种子/搜索/Code）触发 fork/用户追踪。
+#       fork/用户/raw 递归发现的仓库只解析文件，不继续追踪。
+# 原理：仓库数量从指数级降为线性级，大幅节省 API 配额。
+# 默认值：True。强烈建议保持开启。
+TRACE_ONCE_ONLY = True
+
+# 发现队列强制消费阈值。
+# 作用：当发现队列超过此值时，所有 Worker 强制消费发现队列（不取主队列）。
+# 原理：防止发现队列积压过深。类似主队列的 ≥80 背压机制。
+# 默认值：400。取值范围 200-{DISCOVERY_QUEUE_SIZE}。
+# 设为 0：不强制消费，Worker 自由选择。
+DISC_FORCE_CONSUME_AT = 400
+
+# 发现队列允许取主队列阈值。
+# 作用：当发现队列低于此值时，Worker 可以取主队列。
+# 原理：扩展队列少时优先补充主队列消费。
+# 默认值：100。取值范围 50-300。
+DISC_MAIN_OK_AT = 100
+
+# 次级限流自动降级。
+# 作用：检测到 GitHub 次级限流（403 "secondary rate limit"）时，
+#       自动降低 Worker 数到 DEGRADE_WORKERS，等 60 秒后恢复。
+# 默认值：True。建议保持开启。
+SECONDARY_RATE_LIMIT_DEGRADE = True
+
+# 次级限流降级后的 Worker 数。
+# 作用：触发次级限流时临时降到这个数量。
+# 默认值：2。取值范围 1-4。
+DEGRADE_WORKERS = 2
 
 # ==================== API 配额管理 ====================
 
@@ -558,25 +603,41 @@ QUOTA_MAX_PER_HOUR = 4800
 
 # ==================== API 请求超时设置 ====================
 
-# 超时格式: (connect_timeout, read_timeout)，单位秒
+# 超时格式: (connect_timeout, read_timeout)，单位秒。
+# connect_timeout: 建立 TCP 连接的最长等待。
+# read_timeout:   收到第一个字节后，等待后续数据的最大时间。
+#                 大响应/慢网络需要更长的 read_timeout。
+# 注意：这些只影响单个 HTTP 请求。整体处理超时见 FILE_PROCESS_TIMEOUT /
+#       REPO_TIMEOUT_SECONDS。
 
-# 搜索 API 超时
+# 搜索 API（/search/repositories, /search/code）
+# GitHub 搜索较慢（中文关键词 + 多页 + 100 条/页大 JSON）。
+# connect=15s（GA 到 api.github.com 通常 <200ms，15s 容错），
+# read=30s（搜索响应 JSON 可达数百 KB）。
 SEARCH_TIMEOUT = (15, 30)
 
-# 仓库信息 API 超时（仅 Contents API 回退路径使用）
+# 仓库信息 API（/repos/{owner}/{repo}）
+# 单仓库元数据，响应小（~2KB），快速 API。
+# 用途：种子信息、fork 链父仓库、raw 递归发现验证。
 REPO_INFO_TIMEOUT = (8, 15)
 
-# raw 文件下载超时
-FILE_DOWNLOAD_TIMEOUT = (10, 30)
+# raw 文件下载（raw.githubusercontent.com，不计 API 配额）
+# read=180s：极端 100MB 节点文件在慢网络（1MB/s）下需 100s+。
+# 注意：下载超时 ≠ 解析超时（后者见 FILE_PROCESS_TIMEOUT）。
+FILE_DOWNLOAD_TIMEOUT = (15, 180)
 
-# Contents API 超时（回退路径，仅在树 API 失败时使用）
+# Contents API（/repos/{repo}/contents/{path}）
+# 回退路径，仅树 API 失败时使用。逐目录遍历，速度慢。
 CONTENTS_API_TIMEOUT = (10, 20)
 
-# Commits API 超时
+# Commits API（/repos/{repo}/commits）
+# 获取分支最新 commit SHA + 24h 前 commit SHA。响应小（~1KB）。
 COMMITS_API_TIMEOUT = (8, 12)
 
-# Tree API 超时（递归树）
-TREE_API_TIMEOUT = (12, 20)
+# Tree API（/repos/{repo}/git/trees/{branch}?recursive=1）
+# 递归树，一次获取全仓库文件列表。大仓库树 JSON 可达数 MB。
+# read=30s 覆盖大仓库。
+TREE_API_TIMEOUT = (15, 30)
 
 # ==================== 树 API 策略 ====================
 
@@ -816,16 +877,6 @@ SEARCH_SUFFIX = " ".join(_SEARCH_SUFFIX_PARTS)
 
 # 清理内部变量，避免被外部 import 污染命名空间
 del _SEARCH_SUFFIX_PARTS
-
-# ==================== 追踪策略 ====================
-
-# 是否只追踪一层（源头仓库触发 fork/用户/raw 追踪，衍生仓库不再触发）。
-# 设为 True 后：
-#   - 种子仓库、关键词搜索、Code 搜索直接发现的仓库 → 正常触发追踪
-#   - fork 仓库、用户仓库、raw 递归发现的仓库 → 只解析文件，不触发追踪
-#   - 仓库数量从指数级降为线性级，大幅节省 API 配额
-# 默认 True。建议保持开启。
-TRACE_ONCE_ONLY = True
 
 # ==================== 队列控制 ====================
 

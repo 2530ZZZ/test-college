@@ -261,6 +261,13 @@ class HttpClient:
                     # 检查剩余配额：X-RateLimit-Remaining > 0 说明没限流，是访问控制
                     remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
                     if remaining_hdr is not None and int(remaining_hdr) > 0:
+                        body = (resp.text or "").lower()
+                        if "secondary rate limit" in body:
+                            self.quota.secondary_limited = True
+                            print(f"[{_now()}] ⚠️ 次级限流！等待 60s...", flush=True)
+                            time.sleep(60)
+                            self.quota.secondary_limited = False
+                            continue  # 重试
                         print(f"[{_now()}] {operation_name} 403（访问被拒，"
                               f"配额剩余 {int(remaining_hdr)}），跳过", flush=True)
                         return None
