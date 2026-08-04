@@ -19,6 +19,7 @@ import random
 import shutil
 import re
 import pickle
+import subprocess
 import threading
 from queue import Queue, PriorityQueue, Empty
 from urllib.parse import quote
@@ -48,9 +49,11 @@ from config import (
     VERBOSE_LOG, SHA_CACHE_DIR, SHA_CACHE_MAX_BYTES, SHA_CACHE_MAX_ENTRIES,
     SHARED_POOL_WORKERS,
     MAIN_QUEUE_SIZE, DISCOVERY_QUEUE_SIZE,
-    DISC_FORCE_CONSUME_AT, DISC_MAIN_OK_AT,
+    DISC_FORCE_CONSUME_AT, DISC_MAIN_OK_AT, DISC_PUT_BACKPRESSURE,
+    API_MAX_PER_MINUTE, API_PAUSE_AT_RATE, API_RESUME_AT_RATE,
     SECONDARY_RATE_LIMIT_DEGRADE, DEGRADE_WORKERS,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
+    PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT,
     AUTO_SEED_MIN_NODES_FOR_SEED,
     SEED_MAX_AGE_HOURS, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
     SEEN_REPOS_PERSIST_ENABLED, SEEN_REPOS_DIR, SEEN_REPOS_MAX_BYTES,
@@ -67,6 +70,7 @@ from config import (
     PARALLEL_DOWNLOAD_MB_HIGH, PARALLEL_DOWNLOAD_MB_MED,
 )
 from http_client import HttpClient, RateLimiter
+from api_queue import ApiRateGate
 from parsers import (
     extract_all_strategies, extract_embedded_uris, extract_clash_yaml,
     extract_singbox_json, extract_surge_format,
@@ -103,8 +107,14 @@ class Collector:
         # 全局配额管理器（所有 HttpClient 共享，消除统计盲区）
         self.quota_mgr = QuotaManager(max_per_hour=QUOTA_MAX_PER_HOUR)
 
+        # API 速率门（所有 HttpClient 共享，削峰填谷 + 端点限速）
+        self.api_gate = ApiRateGate(max_per_minute=API_MAX_PER_MINUTE,
+                                    pause_at_rate=API_PAUSE_AT_RATE,
+                                    resume_at_rate=API_RESUME_AT_RATE)
+
         # 主 HTTP 客户端 + 线程局部存储（并行 fork/用户仓库用）
-        self._main_http = HttpClient(token=token, quota_manager=self.quota_mgr)
+        self._main_http = HttpClient(token=token, quota_manager=self.quota_mgr,
+                                     api_gate=self.api_gate)
         self._http_local = threading.local()
 
         # ── 共享状态（线程安全保护） ──
@@ -323,10 +333,18 @@ class Collector:
         return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {bj}北京时间"
 
     def _disc_put(self, item: tuple, label: str = ""):
-        """放入发现队列（PriorityQueue，按入队时间排序，旧的优先）。"""
+        """放入发现队列（PriorityQueue，按入队时间排序，旧的优先）。
+
+        背压：队列 ≥ DISC_PUT_BACKPRESSURE 时等待 Worker 消费再放入，
+        产生速度受消费速度约束，队列永不满载。
+        """
         dq = getattr(self, '_disc_queue', None)
         if not dq:
             return False
+        while dq.qsize() >= DISC_PUT_BACKPRESSURE:
+            if self._should_stop():
+                return False
+            time.sleep(5)
         try:
             dq.put((time.time(), next(self._disc_seq), item),
                    timeout=QUEUE_PUT_TIMEOUT_SECONDS)
@@ -597,22 +615,25 @@ class Collector:
             except Exception as e:
                 self._wlog(f"⚠️ 批次回调异常: {e}")
 
-    def _add_node(self, node_uri: str, proxy=None):
+    def _add_node(self, node_uri: str, proxy=None) -> str:
         """添加节点到当前批次 buffer。
 
-        如果 buffer 满了则自动刷盘。去重检查在调用前已完成。
+        去重检查在调用前已完成（server_port_protocol）。
 
-        Args:
-            node_uri: 原始 URI 字符串
-            proxy: StandardProxy 实例（可选，用于去重 key 生成）
+        Returns:
+            "added": 新增到全局集合
+            "dup":   与已有节点重复（URI 已存在）
         """
         with self._state_lock:
+            if node_uri in self.unique_nodes:
+                return "dup"
             self.unique_nodes.add(node_uri)
             self.batch_buffer.append(node_uri)
             need_flush = len(self.batch_buffer) >= BATCH_FLUSH_SIZE
 
         if need_flush:
             self._flush_batch()
+        return "added"
 
     # ==================== 种子文件管理 ====================
     # 种子文件（seed_repos.json / seed_channels.json）直接存储来源及其元数据。
@@ -805,6 +826,7 @@ class Collector:
         # 阶段专用 http
         http = HttpClient(token=self.token, rate_limiter=self.limiter,
                           quota_manager=self.quota_mgr,
+                          api_gate=self.api_gate,
                           pool_connections=20, pool_maxsize=20)
         self.http = http
 
@@ -860,19 +882,20 @@ class Collector:
                 "api_report": self.quota_mgr.get_stats_report()}
             self._wait_queue_drain(main_queue, disc_queue)
 
-        # ── 停止 Worker ──
+        # ── 停止 Worker（优雅退出：sentinel 通知，处理完当前仓库即退出） ──
         for _ in workers: main_queue.put((float('inf'), -1, None))
         for _ in workers: disc_queue.put((float('inf'), -1, None))
-        for w in workers: w.join()
-        self._task_queue = None
 
-        # ── 种子排序 + 保存 ──
+        # ── 先保存所有状态（不依赖 Worker 全部完成） ──
         with self._state_lock:
             self._sort_seeds(repo_seeds)
         self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
-
-        # ── 最终保存 ──
         self._finalize(elapsed_seconds=time.time() - self._start_time)
+
+        # ── 最后等待 Worker（最多 30 分钟，超时强制退出，Worker 是 daemon） ──
+        for w in workers:
+            w.join(timeout=1800)
+        self._task_queue = None
 
     def _wait_queue_drain(self, main_queue, disc_queue):
         """等待主队列 + 发现队列全清空（配额耗尽则等待恢复）。"""
@@ -1040,6 +1063,10 @@ class Collector:
             try:
                 if item is None:
                     break
+                # API 速率门：速率接近上限 → 暂停取新任务（削峰）
+                if self.api_gate.should_pause():
+                    time.sleep(5)
+                    continue
                 # 次级限流降级检查
                 if SECONDARY_RATE_LIMIT_DEGRADE and self.quota_mgr.secondary_limited:
                     time.sleep(10)
@@ -1053,18 +1080,17 @@ class Collector:
                     continue
                 source, repo, kwargs = item
                 self.http = HttpClient(token=self.token, rate_limiter=None,
-                                       quota_manager=self.quota_mgr)
-                before = len(self.unique_nodes)
+                                       quota_manager=self.quota_mgr,
+                                       api_gate=self.api_gate)
                 _t0 = time.time()
                 self._wlog(f"🔧 开始处理 {repo}")
-                self.process_repo(repo, **kwargs)
-                new_nodes = len(self.unique_nodes) - before
-                self._wlog(f"✅ 完成 {repo} (+{new_nodes} 节点) "
+                extracted, added = self.process_repo(repo, **kwargs)
+                self._wlog(f"✅ 完成 {repo} | 提取 {extracted} | 新增 {added} "
                       f"| 耗时 {time.time()-_t0:.0f}s | {self._qt()} | {self._qs()}")
                 tn = threading.current_thread().name
                 self._worker_repo_count[tn] = self._worker_repo_count.get(tn, 0) + 1
                 ch = self._channel_new_nodes
-                ch[source] = ch.get(source, 0) + new_nodes
+                ch[source] = ch.get(source, 0) + added
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -1287,6 +1313,9 @@ class Collector:
             if st.get('api_report'):
                 print(f"    API 详情:\n{st['api_report']}")
 
+        # ── API 速率门观测 ──
+        print(f"\n{self.api_gate.get_stats_report()}")
+
         # ── 汇总 ──
         total_new = sum(s.get("nodes_new", 0) for s in self._channel_stats.values())
         qs = self.quota_mgr.get_stats()
@@ -1397,10 +1426,9 @@ class Collector:
                 self.checked_count += 1
                 self._wlog(f"开始处理仓库 {github_url}")
 
-                before_repo = len(self.unique_nodes)
                 try:
                     # 使用搜索结果的字段替代 Repo Info API
-                    self.process_repo(
+                    _extracted, added = self.process_repo(
                         repo=repo,
                         branch=item.get("default_branch", "main"),
                         size=item.get("size", 0),
@@ -1412,12 +1440,11 @@ class Collector:
                     return
                 except Exception as e:
                     self._wlog(f"⚠️ 处理仓库异常 {github_url}: {e}")
+                    added = 0
 
                 # 自动种子追踪：搜索发现的仓库也记录产出
-                if AUTO_SEED_ENABLED:
-                    new_nodes = len(self.unique_nodes) - before_repo
-                    if new_nodes > 0:
-                        self._update_seed_entry(self._repo_seeds, repo, new_nodes)
+                if AUTO_SEED_ENABLED and added > 0:
+                    self._update_seed_entry(self._repo_seeds, repo, added)
 
                 time.sleep(REPO_SLEEP_SECONDS)
 
@@ -1441,7 +1468,6 @@ class Collector:
             raw_depth: raw 递归发现深度
         """
         github_url = f"https://github.com/{repo}"
-        _repo_nodes_before = len(self.unique_nodes)
 
         # ── pushed_at 为空 → 强制补查 repo info ──
         if not pushed_at:
@@ -1459,20 +1485,20 @@ class Collector:
         # 已处理仓库缓存检查（pushed_at 未变→跳过）
         if self._check_seen_cache(repo, pushed_at):
             self._wlog(f"⏭️ 仓库 {github_url} 未更新，跳过")
-            return
+            return (0, 0)
 
         # 黑名单检查
         if self._check_blacklist(github_url):
             self._wlog(f"仓库在黑名单中: {github_url}")
-            return
+            return (0, 0)
 
         # 有效性检查
         if size == 0:
             self._wlog(f"⚠️ 仓库 {github_url} 大小为 0，跳过")
-            return
+            return (0, 0)
         if disabled:
             self._wlog(f"⚠️ 仓库 {github_url} 已禁用，跳过")
-            return
+            return (0, 0)
 
         # 仓库年龄过滤（统一入口：搜索结果、fork链、用户仓库、raw递归）
         if pushed_at:
@@ -1486,7 +1512,7 @@ class Collector:
                     self._mark_seen_cache(repo, pushed_at)
                     self._wlog(f"⚠️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，废弃 → 跳过")
-                    return
+                    return (0, 0)
 
                 # 超过跳过阈值 → 不解析文件，但仍追踪 fork 链（fork 可能活跃）
                 if SKIP_PROCESSING_AGE_HOURS > 0 and age_hours > SKIP_PROCESSING_AGE_HOURS:
@@ -1502,7 +1528,7 @@ class Collector:
                             self._trace_fork_chain(repo, branch, pushed_at)
                         if USER_REPOS_ENABLED:
                             self._trace_user_repos(repo, branch)
-                    return
+                    return (0, 0)
             except Exception:
                 pass  # 时间解析失败，放行
         if branch == "main" and repo in self._branch_cache and self._branch_cache[repo]:
@@ -1512,11 +1538,12 @@ class Collector:
               f"size: {size}KB, pushed: {pushed_at})")
 
         has_nodes_flag = [False]
+        repo_stats = [0, 0]  # [extracted, added] 本仓库级统计
 
         # 主要路径：递归树 API
         if USE_RECURSIVE_TREE:
             success = self._process_with_recursive_tree(
-                repo, branch, has_nodes_flag, raw_depth)
+                repo, branch, has_nodes_flag, raw_depth, repo_stats)
             if not success:
                 # 树 API 404 可能是因为分支名不对（种子仓库进来默认是 main），
                 # 懒查真实分支名，只消耗 1 次 API 调用，然后重试
@@ -1524,35 +1551,19 @@ class Collector:
                 if actual_branch and actual_branch != branch:
                     self._wlog(f"  分支名修正: {branch} → {actual_branch}")
                     success = self._process_with_recursive_tree(
-                        repo, actual_branch, has_nodes_flag, raw_depth)
+                        repo, actual_branch, has_nodes_flag, raw_depth, repo_stats)
 
             if not success:
                 self._wlog(f"树 API 失败，回退到 Contents API")
                 try:
-                    if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
-                        with ThreadPoolExecutor(max_workers=1) as _exec2:
-                            _future2 = _exec2.submit(
-                                self.process_file_tree, repo, "", branch, has_nodes_flag)
-                            _future2.result(timeout=REPO_TIMEOUT_SECONDS)
-                    else:
-                        self.process_file_tree(repo, "", branch, has_nodes_flag)
-                except FutureTimeoutError:
-                    self._wlog(f"⚠️ Contents API 处理超时，跳过")
+                    self.process_file_tree(repo, "", branch, has_nodes_flag, repo_stats)
                 except RuntimeError:
                     raise
         else:
             # 回退路径：Contents API 逐层遍历
-            # 用 ThreadPoolExecutor 超时替代 signal(SIGALRM)，后者在 Worker 线程中不可用
+            # 直接调用（大仓库保证处理完，配额由 ApiRateGate 管控）
             try:
-                if REPO_TIMEOUT_SECONDS is not None and REPO_TIMEOUT_SECONDS > 0:
-                    with ThreadPoolExecutor(max_workers=1) as _exec:
-                        _future = _exec.submit(
-                            self.process_file_tree, repo, "", branch, has_nodes_flag)
-                        _future.result(timeout=REPO_TIMEOUT_SECONDS)
-                else:
-                    self.process_file_tree(repo, "", branch, has_nodes_flag)
-            except FutureTimeoutError:
-                self._wlog(f"⚠️ Contents API 处理超时，跳过")
+                self.process_file_tree(repo, "", branch, has_nodes_flag, repo_stats)
             except RuntimeError:
                 raise
 
@@ -1572,7 +1583,7 @@ class Collector:
 
         # 种子自动收录：任何渠道只要有节点产出即加入
         if AUTO_SEED_ENABLED and has_nodes_flag[0]:
-            repo_nodes = len(self.unique_nodes) - _repo_nodes_before
+            repo_nodes = repo_stats[1]  # 新增（server_port_protocol 去重后）
             seeds = getattr(self, '_repo_seeds', {})
             if repo_nodes is not None and repo_nodes >= AUTO_SEED_MIN_NODES_FOR_SEED:
                 self._update_seed_entry(seeds, repo, repo_nodes, pushed_at)
@@ -1589,6 +1600,8 @@ class Collector:
                     self._trace_fork_chain(repo, branch, pushed_at)
             if USER_REPOS_ENABLED and has_nodes_flag[0]:
                 self._trace_user_repos(repo, branch)
+
+        return (repo_stats[0], repo_stats[1])
 
     # ==================== Fork 链追踪 ====================
 
@@ -1620,17 +1633,17 @@ class Collector:
 
         # 2. 如果父仓库还没处理过，先处理父仓库
         if not self._is_seen(parent_name):
-            before_parent = len(self.unique_nodes)
             try:
-                self.process_repo(parent_name,
-                                  branch=parent.get("default_branch", branch),
-                                  size=parent.get("size", -1),
-                                  disabled=False,
-                                  pushed_at=parent.get("pushed_at", ""))
+                _pextracted, _padded = self.process_repo(
+                    parent_name,
+                    branch=parent.get("default_branch", branch),
+                    size=parent.get("size", -1),
+                    disabled=False,
+                    pushed_at=parent.get("pushed_at", ""))
             except Exception as e:
                 self._wlog(f"  ⚠️ 父仓库 {parent_name}: {e}")
-            new_parent = len(self.unique_nodes) - before_parent
-            self._wlog(f"  父仓库 +{new_parent} 个节点")
+                _padded = 0
+            self._wlog(f"  父仓库 +{_padded} 个节点")
 
         # 3. 遍历父仓库的 fork 列表（兄弟仓库）
         qualified = []
@@ -1657,19 +1670,20 @@ class Collector:
     def _process_fork_repo(self, fork: dict, branch: str) -> tuple:
         """处理单个 fork/用户仓库（串行降级路径）。"""
         self.http = HttpClient(token=self.token, rate_limiter=None,
-                               quota_manager=self.quota_mgr)
+                               quota_manager=self.quota_mgr,
+                               api_gate=self.api_gate)
         fork_name = fork.get("full_name")
-        before = len(self.unique_nodes)
+        added = 0
         try:
-            self.process_repo(fork_name,
-                              branch=fork.get("default_branch", branch),
-                              size=fork.get("size", -1),
-                              disabled=fork.get("disabled", False),
-                              pushed_at=fork.get("pushed_at", ""))
+            _extracted, added = self.process_repo(
+                fork_name,
+                branch=fork.get("default_branch", branch),
+                size=fork.get("size", -1),
+                disabled=fork.get("disabled", False),
+                pushed_at=fork.get("pushed_at", ""))
         except Exception as e:
             self._wlog(f"  ⚠️ {fork_name}: {e}")
-        new_nodes = len(self.unique_nodes) - before
-        return (fork_name, new_nodes)
+        return (fork_name, added)
 
     def _trace_child_forks(self, repo: str, branch: str):
         """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
@@ -1777,10 +1791,14 @@ class Collector:
 
     def _process_with_recursive_tree(self, repo: str, branch: str,
                                      has_nodes: List[bool],
-                                     raw_depth: int = 0) -> bool:
+                                     raw_depth: int = 0,
+                                     stats: List[int] = None) -> bool:
         """使用 git/trees API 获取递归文件树。
 
         一次 API 调用获取全仓库文件列表，然后过滤、下载、提取。
+
+        Args:
+            stats: [extracted, added] 本仓库级统计累加。
 
         Returns:
             True 表示处理成功，False 表示需要回退到 Contents API
@@ -1796,13 +1814,32 @@ class Collector:
 
         data = resp.json()
         if data.get('truncated', False):
-            self._wlog(f"树数据被截断，回退到 Contents API")
+            if PARTIAL_CLONE_ENABLED:
+                self._wlog(f"树数据被截断，尝试 Partial Clone 获取完整文件树")
+                entries = self._partial_clone_file_list(repo, branch)
+                if entries is not None:
+                    # entries 与 tree API 格式相同，走共用过滤逻辑
+                    return self._process_file_list(repo, branch, entries,
+                                                   has_nodes, raw_depth, stats)
+                self._wlog(f"Partial Clone 失败，回退到 Contents API")
+            else:
+                self._wlog(f"树数据被截断，回退到 Contents API")
             return False
 
         entries = data.get('tree', [])
         if not entries:
             return True
+        return self._process_file_list(repo, branch, entries, has_nodes,
+                                       raw_depth, stats)
 
+    def _process_file_list(self, repo: str, branch: str, entries: list,
+                           has_nodes: List[bool], raw_depth: int,
+                           stats: List[int]) -> bool:
+        """过滤文件列表 + 下载 + 提取（tree API 与 Partial Clone 共用）。
+
+        Args:
+            entries: [{path, sha, size, type}, ...] 文件列表。
+        """
         # ---- 收集候选文件 ----
         files_to_check = []
         skipped_by_processed = 0
@@ -1876,7 +1913,8 @@ class Collector:
             for file_path, sha, _size in files_to_check:
                 if self.limiter.should_stop():
                     raise RuntimeError("限流超限")
-                self._handle_one_file(repo, branch, file_path, sha, has_nodes, raw_depth)
+                self._handle_one_file(repo, branch, file_path, sha, has_nodes,
+                                      raw_depth, stats)
         else:
             # 按文件大小升序 → 小文件先跑完释放内存
             files_to_check.sort(key=lambda x: x[2])
@@ -1889,7 +1927,8 @@ class Collector:
                 workers = PARALLEL_DOWNLOAD_WORKERS
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {executor.submit(
-                    self._handle_one_file, repo, branch, fp, s, has_nodes, raw_depth
+                    self._handle_one_file, repo, branch, fp, s, has_nodes,
+                    raw_depth, stats
                 ): fp for fp, s, _sz in files_to_check}
                 for future in as_completed(futures):
                     if self.limiter.should_stop():
@@ -1902,6 +1941,66 @@ class Collector:
                               f"{futures[future]}: {e}")
 
         return True
+
+    def _partial_clone_file_list(self, repo: str, branch: str):
+        """用 git partial clone 获取完整文件列表（零 API 配额）。
+
+        git clone --filter=blob:none 只下载 commit + tree 对象（路径名），
+        不下载文件内容（blob）。git ls-tree -r HEAD 输出完整路径。
+
+        Returns:
+            [{path, sha, size, type}, ...] 或 None（失败）
+        """
+        import tempfile
+        tmp = tempfile.mkdtemp(prefix="pclone_")
+        try:
+            token = self.token or GITHUB_TOKEN
+            if not token:
+                self._wlog(f"⚠️ Partial Clone 无 token，跳过")
+                return None
+            clone_url = f"https://x-access-token:{token}@github.com/{repo}.git"
+            r = subprocess.run(
+                ["git", "clone", "--depth", "1", "--filter=blob:none",
+                 "--no-checkout", "--single-branch", f"--branch={branch}",
+                 clone_url, tmp],
+                capture_output=True, text=True, timeout=900)
+            if r.returncode != 0:
+                self._wlog(f"⚠️ Partial Clone 失败: {(r.stderr or '')[:200]}")
+                return None
+            r2 = subprocess.run(
+                ["git", "-C", tmp, "ls-tree", "-r", "-l", "HEAD"],
+                capture_output=True, text=True, timeout=300)
+            if r2.returncode != 0:
+                self._wlog(f"⚠️ ls-tree 失败")
+                return None
+            entries = []
+            for line in r2.stdout.splitlines():
+                parts = line.split("\t", 1)
+                if len(parts) != 2:
+                    continue
+                meta, path = parts
+                meta_parts = meta.split()
+                if len(meta_parts) < 4:
+                    continue
+                _mode, etype, sha, size = meta_parts[:4]
+                if etype != "blob":
+                    continue
+                try:
+                    sz = int(size)
+                except ValueError:
+                    sz = 0
+                entries.append({"path": path, "sha": sha, "size": sz,
+                                "type": "blob"})
+            self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）")
+            return entries
+        except subprocess.TimeoutExpired:
+            self._wlog(f"⚠️ Partial Clone 超时（900s），放弃")
+            return None
+        except Exception as e:
+            self._wlog(f"⚠️ Partial Clone 异常: {e}")
+            return None
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     # ==================== 懒分支名解析 ====================
 
@@ -2027,11 +2126,17 @@ class Collector:
     # ==================== 文件处理 ====================
 
     def _handle_one_file(self, repo: str, branch: str, file_path: str,
-                         sha: str, has_nodes: List[bool], raw_depth: int):
+                         sha: str, has_nodes: List[bool], raw_depth: int,
+                         stats: List[int] = None):
         """处理单个文件：下载 → 提取节点 → 去重 → 入 buffer。
 
         使用 uri_parser 协议解析层提取 StandardProxy，
         按 (server, port, protocol) 全局去重后写入批次 buffer。
+
+        Args:
+            stats: [extracted, added] 累加数组（本仓库级统计）。
+                   extracted = 解析出的有效节点数（含与已有重复）
+                   added     = server_port_protocol 去重后全局新增
         """
         if self.limiter.should_stop():
             raise RuntimeError("限流超限")
@@ -2149,6 +2254,11 @@ class Collector:
             else:
                 self._wlog(f"📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
                       f"{valid_count} 个有效节点，全部重复")
+
+        # 累加本仓库级统计（提取出 / 新增）
+        if stats is not None:
+            stats[0] += valid_count
+            stats[1] += new_count
 
         # ---- 自动刷盘 ----
         if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:
@@ -2345,10 +2455,13 @@ class Collector:
     # ==================== 回退路径：Contents API ====================
 
     def process_file_tree(self, repo: str, path: str, branch: str,
-                          has_nodes: List[bool]):
+                          has_nodes: List[bool], stats: List[int] = None):
         """回退路径：使用 Contents API 逐层遍历目录。
 
         仅在递归树 API 失败时使用。对每个文件/目录单独发请求。
+
+        Args:
+            stats: [extracted, added] 本仓库级统计累加。
         """
         contents_url = (f"https://api.github.com/repos/{repo}/contents/{path}"
                         if path
@@ -2432,7 +2545,7 @@ class Collector:
                     continue
 
                 self._handle_one_file(repo, branch, item_path, item_sha,
-                                      has_nodes, raw_depth=0)
+                                      has_nodes, raw_depth=0, stats=stats)
 
     # ==================== 最终输出 ====================
 

@@ -544,12 +544,12 @@ PARALLEL_DOWNLOAD_WORKERS = 16
 
 # 共用线程池 Worker 数（处理仓库/fork/用户仓库等所有类型任务）。
 # 作用：控制并发处理仓库的线程数。每个 Worker 独立持有 HttpClient。
-# 原理：4 Worker 约 80-480 API 调用/分钟。次级限流上限 900/分钟/端点。
-#       8 Worker 约 160-960/分钟，仍在安全范围内。
-#       并发请求上限 100（REST+GraphQL 共享），raw 下载不计入。
-# 默认值：8。建议范围 4-16。增大加速消费，但需注意 GitHub 次级限流。
-# 次级限流保护：遇到 "secondary rate limit" 403 时自动降为 2 Worker。
-SHARED_POOL_WORKERS = 8
+# 原理：API 速率门（ApiRateGate）按 600/分钟 限速削峰，
+#       Worker 数不受 API 速率约束，可放心加大。
+#       并发上限 100（REST+GraphQL 共享），16 Worker × ~2 并发 = 32，安全。
+# 默认值：16。建议范围 8-32。
+# 次级限流保护：API 队列端点限速 + 遇到 403 自动降级。
+SHARED_POOL_WORKERS = 16
 
 # 主队列最大长度（搜索渠道：种子/关键词/Code Search）。
 # 作用：满时搜索线程阻塞（背压），防止搜索结果浪费 API 配额。
@@ -584,6 +584,14 @@ DISC_FORCE_CONSUME_AT = 400
 # 默认值：100。取值范围 50-300。
 DISC_MAIN_OK_AT = 100
 
+# 发现队列 put 背压阈值。
+# 作用：队列 ≥ 此值时，_disc_put 等待（5 秒间隔）直到消费方腾出空间。
+# 原理：产生速度受消费速度约束，队列永不满载（削峰）。
+# 默认值：500。取值范围 300-{DISCOVERY_QUEUE_SIZE}。
+# 注意：低于 DISC_FORCE_CONSUME_AT(400) 会导致背压与强制消费冲突，
+#       建议 ≥ DISC_FORCE_CONSUME_AT。
+DISC_PUT_BACKPRESSURE = 500
+
 # 次级限流自动降级。
 # 作用：检测到 GitHub 次级限流（403 "secondary rate limit"）时，
 #       自动降低 Worker 数到 DEGRADE_WORKERS，等 60 秒后恢复。
@@ -594,6 +602,26 @@ SECONDARY_RATE_LIMIT_DEGRADE = True
 # 作用：触发次级限流时临时降到这个数量。
 # 默认值：2。取值范围 1-4。
 DEGRADE_WORKERS = 2
+
+# ==================== API 速率门 ====================
+
+# API 速率门全局速率上限（次/分钟）。
+# 作用：所有 api.github.com 调用经滑动窗口限速，速率不超过此值。
+# 原理：次级限流 900 点/分钟/端点（GET=1 点），600 留 33% 余量。
+# 默认值：600。取值范围 300-900。
+API_MAX_PER_MINUTE = 600
+
+# API 速率门暂停阈值（次/分钟）。
+# 作用：最近 60s 放行数 ≥ 此值 → Worker 暂停取新任务（削峰）。
+# 原理：480 = 600 的 80%，接近上限前提前收手，在途请求消化后速率回落。
+# 默认值：480。取值范围 300-{API_MAX_PER_MINUTE}。
+API_PAUSE_AT_RATE = 480
+
+# API 速率门恢复阈值（次/分钟）。
+# 作用：速率 ≤ 此值 → Worker 恢复取任务。
+# 原理：300 = 600 的 50%，滞回带（300-480）防止阈值附近反复抖动。
+# 默认值：300。取值范围 100-{API_PAUSE_AT_RATE}。
+API_RESUME_AT_RATE = 300
 
 # ==================== API 配额管理 ====================
 
@@ -821,6 +849,23 @@ MAX_RECURSIVE_REPOS = 100
 # 最大 raw 递归深度。
 # 默认 5。层数越深发现越多，但仓库重复度也越高。
 MAX_RECURSIVE_DEPTH = 5
+
+# ==================== Partial Clone（大仓库处理） ====================
+
+# 是否启用 git partial clone 处理 tree 截断的大仓库。
+# 作用：tree API truncated（仓库 >10 万文件）时，
+#       用 `git clone --filter=blob:none --depth 1` 只下载文件树（路径名），
+#       `git ls-tree -r HEAD` 获取完整文件列表（零 API 配额），
+#       然后 raw 下载候选文件（免费）。
+# 原理：Contents API 逐目录遍历每个目录 1 次 API（大仓库 1000-3000 次），
+#       partial clone 只消耗 git 网络流量（~100MB 级 tree 对象）。
+# 默认值：True。建议保持开启。
+# 失败时自动回退到 Contents API 遍历。
+PARTIAL_CLONE_ENABLED = True
+
+# Partial Clone clone 超时（秒）。
+# 默认 900（15 分钟）。大仓库 tree 对象 ~100MB 需 30-60s。
+PARTIAL_CLONE_TIMEOUT = 900
 
 # ==================== 输出配置 ====================
 

@@ -11,6 +11,7 @@ HTTP 请求客户端。
 """
 
 import time
+import random
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -49,6 +50,7 @@ class HttpClient:
         token: str = "",
         rate_limiter: RateLimiter = None,
         quota_manager: QuotaManager = None,
+        api_gate=None,
         pool_connections: int = 10,
         pool_maxsize: int = 10,
         user_agent: str = "Mozilla/5.0 (compatible; FreeNodesCollector/5.0)",
@@ -56,6 +58,7 @@ class HttpClient:
         self.token = token or GITHUB_TOKEN
         self.limiter = rate_limiter or RateLimiter()
         self.quota = quota_manager or QuotaManager()
+        self.api_gate = api_gate  # ApiRateGate 实例（None = 不限速）
         self.user_agent = user_agent
 
         # API 调用统计（当前实例）
@@ -208,6 +211,11 @@ class HttpClient:
                 self._record_call(url, 0)
                 return None
 
+            # ---- API 速率门：削峰填谷（raw 下载直接放行） ----
+            if is_api_call and self.api_gate is not None:
+                while not self.api_gate.acquire(url):
+                    time.sleep(random.uniform(0.3, 0.8))  # 自旋重试（抖动防惊群）
+
             # ---- 配额检查：主动限速 + 配额耗尽等待恢复 ----
             if is_api_call and not self.quota.check():
                 self._record_call(url, 0)
@@ -231,6 +239,12 @@ class HttpClient:
                 self._record_call(url, resp.status_code, remaining)
                 if is_api_call:
                     self.quota.record()
+                    # 记录响应状态（次级限流观测）
+                    if self.api_gate is not None:
+                        retry_after = resp.headers.get("Retry-After")
+                        self.api_gate.record_response(
+                            url, resp.status_code,
+                            int(retry_after) if retry_after else None)
 
                 # 成功
                 if resp.status_code == 200:
