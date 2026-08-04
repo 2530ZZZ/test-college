@@ -30,7 +30,7 @@ from typing import List, Set, Optional, Tuple, Dict
 from config import (
     GITHUB_TOKEN, MAX_PAGES, PER_PAGE, REPO_SLEEP_SECONDS, PAGE_SLEEP_SECONDS, SEARCH_FORK,
     REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, FILE_PROCESS_TIMEOUT,
-    ALLOWED_EXTENSIONS, BLACKLIST_FILE, README_SPAM_KEYWORDS,
+    ALLOWED_EXTENSIONS, SKIP_LANGUAGES,
     SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
@@ -41,7 +41,7 @@ from config import (
     MAX_PARENT_TRACE_DEPTH, FORK_CHAIN_CHILD_DEPTH,
     TRACE_ONCE_ONLY,
     AUTO_SEED_ENABLED,
-    TOPIC_SEARCH_ENABLED, TOPIC_QUERIES, REPO_MAX_AGE_HOURS,
+    TOPIC_SEARCH_ENABLED, TOPIC_QUERIES,
     README_SEARCH_ENABLED, README_QUERIES, README_MAX_PAGES,
     CODE_SEARCH_ENABLED, CODE_QUERIES, CODE_MAX_PAGES,
     MAX_PAGES_ZH_MULTIPLIER,
@@ -65,7 +65,6 @@ from config import (
     GITHUB_SEARCH_ENABLED, QUOTA_MAX_PER_HOUR,
     SKIP_PROCESSING_AGE_HOURS,
     QUEUE_PUT_TIMEOUT_SECONDS,
-    BLACKLIST_EVICTION_ENABLED, BLACKLIST_EVICTION_RATIO,
     LOG_FAILED_CANDIDATES,
     PARALLEL_DOWNLOAD_MB_HIGH, PARALLEL_DOWNLOAD_MB_MED,
 )
@@ -123,10 +122,6 @@ class Collector:
         self.unique_nodes: Set[str] = set()            # 全局已收集节点 URI
         self.global_dedup_keys: Set[tuple] = set()     # (server, port, protocol) 去重
         self.seen_repos: Set[str] = set()  # 存储小写，大小写不敏感
-        self.blacklist_repos: Set[str] = set()
-        self._blacklist_order: List[str] = []      # 保留加载顺序（LRU 排序用）
-        self._blacklist_touched: Set[str] = set()  # 本次运行命中过的条目
-        self._blacklist_loaded: Set[str] = set()   # 启动时从文件加载的条目（vs 本次新加）
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
         self.processed_file_shas: Set[str] = set()
@@ -168,7 +163,6 @@ class Collector:
         self._channel_new_nodes = {}  # channel_name → 本渠道新增计数（线程安全）
 
         # 加载持久化状态
-        self.load_blacklist()
         self.load_sha_cache()
         self.load_seen_cache()
 
@@ -298,13 +292,6 @@ class Collector:
             self.seen_cache[r] = existing
             if is_new:
                 self._wlog(f"📝 已处理缓存: {repo}")
-
-    def _check_blacklist(self, github_url: str) -> bool:
-        """检查 URL 是否在黑名单中，命中时标记为"热"条目。"""
-        if github_url in self.blacklist_repos:
-            self._blacklist_touched.add(github_url)
-            return True
-        return False
 
     def _wlog(self, msg: str, **kwargs):
         """统一日志：优先用显式前缀，否则 fallback 到线程名。
@@ -437,27 +424,6 @@ class Collector:
     def _mark_repo_forbidden(self, repo: str):
         """标记仓库为 403 访问拒绝（私有/被封），本次运行内不再重试。"""
         self._repo_forbidden.add(repo.lower())
-
-    def _check_blacklist(self, github_url: str) -> bool:
-        """检查 URL 是否在黑名单中，命中时标记为"热"条目。"""
-        if github_url in self.blacklist_repos:
-            self._blacklist_touched.add(github_url)
-            return True
-        return False
-
-    def load_blacklist(self):
-        """加载仓库黑名单文件（保留顺序用于 LRU 淘汰）。"""
-        self._blacklist_order.clear()
-        self._blacklist_loaded.clear()
-        if os.path.exists(BLACKLIST_FILE):
-            with open(BLACKLIST_FILE, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith("https://github.com/"):
-                        self.blacklist_repos.add(line)
-                        self._blacklist_order.append(line)
-                        self._blacklist_loaded.add(line)
-            self._wlog(f"已加载黑名单: {len(self.blacklist_repos)} 个")
 
     def load_sha_cache(self):
         """加载 SHA 缓存（分片 pickle 目录）。"""
@@ -941,15 +907,12 @@ class Collector:
                     self._wlog(f"❌ {_prefix} 大小为0 | {self._qt()} | {self._qs()}")
                     continue
                 pushed = ri.get("pushed_at", "")
-                # 已处理缓存命中 → 跳过入队
-                if self._check_seen_cache(repo, pushed):
-                    self._wlog(f"⏭️ {_prefix} 已处理(pushed_at未变) | {self._qt()}")
-                    continue
                 br = ri.get("default_branch", "main")
                 if not self._main_put(("种子仓库", repo,
                                        {"branch": br, "size": ri.get("size", -1),
                                         "disabled": False, "pushed_at": pushed,
-                                        "seed_key": repo, "is_source": True})):
+                                        "seed_key": repo, "is_source": True,
+                                        "language": ri.get("language", "")})):
                     self._wlog(f"🗑️ 主队列满，丢弃种子 {repo}")
                     continue
                 self._branch_cache[repo] = br
@@ -1125,14 +1088,9 @@ class Collector:
             for item in items:
                 repo = item.get("full_name")
                 if not repo: continue
-                github_url = f"https://github.com/{repo}"
                 if not self._check_and_add_seen(repo):
                     continue
-                if self._check_blacklist(github_url):
-                    continue
                 pushed = item.get("pushed_at", "")
-                if self._check_seen_cache(repo, pushed):
-                    continue
                 self.checked_count += 1
                 self._main_queue_total += 1
                 if not self._main_put(("GitHub", repo,
@@ -1140,7 +1098,8 @@ class Collector:
                                         "size": item.get("size", 0),
                                         "disabled": item.get("disabled", False),
                                         "pushed_at": pushed,
-                                        "is_source": True})):
+                                        "is_source": True,
+                                        "language": item.get("language", "")})):
                     self._wlog(f"🗑️ 主队列满，丢弃 {repo}")
             time.sleep(PAGE_SLEEP_SECONDS)
 
@@ -1209,8 +1168,6 @@ class Collector:
                     repos_found.add(repo_name)
 
                     github_url = f"https://github.com/{repo_name}"
-                    if self._check_blacklist(github_url):
-                        continue
 
                     # SHA 缓存检查：避免重复下载相同内容
                     if file_sha and self._sha_in_cache(file_sha):
@@ -1242,14 +1199,13 @@ class Collector:
                         # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
                         if self._check_and_add_seen(repo_name):
                             pushed = repo_data.get("pushed_at", "")
-                            if self._check_seen_cache(repo_name, pushed):
-                                continue
                             if self._main_put(("Code", repo_name,
                                                {"branch": default_branch,
                                                 "size": repo_data.get("size", -1),
                                                 "disabled": False,
                                                 "pushed_at": pushed,
-                                                "is_source": True})):
+                                                "is_source": True,
+                                                "language": repo_data.get("language", "")})):
                                 self.checked_count += 1
                                 self._main_queue_total += 1
                             else:
@@ -1334,43 +1290,6 @@ class Collector:
             print(f"  解析失败文件: {fc} 个 → 详见 failed_candidates.txt")
         print(f"{'='*60}", flush=True)
 
-        # ── 黑名单 LRU 排序 + 自动淘汰 ──
-        self._save_blacklist_lru()
-
-    def _save_blacklist_lru(self):
-        """黑名单 LRU 重排 + 淘汰末尾 1/30 的冷门条目。
-
-        热条目（本次命中过的）排最前，冷条目排最后。
-        本次新加入的条目不被淘汰。
-        每次运行淘汰末尾 1/30 的旧冷条目，约 30 次运行后自然消失。
-        """
-        if not BLACKLIST_EVICTION_ENABLED or not self._blacklist_order:
-            return
-        # 区分本次新加 vs 旧条目
-        new_entries = [u for u in self._blacklist_order
-                       if u not in self._blacklist_loaded]
-        old_touched = [u for u in self._blacklist_order
-                       if u in self._blacklist_touched and u in self._blacklist_loaded]
-        old_untouched = [u for u in self._blacklist_order
-                         if u not in self._blacklist_touched and u in self._blacklist_loaded]
-        # 新条目视为热（排在前面），旧条目 touched → untouched
-        current_order = new_entries + old_touched + old_untouched
-        # 仅淘汰旧冷条目：保留前 29/30
-        evictable = len(old_untouched)
-        ratio = max(5, BLACKLIST_EVICTION_RATIO)
-        evict = max(0, evictable // ratio) if evictable > ratio else 0
-        if evict > 0:
-            keep = len(current_order) - evict
-        else:
-            keep = len(current_order)
-        current_order = current_order[:keep]
-        # 覆写 ljck.txt
-        with open(BLACKLIST_FILE, "w", encoding="utf-8") as f:
-            for url in current_order:
-                f.write(url + "\n")
-        if evict > 0:
-            self._wlog(f"黑名单淘汰 {evict} 条（保留 {len(current_order)} 条）")
-
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
 
@@ -1419,9 +1338,6 @@ class Collector:
                 if not self._check_and_add_seen(repo):
                     self._wlog(f"⏭️ 跳过已处理仓库 {github_url}")
                     continue
-                if self._check_blacklist(github_url):
-                    self._wlog(f"⏭️ 跳过黑名单仓库 {github_url}")
-                    continue
 
                 self.checked_count += 1
                 self._wlog(f"开始处理仓库 {github_url}")
@@ -1450,10 +1366,28 @@ class Collector:
 
             time.sleep(PAGE_SLEEP_SECONDS)
 
+    def _trace_repo(self, repo: str, branch: str, pushed_at: str,
+                    is_source: bool):
+        """追踪 fork/用户仓库（不受 has_nodes/已处理/超龄限制）。
+
+        TRACE_ONCE_ONLY 模式下，只有源头仓库（is_source=True）触发追踪，
+        防止扩展仓库指数爆炸。追踪动作本身不受任何条件限制。
+        """
+        if TRACE_ONCE_ONLY and not is_source:
+            return
+        if FORK_CHAIN_ENABLED:
+            if FORK_CHAIN_CHILD_DEPTH > 0:
+                self._trace_child_forks(repo, branch)
+            if FORK_PARENT_TRACE_ENABLED:
+                self._trace_fork_chain(repo, branch, pushed_at)
+        if USER_REPOS_ENABLED:
+            self._trace_user_repos(repo, branch)
+
     def process_repo(self, repo: str, branch: str = "main",
                      size: int = -1, disabled: bool = False,
                      pushed_at: str = "", raw_depth: int = 0,
-                     seed_key: str = None, is_source: bool = False):
+                     seed_key: str = None, is_source: bool = False,
+                     language: str = ""):
         """处理单个仓库。
 
         使用搜索结果的字段代替 GET /repos/{repo} 调用，
@@ -1466,8 +1400,15 @@ class Collector:
             disabled: 是否已禁用（从搜索结果获取）
             pushed_at: 最后推送时间（从搜索结果获取）
             raw_depth: raw 递归发现深度
+            is_source: 是否源头仓库（种子/搜索/Code 直接发现）
+            language: 主要语言（SKIP_LANGUAGES 过滤用，空则放行）
         """
         github_url = f"https://github.com/{repo}"
+
+        # ── 语言过滤（HTML 等无价值仓库跳过） ──
+        if language and language in SKIP_LANGUAGES:
+            self._wlog(f"⏭️ 仓库 {github_url} 主要语言 {language}，跳过")
+            return (0, 0)
 
         # ── pushed_at 为空 → 强制补查 repo info ──
         if not pushed_at:
@@ -1480,16 +1421,13 @@ class Collector:
                 branch = ri.get("default_branch", branch)
                 size = ri.get("size", size)
                 disabled = ri.get("disabled", disabled)
+                language = ri.get("language", language)
             # 如果还是空（API 失败），仍然继续处理
 
-        # 已处理仓库缓存检查（pushed_at 未变→跳过）
+        # 已处理仓库缓存检查（pushed_at 未变→跳过解析，但仍追踪）
         if self._check_seen_cache(repo, pushed_at):
-            self._wlog(f"⏭️ 仓库 {github_url} 未更新，跳过")
-            return (0, 0)
-
-        # 黑名单检查
-        if self._check_blacklist(github_url):
-            self._wlog(f"仓库在黑名单中: {github_url}")
+            self._wlog(f"⏭️ 仓库 {github_url} 未更新，跳过解析（仍追踪）")
+            self._trace_repo(repo, branch, pushed_at, is_source)
             return (0, 0)
 
         # 有效性检查
@@ -1507,27 +1445,12 @@ class Collector:
                     pushed_at.replace("Z", "+00:00"))
                 age_hours = (datetime.now(timezone.utc) - pushed_time).total_seconds() / 3600
 
-                # 废弃仓库 → 跳过（不加入黑名单）
-                if REPO_MAX_AGE_HOURS > 0 and age_hours > REPO_MAX_AGE_HOURS:
-                    self._mark_seen_cache(repo, pushed_at)
-                    self._wlog(f"⚠️ 仓库 {github_url} "
-                          f"{age_hours:.0f}h 未更新，废弃 → 跳过")
-                    return (0, 0)
-
-                # 超过跳过阈值 → 不解析文件，但仍追踪 fork 链（fork 可能活跃）
+                # 超过跳过阈值 → 不解析文件，但仍追踪 fork/用户仓库
                 if SKIP_PROCESSING_AGE_HOURS > 0 and age_hours > SKIP_PROCESSING_AGE_HOURS:
                     self._mark_seen_cache(repo, pushed_at)
                     self._wlog(f"⏭️ 仓库 {github_url} "
-                          f"{age_hours:.0f}h 未更新，跳过解析（追踪 fork 链）")
-                    # TRACE_ONCE_ONLY 模式下，只有源头仓库触发追踪
-                    should_trace = (not TRACE_ONCE_ONLY) or is_source
-                    if should_trace:
-                        if FORK_CHAIN_ENABLED and FORK_CHAIN_CHILD_DEPTH > 0:
-                            self._trace_child_forks(repo, branch)
-                        if FORK_CHAIN_ENABLED and FORK_PARENT_TRACE_ENABLED:
-                            self._trace_fork_chain(repo, branch, pushed_at)
-                        if USER_REPOS_ENABLED:
-                            self._trace_user_repos(repo, branch)
+                          f"{age_hours:.0f}h 未更新，跳过解析（仍追踪）")
+                    self._trace_repo(repo, branch, pushed_at, is_source)
                     return (0, 0)
             except Exception:
                 pass  # 时间解析失败，放行
@@ -1567,17 +1490,6 @@ class Collector:
             except RuntimeError:
                 raise
 
-        # 未提取到节点 → 检查 README 广告（只有确认为广告仓库才加黑名单）
-        if not has_nodes_flag[0] and github_url not in self.blacklist_repos:
-            if not (self.quota_mgr.exceeded or self.limiter.should_stop()):
-                is_spam = self._check_readme_spam(repo, branch)
-                if is_spam:
-                    self._wlog(f"仓库 {github_url} README 含广告词，加入黑名单")
-                    self.blacklist_repos.add(github_url)
-                    self._blacklist_order.append(github_url)
-                    with open(BLACKLIST_FILE, "a", encoding="utf-8") as f:
-                        f.write(github_url + "\n")
-
         # 标记已处理
         self._mark_seen_cache(repo, pushed_at)
 
@@ -1589,17 +1501,8 @@ class Collector:
                 self._update_seed_entry(seeds, repo, repo_nodes, pushed_at)
                 self._wlog(f"🌱 加入种子: {repo} (+{repo_nodes} 节点)")
 
-        # Fork 链追踪 + 用户仓库遍历
-        # TRACE_ONCE_ONLY 模式下，只有源头仓库（is_source=True）触发追踪
-        should_trace = (not TRACE_ONCE_ONLY) or is_source
-        if should_trace:
-            if FORK_CHAIN_ENABLED and has_nodes_flag[0]:
-                if FORK_CHAIN_CHILD_DEPTH > 0:
-                    self._trace_child_forks(repo, branch)
-                if FORK_PARENT_TRACE_ENABLED:
-                    self._trace_fork_chain(repo, branch, pushed_at)
-            if USER_REPOS_ENABLED and has_nodes_flag[0]:
-                self._trace_user_repos(repo, branch)
+        # Fork 链追踪 + 用户仓库遍历（不受节点产出限制）
+        self._trace_repo(repo, branch, pushed_at, is_source)
 
         return (repo_stats[0], repo_stats[1])
 
@@ -1639,7 +1542,8 @@ class Collector:
                     branch=parent.get("default_branch", branch),
                     size=parent.get("size", -1),
                     disabled=False,
-                    pushed_at=parent.get("pushed_at", ""))
+                    pushed_at=parent.get("pushed_at", ""),
+                    language=parent.get("language", ""))
             except Exception as e:
                 self._wlog(f"  ⚠️ 父仓库 {parent_name}: {e}")
                 _padded = 0
@@ -1680,7 +1584,8 @@ class Collector:
                 branch=fork.get("default_branch", branch),
                 size=fork.get("size", -1),
                 disabled=fork.get("disabled", False),
-                pushed_at=fork.get("pushed_at", ""))
+                pushed_at=fork.get("pushed_at", ""),
+                language=fork.get("language", ""))
         except Exception as e:
             self._wlog(f"  ⚠️ {fork_name}: {e}")
         return (fork_name, added)
@@ -1730,7 +1635,8 @@ class Collector:
                             {"branch": fork.get("default_branch", branch),
                              "size": fork.get("size", -1),
                              "disabled": fork.get("disabled", False),
-                             "pushed_at": fork.get("pushed_at", "")}),
+                             "pushed_at": fork.get("pushed_at", ""),
+                             "language": fork.get("language", "")}),
                            label=label)
         self._wlog(f"  {label}: {len(forks)} 个 → {self._qs()}")
 
@@ -1758,7 +1664,7 @@ class Collector:
                 break
             for r in repos_data:
                 fn = r.get("full_name")
-                if not fn or self._check_blacklist(f"https://github.com/{fn}"):
+                if not fn:
                     continue
                 if fn in found: continue
                 found.add(fn)
@@ -1771,21 +1677,6 @@ class Collector:
         if qualified:
             self._run_fork_batch(qualified, branch, "👤 用户仓库")
         self._wlog(f"  用户 {owner} 共查 {len(qualified)} 个仓库")
-
-    def _check_readme_spam(self, repo: str, branch: str) -> bool:
-        """下载仓库 README 并检查广告关键词。只在无节点时调用。
-
-        Returns: True 表示 README 包含广告词（应加黑名单）。
-        """
-        if not README_SPAM_KEYWORDS:
-            return False
-        readme_url = f"https://raw.githubusercontent.com/{repo}/{branch}/README.md"
-        resp = self.http.get(readme_url, timeout=FILE_DOWNLOAD_TIMEOUT,
-                             operation_name=f"README ({repo})")
-        if not resp:
-            return False
-        content = resp.text.lower()
-        return any(kw.lower() in content for kw in README_SPAM_KEYWORDS)
 
     # ==================== 递归树 API 处理 ====================
 
@@ -2341,7 +2232,6 @@ class Collector:
             if ext not in ALLOWED_EXTENSIONS:
                 continue
             if not self._check_and_add_seen(full_name) or \
-               self._check_blacklist(f"https://github.com/{full_name}") or \
                self._is_repo_dead(full_name):
                 continue
             if full_name in found:
@@ -2387,14 +2277,16 @@ class Collector:
                                  "size": repo_info.get("size", -1),
                                  "disabled": False,
                                  "pushed_at": repo_info.get("pushed_at", ""),
-                                 "raw_depth": raw_depth + 1}),
+                                 "raw_depth": raw_depth + 1,
+                                 "language": repo_info.get("language", "")}),
                                label="raw 递归")
             else:
                 self.process_repo(full_name, branch=branch,
                                   size=repo_info.get("size", -1),
                                   disabled=False,
                                   pushed_at=repo_info.get("pushed_at", ""),
-                                  raw_depth=raw_depth + 1)
+                                  raw_depth=raw_depth + 1,
+                                  language=repo_info.get("language", ""))
 
         # ── 处理仓库链接 ──
         for match in repo_pattern.finditer(content):
@@ -2402,7 +2294,7 @@ class Collector:
             if full_name in found or not self._check_and_add_seen(full_name):
                 continue
             github_url = f"https://github.com/{full_name}"
-            if self._check_blacklist(github_url) or self._is_repo_dead(full_name):
+            if self._is_repo_dead(full_name):
                 continue
             found.add(full_name)
             if self.recursive_count >= MAX_RECURSIVE_REPOS:
@@ -2436,6 +2328,11 @@ class Collector:
                 self._repo_checking.discard(rl)
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
+            # README/聚合文件中的来源仓库 → 直接追踪该用户的所有仓库
+            # （来源仓库的 owner 大概率有多个节点仓库）
+            if USER_REPOS_ENABLED:
+                self._wlog(f"👤 来源仓库 {full_name} → 追踪用户 {full_name.split('/')[0]}")
+                self._trace_user_repos(full_name, branch)
             # 异步：放入发现队列，不阻塞当前 Worker
             if getattr(self, '_disc_queue', None):
                 self._disc_put(("GitHub", full_name,
@@ -2443,14 +2340,16 @@ class Collector:
                                  "size": repo_info.get("size", -1),
                                  "disabled": False,
                                  "pushed_at": repo_info.get("pushed_at", ""),
-                                 "raw_depth": raw_depth + 1}),
+                                 "raw_depth": raw_depth + 1,
+                                 "language": repo_info.get("language", "")}),
                                label="链接")
             else:
                 self.process_repo(full_name, branch=branch,
                                   size=repo_info.get("size", -1),
                                   disabled=False,
                                   pushed_at=repo_info.get("pushed_at", ""),
-                                  raw_depth=raw_depth + 1)
+                                  raw_depth=raw_depth + 1,
+                                  language=repo_info.get("language", ""))
 
     # ==================== 回退路径：Contents API ====================
 
