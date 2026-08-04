@@ -1,22 +1,84 @@
 {
   "repos": {
-    "gfpcom/free-proxy-list": {
-      "consecutive_runs": 0,
-      "last_new_node": "2026-07-30T16:11:15.427212+00:00"
+    "mr-mohamad-mr/multi-proxy-config-fetcher": {
+      "last_new_node": "2026-08-04T20:28:56.187079+00:00",
+      "pushed_at": "2026-08-04T16:12:09Z"
     },
-    "ermaozi/get_subscribe": {
-      "consecutive_runs": 0,
-      "last_new_node": "2026-07-30T16:11:16.397421+00:00"
+    "BiHuDeH/multi-proxy-config-fetcher": {
+      "last_new_node": "2026-08-04T16:31:50.459541+00:00",
+      "pushed_at": "2026-08-04T16:05:29Z"
     },
-    "AtenaPV/PL4": {
-      "last_new_node": "2026-07-30T16:11:33.318146+00:00"
+    "Pawdroid/Free-servers": {
+      "last_new_node": "2026-08-04T16:30:52.724185+00:00",
+      "pushed_at": "2026-08-04T16:00:45Z"
+    },
+    "sami4030/multi-proxy-config-fetcher": {
+      "last_new_node": "2026-08-04T16:32:40.446526+00:00",
+      "pushed_at": "2026-08-04T15:26:30Z"
+    },
+    "miladkantoori/multi-proxy-config-fetcher": {
+      "last_new_node": "2026-08-04T16:33:19.410205+00:00",
+      "pushed_at": "2026-08-04T15:20:41Z"
+    },
+    "Rayan-Config/C-Sub": {
+      "last_new_node": "2026-08-04T16:32:09.632164+00:00",
+      "pushed_at": "2026-08-04T15:16:24Z"
+    },
+    "free-nodes/clashfree": {
+      "last_new_node": "2026-08-04T16:37:07.529715+00:00",
+      "pushed_at": "2026-08-04T15:09:16Z"
     },
     "ninjastrikers/nexus-nodes": {
       "consecutive_runs": 0,
-      "last_new_node": "2026-07-30T16:11:55.939340+00:00"
+      "last_new_node": "2026-08-04T16:29:27.301394+00:00",
+      "pushed_at": "2026-08-04T14:38:53Z"
+    },
+    "Airuop/cross": {
+      "last_new_node": "2026-08-04T20:28:55.649995+00:00",
+      "pushed_at": "2026-08-04T14:34:29Z"
+    },
+    "SkillfulElectro/V2RayCollector": {
+      "last_new_node": "2026-08-04T16:30:57.512181+00:00",
+      "pushed_at": "2026-08-04T14:25:53Z"
+    },
+    "aiboboxx/v2rayfree": {
+      "consecutive_runs": 0,
+      "last_new_node": "2026-08-04T16:31:29.177618+00:00",
+      "pushed_at": "2026-08-04T14:24:33Z"
+    },
+    "pooriaredorg/pooriaredorg": {
+      "last_new_node": "2026-08-04T16:32:37.513257+00:00",
+      "pushed_at": "2026-08-04T14:18:39Z"
     },
     "ssrsub/ssr": {
-      "last_new_node": "2026-07-30T16:12:29.601873+00:00"
+      "last_new_node": "2026-08-04T16:29:13.584859+00:00",
+      "pushed_at": "2026-08-04T14:14:03Z"
+    },
+    "10ium/multi-proxy-config-fetcher": {
+      "last_new_node": "2026-08-04T16:31:52.048813+00:00",
+      "pushed_at": "2026-08-04T14:03:06Z"
+    },
+    "gfpcom/free-proxy-list": {
+      "consecutive_runs": 0,
+      "last_new_node": "2026-08-04T16:28:55.051937+00:00",
+      "pushed_at": "2026-08-04T13:58:47Z"
+    },
+    "ermaozi/get_subscribe": {
+      "consecutive_runs": 0,
+      "last_new_node": "2026-08-04T16:28:56.788570+00:00",
+      "pushed_at": "2026-08-04T12:44:05Z"
+    },
+    "Leon406/SubCrawler": {
+      "consecutive_runs": 0,
+      "last_new_node": "2026-08-04T16:37:01.600704+00:00",
+      "pushed_at": "2026-08-04T12:01:18Z"
+    },
+    "Airuop/archive": {
+      "last_new_node": "2026-08-04T16:36:05.601199+00:00",
+      "pushed_at": "2026-08-04T10:44:31Z"
+    },
+    "AtenaPV/PL4": {
+      "last_new_node": "2026-07-30T16:11:33.318146+00:00"
     },
     "mahdibland/SSAggregator": {
       "last_new_node": "2026-07-30T16:12:53.911672+00:00"
@@ -29,13 +91,6 @@
     },
     "mahdibland/ShadowsocksAggregator": {
       "last_new_node": "2026-07-30T16:15:58.049051+00:00"
-    },
-    "Pawdroid/Free-servers": {
-      "last_new_node": "2026-07-30T16:16:28.681885+00:00"
-    },
-    "aiboboxx/v2rayfree": {
-      "consecutive_runs": 0,
-      "last_new_node": "2026-07-30T16:18:53.640364+00:00"
     },
     "AtenaPV/Sub-Sync": {
       "last_new_node": "2026-07-30T16:23:20.471974+00:00"
@@ -71,9 +126,6 @@
       "consecutive_runs": 0
     },
     "MhdiTaheri/V2rayCollector_Py": {
-      "consecutive_runs": 0
-    },
-    "Leon406/SubCrawler": {
       "consecutive_runs": 0
     },
     "alanbobs999/TopFreeProxies": {},
@@ -470,9 +522,6 @@
     },
     "ripaojiedian/freenode": {
       "last_new_node": "2026-07-28T01:36:33.423531+00:00"
-    },
-    "free-nodes/clashfree": {
-      "last_new_node": "2026-07-28T01:36:43.694218+00:00"
     },
     "pawdroid/Free-servers": {
       "consecutive_runs": 0,
@@ -1025,9 +1074,6 @@
     "benqsr/SubCrawler": {
       "last_new_node": "2026-07-28T02:24:36.352162+00:00"
     },
-    "Rayan-Config/C-Sub": {
-      "last_new_node": "2026-07-28T02:24:37.048182+00:00"
-    },
     "bike3097/WorkerVless2sub": {
       "last_new_node": "2026-07-28T02:24:37.233896+00:00"
     },
@@ -1081,6 +1127,7 @@
       "last_new_node": "2026-07-29T17:33:36.645856+00:00"
     }
   },
-  "updated_at": "2026-07-30T20:25:19.548958+00:00",
-  "pruning_days": 0
+  "updated_at": "2026-08-04T20:29:09.353465+00:00",
+  "max_entries": 5000000,
+  "max_age_hours": 720
 }
