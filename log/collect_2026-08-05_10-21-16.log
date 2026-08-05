@@ -1,0 +1,15 @@
+[2026-08-05 18:21:16] 🚀 程序启动
+[2026-08-05 18:21:16] 关键词: 105 个
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/main.py", line 106, in <module>
+    main()
+  File "/home/runner/work/test-college/test-college/main.py", line 92, in main
+    collector = Collector(token=GITHUB_TOKEN, queries=queries)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 158, in __init__
+    self._log_sink = LogSink()                      # 日志汇聚（单消费者线程）
+                     ^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 89, in __init__
+    self._q = queue.Queue(maxsize=maxsize)
+              ^^^^^
+NameError: name 'queue' is not defined. Did you mean: 'Queue'? Or did you forget to import 'queue'?
