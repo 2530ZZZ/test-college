@@ -43,6 +43,8 @@ class QuotaManager:
         self.exceeded = False         # 配额耗尽标志（本窗口内不恢复）
         self.secondary_limited = False  # 次级限流标志
         self.total_calls = 0          # 累计调用（统计用）
+        self._current_utc_window = int(time.time() // 3600)  # 当前 UTC 整点窗口
+        self._window_calls = 0        # 当前窗口已用次数（整点统计）
         self.throttle_count = 0       # 主动延迟次数（统计用）
         self.failed_calls = 0         # 失败调用次数（403/网络错误）
 
@@ -101,6 +103,7 @@ class QuotaManager:
         with self._lock:
             self.calls += 1
             self.total_calls += 1
+            self._check_utc_window()
 
     def record_failed(self):
         """记录一次失败的 API 调用（403/网络错误等，配额已被消耗）。"""
@@ -108,6 +111,24 @@ class QuotaManager:
             self.calls += 1
             self.total_calls += 1
             self.failed_calls += 1
+            self._check_utc_window()
+
+    def _check_utc_window(self):
+        """UTC 整点窗口检测：窗口变化时打印上一窗口消耗。
+
+        GitHub 核心 API 配额在 UTC 整点刷新，窗口边界必须用 UTC。
+        每次 record 调用一次，整数比较开销可忽略。
+        """
+        window = int(time.time() // 3600)
+        if window != self._current_utc_window:
+            if self._window_calls > 0:
+                print(f"[{self._bj_now()}] "
+                      f"🕐 UTC {window-1:02d}:00 窗口已用 "
+                      f"{self._window_calls}/{self.max_per_hour} 配额",
+                      flush=True)
+            self._current_utc_window = window
+            self._window_calls = 0
+        self._window_calls += 1
 
     # ── 状态查询 ──
 

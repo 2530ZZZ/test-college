@@ -36,6 +36,15 @@
 保存时在内存中排序 → 淘汰 → 顺序写入磁盘。分片文件之间不维护严格排序，
 每个分片内部按序排列。跨文件排序靠分片编号（0000=最旧/最低命中, N=最新/最高命中）。
 ═══════════════════════════════════════════════════════════════
+
+队列仓库标志位
+源头（[种子仓库]等）      → 追踪 fork + 父链 + user
+[userN]/[404userN]        → 追踪 fork + raw（不追踪 user）
+[forkN]/[rawN] N<MAX_TRACE_DEPTH → 追踪全部
+[forkN]/[rawN] N≥MAX_TRACE_DEPTH → 直接处理
+
+任何仓库 404（无论是否需追踪）→ 追踪用户（[404userN]）
+
 """
 
 import os
@@ -143,7 +152,7 @@ MAX_COMMITS_PER_REPO = None
 
 # 是否追踪 fork 链（发现 fork 仓库后追溯父仓库，再查父仓库的所有 fork）
 # 默认 True。可发现同一模板在不同 fork 中的不同节点。
-# 注意：受 TRACE_ONCE_ONLY 控制，设为 True 后只有源头仓库触发追踪。
+# 注意：受 MAX_TRACE_DEPTH 控制，设为 True 后只有源头仓库触发追踪。
 FORK_CHAIN_ENABLED = True
 
 # --- 数量限制 ---
@@ -151,16 +160,16 @@ FORK_CHAIN_ENABLED = True
 # 每个仓库最多查几个子 fork（从本仓库 fork 出去的仓库）
 # 默认 30。子 fork 最直接相关，高产概率最高。
 # 取值范围 5-100。
-FORK_CHILD_MAX = 30
+FORK_CHILD_MAX = 80
 
 # 每个仓库最多查几个兄弟 fork（同父仓库下的其他 fork）
 # 默认 20。兄弟 fork 相关度低于子 fork，配额省给子 fork。
 # 取值范围 5-100。
-FORK_SIBLING_MAX = 20
+FORK_SIBLING_MAX = 80
 
 # 每个仓库最多查几个 fork（总上限，兜底用）
 # 当单独限制未生效时使用此值。默认 30，取值范围 10-100。
-FORK_CHAIN_MAX_FORKS = 30
+FORK_CHAIN_MAX_FORKS = 100
 
 # --- Fork 查询分页 ---
 
@@ -176,14 +185,6 @@ FORK_PER_PAGE = 100
 # 默认 True。
 FORK_PARENT_TRACE_ENABLED = True
 
-# 往上追溯父仓库的层数（父→父的父→...）
-# 默认 2。已废弃：TRACE_ONCE_ONLY 模式下只追一层。
-MAX_PARENT_TRACE_DEPTH = 2
-
-# Fork 链中本仓库的子仓库遍历层数（子→子的子→...）
-# 默认 2。已废弃：TRACE_ONCE_ONLY 模式下只追一层。
-FORK_CHAIN_CHILD_DEPTH = 2
-
 # ==================== 同用户仓库遍历 ====================
 
 # 是否在发现节点后遍历该用户名下的所有公开仓库
@@ -193,6 +194,17 @@ USER_REPOS_ENABLED = True
 # 每个用户最多额外查询几个仓库（通过 repos API 分页获取）
 # 默认 30，取值范围 5-100。设为 0 表示不限制。
 USER_REPOS_MAX_PER_USER = 30
+
+# 仓库无法访问（404/隐藏/删除）时，是否追踪该用户名下仓库。
+# 作用：README 来源仓库被删、种子仓库被隐藏时，其 owner 可能还有
+#       其他节点仓库，追踪用户弥补损失。
+# 触发：任何仓库处理时 404（种子入队、process_repo 补查、递归发现），
+#       无论该仓库本身是否需追踪。
+# 产出：追踪出的用户仓库标志 [404userN]，处理时只追踪 fork/raw（不追踪 user）。
+# 成本：每个 404 仓库 1 次用户 repos API + N 个仓库入队。
+#       404 较多时配额消耗增加，可关闭。
+# 默认值：True。
+TRACE_USER_ON_404 = True
 
 # ==================== 日志配置 ====================
 
@@ -527,7 +539,9 @@ MAX_PAGES_ZH_MULTIPLIER = 2
 PARALLEL_DOWNLOAD_THRESHOLD = 10
 
 # 并行下载最大线程数（raw CDN 不限流，设大加速）
-PARALLEL_DOWNLOAD_WORKERS = 16
+# 注意：总下载线程 = Worker 数 × 此值。24 Worker × 8 = 192 线程，
+#       GA runner 7GB 内存安全（大仓库有 MB_HIGH/MED 动态降级）。
+PARALLEL_DOWNLOAD_WORKERS = 8
 
 # ==================== 共用线程池 ====================
 
@@ -536,9 +550,11 @@ PARALLEL_DOWNLOAD_WORKERS = 16
 # 原理：API 速率门（ApiRateGate）按 600/分钟 限速削峰，
 #       Worker 数不受 API 速率约束，可放心加大。
 #       并发上限 100（REST+GraphQL 共享），16 Worker × ~2 并发 = 32，安全。
-# 默认值：16。建议范围 8-32。
+# 默认值：24。建议范围 16-32。
 # 次级限流保护：API 队列端点限速 + 遇到 403 自动降级。
-SHARED_POOL_WORKERS = 16
+# 注意：增大 Worker 时需同步调小 PARALLEL_DOWNLOAD_WORKERS，
+#       避免并行下载线程总数（Worker × 下载线程）超出 GA runner 内存。
+SHARED_POOL_WORKERS = 24
 
 # 主队列最大长度（搜索渠道：种子/关键词/Code Search）。
 # 作用：满时搜索线程阻塞（背压），防止搜索结果浪费 API 配额。
@@ -546,40 +562,51 @@ SHARED_POOL_WORKERS = 16
 MAIN_QUEUE_SIZE = 200
 
 # 发现队列最大长度（fork 链/用户仓库/raw 递归）。
-# 作用：衍生仓库量大但可丢弃（下次运行可能再发现）。
-# 注意：使用 PriorityQueue（按入队时间戳排序，旧的优先处理）。
-# 默认值：600。取值范围 200-1000。
-DISCOVERY_QUEUE_SIZE = 600
+# 作用：衍生仓库的缓冲容量。瞬时爆发（一个聚合仓库一次产生 100+ 条目）
+#       需要足够缓冲。配合生产令牌（MAIN_PRODUCER_LIMIT）数学上有界：
+#       最多 MAIN_PRODUCER_LIMIT 个主仓库同时产出 × 每次 ≤100 = 400 瞬时。
+# 注意：PriorityQueue，元素 (priority, ts, seq, item)，
+#       priority 0 = 不需要追踪（先消费），1 = 需要追踪（后消费）。
+# 默认值：3000。取值范围 1000-10000。
+DISCOVERY_QUEUE_SIZE = 3000
 
 # ==================== 队列调度策略 ====================
 
-# 追踪策略：是否只追踪一层。
-# 作用：设为 True 后，只有源头仓库（种子/搜索/Code）触发 fork/用户追踪。
-#       fork/用户/raw 递归发现的仓库只解析文件，不继续追踪。
-# 原理：仓库数量从指数级降为线性级，大幅节省 API 配额。
-# 默认值：True。强烈建议保持开启。
-TRACE_ONCE_ONLY = True
+# 统一追踪层数（取代旧的 TRACE_ONCE_ONLY / fork、raw 分开限制）。
+# 作用：控制扩展仓库的追踪深度。仓库标志位 [来源][层数] 决定是否继续追踪：
+#   [userN]           → 用户仓库，无层数概念，直接处理不追踪
+#   [forkN]/[rawN]    → N < 此值：处理 + 继续追踪（像源头仓库）
+#                       N ≥ 此值：直接处理不追踪
+#   [种子仓库]/[code搜索]/[关键词搜索] → 源头，层数视为 0，总是追踪
+# 原理：层数 + 去重 + 生产令牌 = 扩展仓库总量数学上有界（每层 ≤100 倍）。
+# 默认值：2。取值范围 1-5。设 1 = 只追踪一层（等价旧 TRACE_ONCE_ONLY）。
+MAX_TRACE_DEPTH = 2
+
+# 生产令牌：同时最多几个 Worker 处理主队列仓库（生产者数量上限）。
+# 作用：限制"正在产生扩展仓库"的源头仓库数量，防止队列瞬时爆满。
+# 原理：同时最多 N 个主仓库在产出，每个瞬时 ≤100 条目，
+#       N × 100 = 队列瞬时压力上限（4 × 100 = 400，3000 容量绰绰有余）。
+# 默认值：4。取值范围 1-{SHARED_POOL_WORKERS}。
+# 注意：这是硬性限制但不会饿死主队列——令牌释放后其他 Worker 立即补上。
+MAIN_PRODUCER_LIMIT = 4
 
 # 发现队列强制消费阈值。
 # 作用：当发现队列超过此值时，所有 Worker 强制消费发现队列（不取主队列）。
-# 原理：防止发现队列积压过深。类似主队列的 ≥80 背压机制。
-# 默认值：400。取值范围 200-{DISCOVERY_QUEUE_SIZE}。
+# 原理：最后防线。正常情况（生产令牌 + 大容量）不会触发。
+# 默认值：2500。取值范围 1000-{DISCOVERY_QUEUE_SIZE}。
 # 设为 0：不强制消费，Worker 自由选择。
-DISC_FORCE_CONSUME_AT = 400
+DISC_FORCE_CONSUME_AT = 2000
 
 # 发现队列允许取主队列阈值。
-# 作用：当发现队列低于此值时，Worker 可以取主队列。
-# 原理：扩展队列少时优先补充主队列消费。
-# 默认值：100。取值范围 50-300。
-DISC_MAIN_OK_AT = 100
+# 作用：当发现队列低于此值时，Worker 可以取主队列（需生产令牌）。
+# 默认值：500。取值范围 100-{DISC_FORCE_CONSUME_AT}。
+DISC_MAIN_OK_AT = 500
 
 # 发现队列 put 背压阈值。
 # 作用：队列 ≥ 此值时，_disc_put 等待（5 秒间隔）直到消费方腾出空间。
-# 原理：产生速度受消费速度约束，队列永不满载（削峰）。
-# 默认值：500。取值范围 300-{DISCOVERY_QUEUE_SIZE}。
-# 注意：低于 DISC_FORCE_CONSUME_AT(400) 会导致背压与强制消费冲突，
-#       建议 ≥ DISC_FORCE_CONSUME_AT。
-DISC_PUT_BACKPRESSURE = 500
+# 原理：最后防线（正常不会触发）。等待期间 item 不丢，条件满足后正常放入。
+# 默认值：2800。取值范围 1000-{DISCOVERY_QUEUE_SIZE}。
+DISC_PUT_BACKPRESSURE = 2800
 
 # 次级限流自动降级。
 # 作用：检测到 GitHub 次级限流（403 "secondary rate limit"）时，
