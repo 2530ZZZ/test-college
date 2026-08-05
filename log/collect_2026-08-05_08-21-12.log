@@ -1,0 +1,446 @@
+[2026-08-05 16:21:12] 🚀 程序启动
+[2026-08-05 16:21:12] 关键词: 105 个
+[2026-08-05 16:21:12] [MainThread] 加载 SHA 缓存 233489 条 (1 分片)
+[2026-08-05 16:21:12] [MainThread] 加载已处理仓库缓存 8320 条
+[2026-08-05 16:21:12] [MainThread] 🚀 程序启动 | 配额上限 4800/小时
+[2026-08-05 16:21:12] [MainThread] 🔵 阶段 1: 种子仓库 (616 个)
+[2026-08-05 16:21:12] [种子] 🔵 种子仓库: 616 个 → 队列
+[2026-08-05 16:21:12] [种子] 🔵 [种子 1/616] mr-mohamad-mr/multi-proxy-config-fetcher | 配额 4800/4800 08:21UTC | 主队列 1/200 发现队列 0/20000 [空]
+[2026-08-05 16:21:12] [W-0] 🔧 开始处理 [种子仓库] mr-mohamad-mr/multi-proxy-config-fetcher
+[2026-08-05 16:21:12] [W-0] 仓库 https://github.com/mr-mohamad-mr/multi-proxy-config-fetcher (分支: main, size: 62038KB, pushed: 2026-08-05T07:38:43Z)
+[2026-08-05 16:21:13] [W-1] 🔧 开始处理 [种子仓库] BiHuDeH/multi-proxy-config-fetcher
+[2026-08-05 16:21:13] [种子] 🔵 [种子 2/616] BiHuDeH/multi-proxy-config-fetcher | 配额 4799/4800 08:21UTC | 主队列 0/200 发现队列 0/20000 [空]
+[2026-08-05 16:21:13] [W-0] 仓库 https://github.com/mr-mohamad-mr/multi-proxy-config-fetcher 候选文件 3 个
+[2026-08-05 16:21:13] [W-1] 仓库 https://github.com/BiHuDeH/multi-proxy-config-fetcher (分支: main, size: 26063KB, pushed: 2026-08-05T07:30:58Z)
+[2026-08-05 16:21:13] [W-0] 🔗 递归发现仓库 mahsanet/MahsaFreeConfig (来源 https://raw.githubusercontent.com/mr-mohamad-mr/multi-proxy-config-fetcher/main/configs/channel_stats.json)
+[2026-08-05 16:21:13] [W-2] 🔧 开始处理 [种子仓库] Pawdroid/Free-servers
+[2026-08-05 16:21:14] [种子] 🔵 [种子 3/616] Pawdroid/Free-servers | 配额 4797/4800 08:21UTC | 主队列 0/200 发现队列 0/20000 [空]
+[2026-08-05 16:21:14] [W-2] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 93KB, pushed: 2026-08-05T08:00:30Z)
+[2026-08-05 16:21:15] [W-0] 🌱 加入种子: mr-mohamad-mr/multi-proxy-config-fetcher (+32 节点)
+[2026-08-05 16:21:15] [W-0] 🔗 查子仓库: mr-mohamad-mr/multi-proxy-config-fetcher
+[2026-08-05 16:21:15] [W-3] 🔧 开始处理 [种子仓库] sami4030/multi-proxy-config-fetcher
+[2026-08-05 16:21:16] [W-1] 仓库 https://github.com/BiHuDeH/multi-proxy-config-fetcher 候选文件 1 个
+[2026-08-05 16:21:16] [种子] 🔵 [种子 4/616] sami4030/multi-proxy-config-fetcher | 配额 4794/4800 08:21UTC | 主队列 0/200 发现队列 1/20000 [[raw1]:1]
+[2026-08-05 16:21:16] [W-0] 🔗 开始 Fork 链追踪 (mr-mohamad-mr/multi-proxy-config-fetcher)
+[2026-08-05 16:21:16] [W-1] 🔗 查子仓库: BiHuDeH/multi-proxy-config-fetcher
+[2026-08-05 16:21:16] [W-4] 🔧 开始处理 [种子仓库] miladkantoori/multi-proxy-config-fetcher
+[2026-08-05 16:21:17] [W-2] 仓库 https://github.com/Pawdroid/Free-servers 候选文件 32 个
+[2026-08-05 16:21:17] [W-3] ⏭️ 仓库 https://github.com/sami4030/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:17] [种子] 🔵 [种子 5/616] miladkantoori/multi-proxy-config-fetcher | 配额 4791/4800 08:21UTC | 主队列 0/200 发现队列 1/20000 [[raw1]:1]
+[2026-08-05 16:21:17] [W-3] 🔗 查子仓库: sami4030/multi-proxy-config-fetcher
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_1] 🔗 递归发现仓库 Pawdroid/Free-servers (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-de.md)
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_0] 🔗 发现仓库链接 Pawdroid/shadowrocket_for_android (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-id.md)
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_2] 🔗 发现仓库链接 Cenmrev/V2Ray (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-pt-BR.md)
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_3] 🔗 发现仓库链接 2dust/v2ray (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/README.md)
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_7] 🔗 发现仓库链接 Fndroid/clash_for_windows_pk (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-es.md)
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_4] 🔗 发现仓库链接 Shinlor/V2Ray (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-en.md)
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_5] 🔗 发现仓库链接 mellow-io/mello (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-pl.md)
+[2026-08-05 16:21:18] [ThreadPoolExecutor-4_6] 🔗 发现仓库链接 Qv2ray/Qv2ray (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-ko-KR.md)
+[2026-08-05 16:21:18] [W-5] 🔧 开始处理 [种子仓库] Rayan-Config/C-Sub
+[2026-08-05 16:21:19] [W-1] 🔗 开始 Fork 链追踪 (BiHuDeH/multi-proxy-config-fetcher)
+[2026-08-05 16:21:19] [W-0]   父仓库: goldrad/multi-proxy-config-fetcher
+[2026-08-05 16:21:19] [种子] 🔵 [种子 6/616] Rayan-Config/C-Sub | 配额 4789/4800 08:21UTC | 主队列 0/200 发现队列 1/20000 [[raw1]:1]
+[2026-08-05 16:21:19] [W-0] ⏭️ 仓库 https://github.com/goldrad/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:19] [W-0] 🔗 查子仓库: goldrad/multi-proxy-config-fetcher
+[2026-08-05 16:21:19] [W-6] 🔧 开始处理 [种子仓库] free-nodes/clashfree
+[2026-08-05 16:21:20] [W-3] 🔗 开始 Fork 链追踪 (sami4030/multi-proxy-config-fetcher)
+[2026-08-05 16:21:20] [种子] 🔵 [种子 7/616] free-nodes/clashfree | 配额 4788/4800 08:21UTC | 主队列 0/200 发现队列 1/20000 [[raw1]:1]
+[2026-08-05 16:21:20] [W-4] 仓库 https://github.com/miladkantoori/multi-proxy-config-fetcher (分支: main, size: 66330KB, pushed: 2026-08-05T07:39:41Z)
+[2026-08-05 16:21:20] repo info (Fndroid/clash_for_windows_pk) 404，跳过
+[2026-08-05 16:21:20] [ThreadPoolExecutor-4_7] 🔍 仓库 Fndroid/clash_for_windows_pk 不存在，追踪用户 Fndroid
+[2026-08-05 16:21:20] [ThreadPoolExecutor-4_7] 👤 遍历用户仓库: Fndroid
+[2026-08-05 16:21:21] [W-7] 🔧 开始处理 [种子仓库] ninjastrikers/nexus-nodes
+[2026-08-05 16:21:22] [W-3]   父仓库: goldrad/multi-proxy-config-fetcher[2026-08-05 16:21:22] repo info (Shinlor/V2Ray) 404，跳过[2026-08-05 16:21:22] repo info (2dust/v2ray) 404，跳过
+[2026-08-05 16:21:22] repo info (Cenmrev/V2Ray) 404，跳过
+[2026-08-05 16:21:22] repo info (mellow-io/mello) 404，跳过
+
+
+[2026-08-05 16:21:22] [W-1]   父仓库: goldrad/multi-proxy-config-fetcher
+[2026-08-05 16:21:22] [W-1] ⏭️ 仓库 https://github.com/goldrad/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:22] [W-1] 🔗 查子仓库: goldrad/multi-proxy-config-fetcher
+[2026-08-05 16:21:22] [W-6] 仓库 https://github.com/free-nodes/clashfree (分支: main, size: 23111KB, pushed: 2026-08-05T07:23:17Z)
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_2] 🔍 仓库 Cenmrev/V2Ray 不存在，追踪用户 Cenmrev
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_2] 👤 遍历用户仓库: Cenmrev
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_0] 👤 来源仓库 Pawdroid/shadowrocket_for_android → 追踪用户 Pawdroid
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_0] 👤 遍历用户仓库: Pawdroid
+[2026-08-05 16:21:22] [W-5] 仓库 https://github.com/Rayan-Config/C-Sub (分支: main, size: 26451KB, pushed: 2026-08-05T07:35:20Z)
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_3] 🔍 仓库 2dust/v2ray 不存在，追踪用户 2dust
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_3] 👤 遍历用户仓库: 2dust
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_6] 👤 来源仓库 Qv2ray/Qv2ray → 追踪用户 Qv2ray
+[2026-08-05 16:21:22] [W-4] 仓库 https://github.com/miladkantoori/multi-proxy-config-fetcher 候选文件 3 个
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_4] 🔍 仓库 Shinlor/V2Ray 不存在，追踪用户 Shinlor
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_1] 🔗 发现仓库链接 Pawdroid/shadowrocket_for_androi (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-de.md)
+[2026-08-05 16:21:22] [W-3] ⏭️ 仓库 https://github.com/goldrad/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_6] 👤 遍历用户仓库: Qv2ray
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_5] 🔍 仓库 mellow-io/mello 不存在，追踪用户 mellow-io
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_5] 👤 遍历用户仓库: mellow-io
+[2026-08-05 16:21:22] [ThreadPoolExecutor-4_4] 👤 遍历用户仓库: Shinlor
+[2026-08-05 16:21:22] [W-3] 🔗 查子仓库: goldrad/multi-proxy-config-fetcher
+[2026-08-05 16:21:22] [种子] 🔵 [种子 8/616] ninjastrikers/nexus-nodes | 配额 4774/4800 08:21UTC | 主队列 0/200 发现队列 2/20000 [[raw1]:2]
+[2026-08-05 16:21:23] [W-4] 🔗 递归发现仓库 4n0nymou3/ss-config-updater (来源 https://raw.githubusercontent.com/miladkantoori/multi-proxy-config-fetcher/main/configs/channel_stats.json)
+[2026-08-05 16:21:23] [W-8] 🔧 开始处理 [种子仓库] Airuop/cross
+[2026-08-05 16:21:24] [W-0]   🍴 子仓库: 80 个 → 主队列 0/200 发现队列 82/20000 [[fork2]:80 [raw1]:2]
+[2026-08-05 16:21:24] [W-0] 🔗 开始 Fork 链追踪 (goldrad/multi-proxy-config-fetcher)
+[2026-08-05 16:21:30] [种子] 🔵 [种子 9/616] Airuop/cross | 配额 4773/4800 08:21UTC | 主队列 0/200 发现队列 82/20000 [[fork2]:80 [raw1]:2]
+[2026-08-05 16:21:30] [W-7] 仓库 https://github.com/ninjastrikers/nexus-nodes (分支: main, size: 1099273KB, pushed: 2026-08-05T06:41:32Z)
+[2026-08-05 16:21:30] [W-1]   🍴 子仓库: 3 个 → 主队列 0/200 发现队列 85/20000 [[fork2]:83 [raw1]:2]
+[2026-08-05 16:21:30] [W-6] 仓库 https://github.com/free-nodes/clashfree 候选文件 2 个
+[2026-08-05 16:21:30] [W-1] 🔗 开始 Fork 链追踪 (goldrad/multi-proxy-config-fetcher)
+[2026-08-05 16:21:31] [W-9] 🔧 开始处理 [种子仓库] SkillfulElectro/V2RayCollector
+[2026-08-05 16:21:32] [W-6] 🔗 发现仓库链接 clashbk/clas (来源 https://raw.githubusercontent.com/free-nodes/clashfree/main/README.md)
+[2026-08-05 16:21:32] repo info (4n0nymou3/ss-config-updater) 404，跳过[2026-08-05 16:21:32] [W-5] 仓库 https://github.com/Rayan-Config/C-Sub 候选文件 2 个
+[2026-08-05 16:21:32] repo info (Pawdroid/shadowrocket_for_androi) 404，跳过
+
+[2026-08-05 16:21:32] [W-0] 👤 遍历用户仓库: goldrad
+[2026-08-05 16:21:32] [W-8] 仓库 https://github.com/Airuop/cross (分支: master, size: 335007KB, pushed: 2026-08-05T03:01:21Z)
+[2026-08-05 16:21:32] [W-4] 🔍 仓库 4n0nymou3/ss-config-updater 不存在，追踪用户 4n0nymou3
+[2026-08-05 16:21:32] [ThreadPoolExecutor-4_1] 🔍 仓库 Pawdroid/shadowrocket_for_androi 不存在，追踪用户 Pawdroid
+[2026-08-05 16:21:32] [种子] 🔵 [种子 10/616] SkillfulElectro/V2RayCollector | 配额 4761/4800 08:21UTC | 主队列 0/200 发现队列 85/20000 [[fork2]:83 [raw1]:2]
+[2026-08-05 16:21:32] [W-4] 👤 遍历用户仓库: 4n0nymou3
+[2026-08-05 16:21:32] [ThreadPoolExecutor-4_1] 👤 遍历用户仓库: Pawdroid
+[2026-08-05 16:21:33] [W-5] 🔗 递归发现仓库 Rayan-Config/HUB (来源 https://raw.githubusercontent.com/Rayan-Config/C-Sub/main/configs/channel_stats.json)
+[2026-08-05 16:21:33] [W-10] 🔧 开始处理 [种子仓库] aiboboxx/v2rayfree
+[2026-08-05 16:21:34] [W-3] 🔗 开始 Fork 链追踪 (goldrad/multi-proxy-config-fetcher)
+[2026-08-05 16:21:40] [ThreadPoolExecutor-4_7]   👤 用户仓库: 30 个 → 主队列 0/200 发现队列 115/20000 [[fork2]:83 [raw1]:2 [user1]:30]
+[2026-08-05 16:21:40] [ThreadPoolExecutor-4_7]   用户 Fndroid 共查 30 个仓库
+[2026-08-05 16:21:40] [ThreadPoolExecutor-4_7] 🔗 发现仓库链接 Kr328/ClashForAndroi (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-es.md)
+[2026-08-05 16:21:40] [W-1] 👤 遍历用户仓库: goldrad
+[2026-08-05 16:21:40] [种子] 🔵 [种子 11/616] aiboboxx/v2rayfree | 配额 4754/4800 08:21UTC | 主队列 0/200 发现队列 115/20000 [[fork2]:83 [raw1]:2 [user1]:30]
+[2026-08-05 16:21:40] [W-7] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件较多 (519 个)，先通过 commits API 过滤
+[2026-08-05 16:21:41] [W-11] 🔧 开始处理 [种子仓库] pooriaredorg/pooriaredorg
+[2026-08-05 16:21:42] [W-12] 🔧 开始处理 [fork2] Rayan-Config/C-Sub
+[2026-08-05 16:21:42] [W-13] 🔧 开始处理 [fork2] 10ium/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-14] 🔧 开始处理 [fork2] shabda7/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-14] ⏭️ 仓库 https://github.com/shabda7/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-16] 🔧 开始处理 [fork2] itesoke/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-16] ⏭️ 仓库 https://github.com/itesoke/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-18] 🔧 开始处理 [fork2] pooriaredorg/pooriaredorg
+[2026-08-05 16:21:42] [W-19] 🔧 开始处理 [fork2] mehsad2100/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-20] 🔧 开始处理 [fork2] Demolitionist/string
+[2026-08-05 16:21:42] [W-20] ⏭️ 仓库 https://github.com/Demolitionist/string 主要语言 HTML，跳过
+[2026-08-05 16:21:42] [W-22] 🔧 开始处理 [fork2] TeoDoe777/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-22] ⏭️ 仓库 https://github.com/TeoDoe777/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-17] 🔧 开始处理 [fork2] a471686674/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-13] ⏭️ 仓库 https://github.com/10ium/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-15] 🔧 开始处理 [fork2] Surfboardv2ray/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-23] 🔧 开始处理 [fork2] hadimousavi79/multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-18] ⏭️ 仓库 https://github.com/pooriaredorg/pooriaredorg 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-19] ⏭️ 仓库 https://github.com/mehsad2100/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-21] 🔧 开始处理 [fork2] mahdi021zamani/Mahdi.zamani-multi-proxy-config-fetcher
+[2026-08-05 16:21:42] [W-12] 仓库 https://github.com/Rayan-Config/C-Sub (分支: main, size: 26451KB, pushed: 2026-08-05T07:35:20Z)
+[2026-08-05 16:21:42] [W-17] ⏭️ 仓库 https://github.com/a471686674/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-15] ⏭️ 仓库 https://github.com/Surfboardv2ray/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-23] ⏭️ 仓库 https://github.com/hadimousavi79/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-21] ⏭️ 仓库 https://github.com/mahdi021zamani/Mahdi.zamani-multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:42] [W-9] 仓库 https://github.com/SkillfulElectro/V2RayCollector (分支: main, size: 365316KB, pushed: 2026-08-04T22:16:48Z)
+[2026-08-05 16:21:42] repo info (clashbk/clas) 404，跳过[2026-08-05 16:21:42] [ThreadPoolExecutor-4_3]   👤 用户仓库: 15 个 → 主队列 0/200 发现队列 118/20000 [[fork2]:71 [raw1]:2 [user1]:45]
+
+[2026-08-05 16:21:42] [ThreadPoolExecutor-4_3]   用户 2dust 共查 15 个仓库
+[2026-08-05 16:21:42] [W-6] 🔍 仓库 clashbk/clas 不存在，追踪用户 clashbk
+[2026-08-05 16:21:42] [ThreadPoolExecutor-4_3] 🔗 发现仓库链接 yanue/V2ray (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/README.md)
+[2026-08-05 16:21:42] [W-6] 👤 遍历用户仓库: clashbk
+[2026-08-05 16:21:44] [ThreadPoolExecutor-4_0]   👤 用户仓库: 15 个 → 主队列 0/200 发现队列 133/20000 [[fork2]:71 [raw1]:2 [user1]:45 [user2]:15]
+[2026-08-05 16:21:44] [ThreadPoolExecutor-4_0]   用户 Pawdroid 共查 15 个仓库
+[2026-08-05 16:21:44] [ThreadPoolExecutor-4_5]   👤 用户仓库: 10 个 → 主队列 0/200 发现队列 143/20000 [[fork2]:71 [raw1]:2 [user1]:55 [user2]:15]
+[2026-08-05 16:21:44] [ThreadPoolExecutor-4_5]   用户 mellow-io 共查 10 个仓库
+[2026-08-05 16:21:44] [ThreadPoolExecutor-4_0] 🔗 发现仓库链接 yichengchen/clash (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-id.md)
+[2026-08-05 16:21:44] [ThreadPoolExecutor-4_5] 🔗 发现仓库链接 jiangxufeng/v2rayL (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-pl.md)
+[2026-08-05 16:21:46] [种子] 🔵 [种子 12/616] pooriaredorg/pooriaredorg | 配额 4747/4800 08:21UTC | 主队列 0/200 发现队列 144/20000 [[fork2]:71 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:46] [W-8] 仓库 https://github.com/Airuop/cross 候选文件较多 (1251 个)，先通过 commits API 过滤
+[2026-08-05 16:21:46] [W-14] ✅ 完成 [fork2] shabda7/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 144/20000 [[fork2]:71 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:46] [W-16] ✅ 完成 [fork2] itesoke/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 144/20000 [[fork2]:71 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:46] [W-22] ✅ 完成 [fork2] TeoDoe777/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 144/20000 [[fork2]:71 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:46] [W-22] 🔧 开始处理 [fork2] sami4030/multi-proxy-config-fetcher
+[2026-08-05 16:21:46] [W-22] ⏭️ 仓库 https://github.com/sami4030/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:46] [W-18] ✅ 完成 [fork2] pooriaredorg/pooriaredorg | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 143/20000 [[fork2]:70 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:46] [W-16] 🔧 开始处理 [fork2] kojjii/multi-proxy-config-fetcher
+[2026-08-05 16:21:46] [W-16] ⏭️ 仓库 https://github.com/kojjii/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [W-14] 🔧 开始处理 [fork2] mr-mohamad-mr/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-14] ⏭️ 仓库 https://github.com/mr-mohamad-mr/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [W-13] ✅ 完成 [fork2] 10ium/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 143/20000 [[fork2]:70 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:47] [W-15] ✅ 完成 [fork2] Surfboardv2ray/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 141/20000 [[fork2]:68 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:47] [W-23] ✅ 完成 [fork2] hadimousavi79/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 141/20000 [[fork2]:68 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:47] [W-18] 🔧 开始处理 [fork2] lola530/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-21] ✅ 完成 [fork2] mahdi021zamani/Mahdi.zamani-multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 140/20000 [[fork2]:67 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:47] [W-19] ✅ 完成 [fork2] mehsad2100/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 142/20000 [[fork2]:69 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_4]   👤 用户仓库: 30 个 → 主队列 0/200 发现队列 170/20000 [[fork2]:67 [raw1]:3 [user1]:85 [user2]:15]
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_4]   用户 Shinlor 共查 30 个仓库
+[2026-08-05 16:21:47] [W-17] ✅ 完成 [fork2] a471686674/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4745/4800 08:21UTC | 主队列 0/200 发现队列 141/20000 [[fork2]:68 [raw1]:3 [user1]:55 [user2]:15]
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_6]   👤 用户仓库: 30 个 → 主队列 0/200 发现队列 204/20000 [[fork2]:67 [raw1]:3 [user1]:89 [user2]:45]
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_6]   用户 Qv2ray 共查 30 个仓库
+[2026-08-05 16:21:47] [W-10] 仓库 https://github.com/aiboboxx/v2rayfree (分支: main, size: 25006KB, pushed: 2026-08-05T06:31:08Z)
+[2026-08-05 16:21:47] [W-13] 🔧 开始处理 [fork2] BiHuDeH/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-15] 🔧 开始处理 [fork2] miladkantoori/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-23] 🔧 开始处理 [fork2] enayat186t/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-23] ⏭️ 仓库 https://github.com/enayat186t/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [W-21] 🔧 开始处理 [fork2] rostamzad1902/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-19] 🔧 开始处理 [fork2] Winlightt/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-19] ⏭️ 仓库 https://github.com/Winlightt/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_4] 🔗 发现仓库链接 shadowsocksrr/shadowsocksr-cshar (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-en.md)
+[2026-08-05 16:21:47] [W-17] 🔧 开始处理 [fork2] redjlij/multi-proxy-config-fetcher
+[2026-08-05 16:21:47] [W-17] ⏭️ 仓库 https://github.com/redjlij/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_6] 🔗 发现仓库链接 shadowsocksrr/shadowsocksr-androi (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-ko-KR.md)
+[2026-08-05 16:21:47] [W-13] ⏭️ 仓库 https://github.com/BiHuDeH/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [W-15] 仓库 https://github.com/miladkantoori/multi-proxy-config-fetcher (分支: main, size: 66330KB, pushed: 2026-08-05T07:39:41Z)
+[2026-08-05 16:21:47] [W-18] ⏭️ 仓库 https://github.com/lola530/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [W-21] ⏭️ 仓库 https://github.com/rostamzad1902/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_2]   👤 用户仓库: 4 个 → 主队列 0/200 发现队列 174/20000 [[fork2]:67 [raw1]:3 [user1]:89 [user2]:15]
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_2]   用户 Cenmrev 共查 4 个仓库
+[2026-08-05 16:21:47] [W-3] 👤 遍历用户仓库: goldrad
+[2026-08-05 16:21:47] [ThreadPoolExecutor-4_2] 🔗 发现仓库链接 qinyuhang/ShadowsocksX-NG- (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-pt-BR.md)
+[2026-08-05 16:21:47] [W-5] 🌱 加入种子: Rayan-Config/C-Sub (+41 节点)
+[2026-08-05 16:21:47] [W-5] 🔗 查子仓库: Rayan-Config/C-Sub
+[2026-08-05 16:21:53] [W-20] ✅ 完成 [fork2] Demolitionist/string | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 200/20000 [[fork2]:61 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-22] ✅ 完成 [fork2] sami4030/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 200/20000 [[fork2]:61 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-20] 🔧 开始处理 [fork2] ludwiggvan/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-16] ✅ 完成 [fork2] kojjii/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 199/20000 [[fork2]:60 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-14] ✅ 完成 [fork2] mr-mohamad-mr/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 199/20000 [[fork2]:60 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] repo info (Kr328/ClashForAndroi) 404，跳过
+[2026-08-05 16:21:53] [W-22] 🔧 开始处理 [fork2] ElderArcade/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-23] ✅ 完成 [fork2] enayat186t/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 198/20000 [[fork2]:59 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-19] ✅ 完成 [fork2] Winlightt/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 198/20000 [[fork2]:59 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-17] ✅ 完成 [fork2] redjlij/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 198/20000 [[fork2]:59 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-17] 🔧 开始处理 [fork2] SilkArt/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-17] ⏭️ 仓库 https://github.com/SilkArt/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-20] ⏭️ 仓库 https://github.com/ludwiggvan/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-18] ✅ 完成 [fork2] lola530/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 197/20000 [[fork2]:58 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-18] 🔧 开始处理 [fork2] 4nonym0u3/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-18] ⏭️ 仓库 https://github.com/4nonym0u3/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-21] ✅ 完成 [fork2] rostamzad1902/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 197/20000 [[fork2]:58 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [ThreadPoolExecutor-4_7] 🔍 仓库 Kr328/ClashForAndroi 不存在，追踪用户 Kr328
+[2026-08-05 16:21:53] [W-12] 仓库 https://github.com/Rayan-Config/C-Sub 无候选文件 (总计 20 blob, 扩展名过滤 8, processed_shas 跳过 2, SHA 缓存跳过 10)
+[2026-08-05 16:21:53] [W-11] ⏭️ 仓库 https://github.com/pooriaredorg/pooriaredorg 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-11] 🔗 查子仓库: pooriaredorg/pooriaredorg
+[2026-08-05 16:21:53] [W-22] ⏭️ 仓库 https://github.com/ElderArcade/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-23] 🔧 开始处理 [fork2] Sahah2133/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-23] ⏭️ 仓库 https://github.com/Sahah2133/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-16] 🔧 开始处理 [fork2] Edudotnexx/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-21] 🔧 开始处理 [fork2] NullRoute-Lab/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-14] 🔧 开始处理 [fork2] alieffe/Good
+[2026-08-05 16:21:53] [W-9] 仓库 https://github.com/SkillfulElectro/V2RayCollector 候选文件 2 个
+[2026-08-05 16:21:53] [ThreadPoolExecutor-4_7] 👤 遍历用户仓库: Kr328
+[2026-08-05 16:21:53] [种子] 🔵 [种子 13/616] ssrsub/ssr | 配额 4731/4800 08:21UTC | 主队列 1/200 发现队列 196/20000 [[fork2]:57 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-13] ✅ 完成 [fork2] BiHuDeH/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4737/4800 08:21UTC | 主队列 1/200 发现队列 198/20000 [[fork2]:59 [raw1]:5 [user1]:89 [user2]:45]
+[2026-08-05 16:21:53] [W-19] 🔧 开始处理 [fork2] HamiidFx/multi-proxy-config-fetcher
+[2026-08-05 16:21:53] [W-16] ⏭️ 仓库 https://github.com/Edudotnexx/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-19] ⏭️ 仓库 https://github.com/HamiidFx/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-14] ⏭️ 仓库 https://github.com/alieffe/Good 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-13] 🔧 开始处理 [fork2] omgayaya/hihi
+[2026-08-05 16:21:53] [W-13] ⏭️ 仓库 https://github.com/omgayaya/hihi 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-21] ⏭️ 仓库 https://github.com/NullRoute-Lab/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:53] [W-9] 🌱 加入种子: SkillfulElectro/V2RayCollector (+806 节点)
+[2026-08-05 16:21:53] [W-9] 🔗 查子仓库: SkillfulElectro/V2RayCollector
+[2026-08-05 16:21:57] repo info (yanue/V2ray) 404，跳过
+[2026-08-05 16:21:57] [ThreadPoolExecutor-4_3] 🔍 仓库 yanue/V2ray 不存在，追踪用户 yanue
+[2026-08-05 16:21:57] [ThreadPoolExecutor-4_3] 👤 遍历用户仓库: yanue
+[2026-08-05 16:21:57] [W-4]   👤 用户仓库: 9 个 → 主队列 2/200 发现队列 199/20000 [[fork2]:51 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:57] [W-4]   用户 4n0nymou3 共查 9 个仓库
+[2026-08-05 16:21:57] [ThreadPoolExecutor-4_1]   用户 Pawdroid 共查 0 个仓库
+[2026-08-05 16:21:57] [ThreadPoolExecutor-4_1] 🔗 发现仓库链接 yichenchen/clash (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-vi.md)
+[2026-08-05 16:21:57] [W-4] 🌱 加入种子: miladkantoori/multi-proxy-config-fetcher (+27 节点)
+[2026-08-05 16:21:57] [W-4] 🔗 查子仓库: miladkantoori/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-17] ✅ 完成 [fork2] SilkArt/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 199/20000 [[fork2]:51 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-20] ✅ 完成 [fork2] ludwiggvan/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 199/20000 [[fork2]:51 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-17] 🔧 开始处理 [fork2] 1mahdimf/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-18] ✅ 完成 [fork2] 4nonym0u3/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 198/20000 [[fork2]:50 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-12] ✅ 完成 [fork2] Rayan-Config/C-Sub | 提取 0 | 新增 0 | 耗时 10s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 198/20000 [[fork2]:50 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-20] 🔧 开始处理 [fork2] mjavadz/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] repo info (yichengchen/clash) 404，跳过
+[2026-08-05 16:21:59] [W-20] ⏭️ 仓库 https://github.com/mjavadz/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-23] ✅ 完成 [fork2] Sahah2133/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 197/20000 [[fork2]:49 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-17] ⏭️ 仓库 https://github.com/1mahdimf/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-16] ✅ 完成 [fork2] Edudotnexx/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 197/20000 [[fork2]:49 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-19] ✅ 完成 [fork2] HamiidFx/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 197/20000 [[fork2]:49 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-18] 🔧 开始处理 [fork2] arashshrf/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-18] ⏭️ 仓库 https://github.com/arashshrf/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-13] ✅ 完成 [fork2] omgayaya/hihi | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 196/20000 [[fork2]:48 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-13] 🔧 开始处理 [fork2] s1998ak/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-13] ⏭️ 仓库 https://github.com/s1998ak/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-21] ✅ 完成 [fork2] NullRoute-Lab/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 195/20000 [[fork2]:47 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [ThreadPoolExecutor-4_5] 👤 来源仓库 jiangxufeng/v2rayL → 追踪用户 jiangxufeng
+[2026-08-05 16:21:59] [W-22] ✅ 完成 [fork2] ElderArcade/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 197/20000 [[fork2]:49 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-5]   🍴 子仓库: 2 个 → 主队列 2/200 发现队列 227/20000 [[fork1]:2 [fork2]:47 [raw1]:5 [user1]:98 [user2]:75]
+[2026-08-05 16:21:59] [W-5] 🔗 开始 Fork 链追踪 (Rayan-Config/C-Sub)
+[2026-08-05 16:21:59] [W-15] 仓库 https://github.com/miladkantoori/multi-proxy-config-fetcher 无候选文件 (总计 19 blob, 扩展名过滤 8, processed_shas 跳过 3, SHA 缓存跳过 8)
+[2026-08-05 16:21:59] [ThreadPoolExecutor-4_0] 🔍 仓库 yichengchen/clash 不存在，追踪用户 yichengchen
+[2026-08-05 16:21:59] [ThreadPoolExecutor-4_0] 👤 遍历用户仓库: yichengchen
+[2026-08-05 16:21:59] [W-23] 🔧 开始处理 [fork2] pooriamred/-redfree8-config
+[2026-08-05 16:21:59] [W-16] 🔧 开始处理 [fork2] alieffe1/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-16] ⏭️ 仓库 https://github.com/alieffe1/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-14] ✅ 完成 [fork2] alieffe/Good | 提取 0 | 新增 0 | 耗时 0s | 配额 4728/4800 08:21UTC | 主队列 2/200 发现队列 196/20000 [[fork2]:48 [raw1]:5 [user1]:98 [user2]:45]
+[2026-08-05 16:21:59] [W-14] 🔧 开始处理 [fork2] gransa/Temp-Sub
+[2026-08-05 16:21:59] [W-0]   👤 用户仓库: 30 个 → 主队列 2/200 发现队列 225/20000 [[fork2]:47 [raw1]:5 [user1]:98 [user2]:75]
+[2026-08-05 16:21:59] [W-12] 🔧 开始处理 [fork2] Mohammad3896/4n0nymou3-fetcher
+[2026-08-05 16:21:59] [W-12] ⏭️ 仓库 https://github.com/Mohammad3896/4n0nymou3-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-22] 🔧 开始处理 [fork2] EDK-Rise/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-22] ⏭️ 仓库 https://github.com/EDK-Rise/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [种子] 🔵 [种子 14/616] 10ium/multi-proxy-config-fetcher | 配额 4722/4800 08:21UTC | 主队列 2/200 发现队列 227/20000 [[fork1]:2 [fork2]:47 [raw1]:5 [user1]:98 [user2]:75]
+[2026-08-05 16:21:59] [W-23] ⏭️ 仓库 https://github.com/pooriamred/-redfree8-config 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-19] 🔧 开始处理 [fork2] pikiton/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-19] ⏭️ 仓库 https://github.com/pikiton/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-21] 🔧 开始处理 [fork2] XMA-Faez/multi-proxy-config-fetcher
+[2026-08-05 16:21:59] [W-0]   用户 goldrad 共查 30 个仓库
+[2026-08-05 16:21:59] [ThreadPoolExecutor-4_5] 👤 遍历用户仓库: jiangxufeng
+[2026-08-05 16:21:59] [W-10] 仓库 https://github.com/aiboboxx/v2rayfree 候选文件 3 个
+[2026-08-05 16:21:59] [W-14] ⏭️ 仓库 https://github.com/gransa/Temp-Sub 未更新，跳过解析（仍追踪）
+[2026-08-05 16:21:59] [W-21] 仓库 https://github.com/XMA-Faez/multi-proxy-config-fetcher (分支: main, size: 67809KB, pushed: 2026-08-05T07:43:53Z)
+[2026-08-05 16:21:59] [W-0]   父仓库 +0 个节点
+[2026-08-05 16:21:59] [W-10] 🔗 递归发现仓库 free-nodes/v2rayfree (来源 https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/README.md)
+[2026-08-05 16:22:01] repo info (shadowsocksrr/shadowsocksr-cshar) 404，跳过
+[2026-08-05 16:22:01] [ThreadPoolExecutor-4_4] 🔍 仓库 shadowsocksrr/shadowsocksr-cshar 不存在，追踪用户 shadowsocksrr
+[2026-08-05 16:22:01] [ThreadPoolExecutor-4_4] 👤 遍历用户仓库: shadowsocksrr
+[2026-08-05 16:22:03] repo info (shadowsocksrr/shadowsocksr-androi) 404，跳过[2026-08-05 16:22:03] repo info (qinyuhang/ShadowsocksX-NG-) 404，跳过
+
+[2026-08-05 16:22:03] [W-1]   👤 用户仓库: 30 个 → 主队列 3/200 发现队列 250/20000 [[fork1]:2 [fork2]:40 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:03] [ThreadPoolExecutor-4_2] 🔍 仓库 qinyuhang/ShadowsocksX-NG- 不存在，追踪用户 qinyuhang
+[2026-08-05 16:22:03] [ThreadPoolExecutor-4_2] 👤 遍历用户仓库: qinyuhang
+[2026-08-05 16:22:03] [ThreadPoolExecutor-4_6] 🔍 仓库 shadowsocksrr/shadowsocksr-androi 不存在，追踪用户 shadowsocksrr
+[2026-08-05 16:22:03] [ThreadPoolExecutor-4_6] 👤 遍历用户仓库: shadowsocksrr
+[2026-08-05 16:22:03] [W-1]   用户 goldrad 共查 30 个仓库
+[2026-08-05 16:22:03] [W-1]   父仓库 +0 个节点
+[2026-08-05 16:22:05] [W-20] ✅ 完成 [fork2] mjavadz/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 250/20000 [[fork1]:2 [fork2]:40 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-20] 🔧 开始处理 [fork2] eplord/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-20] ⏭️ 仓库 https://github.com/eplord/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-13] ✅ 完成 [fork2] s1998ak/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 250/20000 [[fork1]:2 [fork2]:40 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-13] 🔧 开始处理 [fork2] ailrzaer/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-13] ⏭️ 仓库 https://github.com/ailrzaer/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-18] ✅ 完成 [fork2] arashshrf/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 250/20000 [[fork1]:2 [fork2]:40 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-16] ✅ 完成 [fork2] alieffe1/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 249/20000 [[fork1]:2 [fork2]:39 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-12] ✅ 完成 [fork2] Mohammad3896/4n0nymou3-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 249/20000 [[fork1]:2 [fork2]:39 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-12] 🔧 开始处理 [fork2] arkanpay/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-23] ✅ 完成 [fork2] pooriamred/-redfree8-config | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 249/20000 [[fork1]:2 [fork2]:39 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-23] 🔧 开始处理 [fork2] yashar1985/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-14] ✅ 完成 [fork2] gransa/Temp-Sub | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 249/20000 [[fork1]:2 [fork2]:39 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-15] ✅ 完成 [fork2] miladkantoori/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 12s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 250/20000 [[fork1]:2 [fork2]:40 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-17] ✅ 完成 [fork2] 1mahdimf/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 250/20000 [[fork1]:2 [fork2]:40 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-6]   👤 用户仓库: 6 个 → 主队列 3/200 发现队列 254/20000 [[fork1]:2 [fork2]:38 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:05] [W-18] 🔧 开始处理 [fork2] resscience/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-16] 🔧 开始处理 [fork2] baranial/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-12] ⏭️ 仓库 https://github.com/arkanpay/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-22] ✅ 完成 [fork2] EDK-Rise/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 249/20000 [[fork1]:2 [fork2]:39 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-23] ⏭️ 仓库 https://github.com/yashar1985/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-19] ✅ 完成 [fork2] pikiton/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4716/4800 08:21UTC | 主队列 3/200 发现队列 249/20000 [[fork1]:2 [fork2]:39 [raw1]:5 [user1]:98 [user2]:105]
+[2026-08-05 16:22:05] [W-14] 🔧 开始处理 [fork2] mmghmm/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-14] ⏭️ 仓库 https://github.com/mmghmm/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-15] 🔧 开始处理 [fork2] newnabell/multi-config
+[2026-08-05 16:22:05] [W-6]   用户 clashbk 共查 6 个仓库
+[2026-08-05 16:22:05] [W-18] ⏭️ 仓库 https://github.com/resscience/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-16] ⏭️ 仓库 https://github.com/baranial/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-22] 🔧 开始处理 [fork2] ErtebateWeb/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-19] 🔧 开始处理 [fork2] sinayazdan/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-17] 🔧 开始处理 [fork2] M-Rezvanpour/multi-proxy-config-fetcher
+[2026-08-05 16:22:05] [W-15] ⏭️ 仓库 https://github.com/newnabell/multi-config 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-6] 🔗 发现仓库链接 free-nodes/clashfre (来源 https://raw.githubusercontent.com/free-nodes/clashfree/main/README.md)
+[2026-08-05 16:22:05] [W-22] ⏭️ 仓库 https://github.com/ErtebateWeb/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-19] ⏭️ 仓库 https://github.com/sinayazdan/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:05] [W-17] ⏭️ 仓库 https://github.com/M-Rezvanpour/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:07] [种子] 🔵 [种子 15/616] gfpcom/free-proxy-list | 配额 4714/4800 08:21UTC | 主队列 3/200 发现队列 245/20000 [[fork1]:2 [fork2]:29 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:07] [W-9] 🔗 开始 Fork 链追踪 (SkillfulElectro/V2RayCollector)
+[2026-08-05 16:22:09] [W-20] ✅ 完成 [fork2] eplord/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4711/4800 08:22UTC | 主队列 4/200 发现队列 245/20000 [[fork1]:2 [fork2]:29 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-13] ✅ 完成 [fork2] ailrzaer/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4711/4800 08:22UTC | 主队列 4/200 发现队列 245/20000 [[fork1]:2 [fork2]:29 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-20] 🔧 开始处理 [fork2] hamidhatamigmtii/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-11]   🍴 子仓库: 1 个 → 主队列 4/200 发现队列 245/20000 [[fork1]:3 [fork2]:28 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-12] ✅ 完成 [fork2] arkanpay/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 245/20000 [[fork1]:3 [fork2]:28 [raw1]:5 [user1]:104 [user2]:105][2026-08-05 16:22:09] repo info (yichenchen/clash) 404，跳过
+
+[2026-08-05 16:22:09] [W-12] 🔧 开始处理 [fork2] statueliberty/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-13] 🔧 开始处理 [fork2] mahiciyah/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-14] ✅ 完成 [fork2] mmghmm/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 244/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-14] 🔧 开始处理 [fork2] SadeghiAmir/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-14] ⏭️ 仓库 https://github.com/SadeghiAmir/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-18] ✅ 完成 [fork2] resscience/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 244/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-18] 🔧 开始处理 [fork2] saeedfweb/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-18] ⏭️ 仓库 https://github.com/saeedfweb/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-16] ✅ 完成 [fork2] baranial/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 244/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-20] ⏭️ 仓库 https://github.com/hamidhatamigmtii/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-17] ✅ 完成 [fork2] M-Rezvanpour/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 244/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-17] 🔧 开始处理 [fork2] emdarx/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-17] ⏭️ 仓库 https://github.com/emdarx/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-3]   👤 用户仓库: 10 个 → 主队列 4/200 发现队列 254/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:115]
+[2026-08-05 16:22:09] [W-3]   用户 goldrad 共查 10 个仓库
+[2026-08-05 16:22:09] [W-3]   父仓库 +0 个节点
+[2026-08-05 16:22:09] [W-12] ⏭️ 仓库 https://github.com/statueliberty/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-5]   父仓库: goldrad/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-13] ⏭️ 仓库 https://github.com/mahiciyah/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-15] ✅ 完成 [fork2] newnabell/multi-config | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 244/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-22] ✅ 完成 [fork2] ErtebateWeb/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 244/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-19] ✅ 完成 [fork2] sinayazdan/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 244/20000 [[fork1]:3 [fork2]:27 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-19] 🔧 开始处理 [fork2] sitsaz/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-11] 🔗 开始 Fork 链追踪 (pooriaredorg/pooriaredorg)
+[2026-08-05 16:22:09] [W-23] ✅ 完成 [fork2] yashar1985/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4710/4800 08:22UTC | 主队列 4/200 发现队列 245/20000 [[fork1]:3 [fork2]:28 [raw1]:5 [user1]:104 [user2]:105]
+[2026-08-05 16:22:09] [W-4] 🔗 开始 Fork 链追踪 (miladkantoori/multi-proxy-config-fetcher)
+[2026-08-05 16:22:09] [ThreadPoolExecutor-4_1] 🔍 仓库 yichenchen/clash 不存在，追踪用户 yichenchen
+[2026-08-05 16:22:09] [W-21] 仓库 https://github.com/XMA-Faez/multi-proxy-config-fetcher 候选文件 3 个
+[2026-08-05 16:22:09] [W-15] 🔧 开始处理 [fork2] viewgithub2023/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-15] ⏭️ 仓库 https://github.com/viewgithub2023/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-16] 🔧 开始处理 [fork2] hos2500/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-16] ⏭️ 仓库 https://github.com/hos2500/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-23] 🔧 开始处理 [fork2] M450ud/config-fetcher
+[2026-08-05 16:22:09] [W-23] ⏭️ 仓库 https://github.com/M450ud/config-fetcher 主要语言 HTML，跳过
+[2026-08-05 16:22:09] [W-22] 🔧 开始处理 [fork2] Crusader-Strike/multi-proxy-config-fetcher
+[2026-08-05 16:22:09] [W-19] ⏭️ 仓库 https://github.com/sitsaz/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [ThreadPoolExecutor-4_1] 👤 遍历用户仓库: yichenchen
+[2026-08-05 16:22:09] [W-22] ⏭️ 仓库 https://github.com/Crusader-Strike/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:09] [W-21] 🌱 加入种子: XMA-Faez/multi-proxy-config-fetcher (+44 节点)
+[2026-08-05 16:22:11] [W-0] 👤 遍历用户仓库: mr-mohamad-mr
+[2026-08-05 16:22:15] [W-10] 🔗 发现仓库链接 free-nodes/clashfree (来源 https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/README.md)
+[2026-08-05 16:22:15] [种子] 🔵 [种子 16/616] ermaozi/get_subscribe | 配额 4700/4800 08:22UTC | 主队列 4/200 发现队列 246/20000 [[fork1]:3 [fork2]:18 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:15] [W-8]   Compare API 返回 22 个变更文件 (3 次 API 调用)
+[2026-08-05 16:22:15] [W-8]   commits 过滤: 1251 → 20 (变更文件 22 个)
+[2026-08-05 16:22:15] [W-8] 仓库 https://github.com/Airuop/cross 候选文件 20 个
+[2026-08-05 16:22:15] [ThreadPoolExecutor-42_5] 🔗 递归发现仓库 Airuop/servers (来源 https://raw.githubusercontent.com/Airuop/cross/master/Eternity.yml)
+[2026-08-05 16:22:17] [W-14] ✅ 完成 [fork2] SadeghiAmir/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 246/20000 [[fork1]:3 [fork2]:18 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:17] [W-18] ✅ 完成 [fork2] saeedfweb/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 246/20000 [[fork1]:3 [fork2]:18 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:17] [W-20] ✅ 完成 [fork2] hamidhatamigmtii/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 246/20000 [[fork1]:3 [fork2]:18 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:17] [W-14] 🔧 开始处理 [fork2] vsevolobo/multi-proxy-config-fetcher
+[2026-08-05 16:22:17] [W-14] ⏭️ 仓库 https://github.com/vsevolobo/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:17] [W-12] ✅ 完成 [fork2] statueliberty/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 245/20000 [[fork1]:3 [fork2]:17 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:17] [W-18] 🔧 开始处理 [fork2] Airuop/config-fetcher
+[2026-08-05 16:22:17] [W-20] 🔧 开始处理 [fork2] kyndgustine578/multi-proxy-config-fetcher
+[2026-08-05 16:22:17] [W-13] ✅ 完成 [fork2] mahiciyah/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 243/20000 [[fork1]:3 [fork2]:15 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:17] [W-17] ✅ 完成 [fork2] emdarx/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 245/20000 [[fork1]:3 [fork2]:17 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:17] [W-15] ✅ 完成 [fork2] viewgithub2023/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 243/20000 [[fork1]:3 [fork2]:15 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:17] [W-16] ✅ 完成 [fork2] hos2500/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 243/20000 [[fork1]:3 [fork2]:15 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:18] [W-12] 🔧 开始处理 [fork2] ali9sr/multi-proxy-config-fetcher
+[2026-08-05 16:22:18] [W-23] ✅ 完成 [fork2] M450ud/config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 242/20000 [[fork1]:3 [fork2]:14 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:18] [W-19] ✅ 完成 [fork2] sitsaz/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 242/20000 [[fork1]:3 [fork2]:14 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:18] [W-22] ✅ 完成 [fork2] Crusader-Strike/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4699/4800 08:22UTC | 主队列 5/200 发现队列 242/20000 [[fork1]:3 [fork2]:14 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:18] [W-22] 🔧 开始处理 [fork2] Spequlant/multi-proxy-config-fetcher
+[2026-08-05 16:22:18] [W-20] ⏭️ 仓库 https://github.com/kyndgustine578/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:18] [W-21] ✅ 完成 [fork2] XMA-Faez/multi-proxy-config-fetcher | 提取 136 | 新增 44 | 耗时 11s | 配额 4698/4800 08:22UTC | 主队列 5/200 发现队列 242/20000 [[fork1]:3 [fork2]:14 [raw1]:6 [user1]:104 [user2]:115]
+[2026-08-05 16:22:18] [W-1] 👤 遍历用户仓库: BiHuDeH
+[2026-08-05 16:22:18] [W-7]   Compare API 返回 300 个变更文件 (3 次 API 调用)
+[2026-08-05 16:22:18] [W-13] 🔧 开始处理 [fork2] parsamrrelax/multi-proxy-config-fetcher
+[2026-08-05 16:22:18] [W-17] 🔧 开始处理 [fork2] me-momo20231/multi-proxy-config-fetcher
+[2026-08-05 16:22:18] [W-15] 🔧 开始处理 [fork2] m3hdiclub/multi-proxy-config-fetcher
+[2026-08-05 16:22:18] [W-15] ⏭️ 仓库 https://github.com/m3hdiclub/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:18] [W-12] 仓库 https://github.com/ali9sr/multi-proxy-config-fetcher (分支: main, size: 10861KB, pushed: 2026-08-05T07:40:39Z)
+[2026-08-05 16:22:18] [W-23] 🔧 开始处理 [fork2] Amiralmomeniin/multi-proxy-config-fetcher
+[2026-08-05 16:22:18] [W-19] 🔧 开始处理 [fork2] nullluser/NullRepo
+[2026-08-05 16:22:18] [W-18] ⏭️ 仓库 https://github.com/Airuop/config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:18] [W-22] ⏭️ 仓库 https://github.com/Spequlant/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:19] [W-21] 🔧 开始处理 [fork2] kheradnameh/multi-proxy-config-fetcher
+[2026-08-05 16:22:19] [W-21] ⏭️ 仓库 https://github.com/kheradnameh/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:19] [W-13] ⏭️ 仓库 https://github.com/parsamrrelax/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:19] [W-17] ⏭️ 仓库 https://github.com/me-momo20231/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:19] [W-16] 🔧 开始处理 [fork2] mohsenzasa/anonymous-multi-proxy-config-fetcher
+[2026-08-05 16:22:19] [W-23] ⏭️ 仓库 https://github.com/Amiralmomeniin/multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）[2026-08-05 16:22:19] repo info (free-nodes/clashfre) 404，跳过
+
+[2026-08-05 16:22:20] [W-19] 仓库 https://github.com/nullluser/NullRepo (分支: main, size: 11659KB, pushed: 2026-08-05T07:40:58Z)
+[2026-08-05 16:22:20] [ThreadPoolExecutor-42_4] 🔗 发现仓库链接 ALIILAPRO/v2rayNG-Config (来源 https://raw.githubusercontent.com/Airuop/cross/master/sub/list/18.txt)
+[2026-08-05 16:22:20] [W-7]   commits 过滤: 519 → 286 (变更文件 300 个)
+[2026-08-05 16:22:20] [W-16] ⏭️ 仓库 https://github.com/mohsenzasa/anonymous-multi-proxy-config-fetcher 未更新，跳过解析（仍追踪）
+[2026-08-05 16:22:21] [ThreadPoolExecutor-4_7]   👤 用户仓库: 30 个 → 主队列 5/200 发现队列 264/20000 [[fork1]:3 [fork2]:6 [raw1]:6 [user1]:134 [user2]:115]
+[2026-08-05 16:22:21] [ThreadPoolExecutor-4_7]   用户 Kr328 共查 30 个仓库
+[2026-08-05 16:22:21] [W-6] 🔍 仓库 free-nodes/clashfre 不存在，追踪用户 free-nodes
+[2026-08-05 16:22:21] [种子] 🔵 [种子 17/616] Leon406/SubCrawler | 配额 4692/4800 08:22UTC | 主队列 5/200 发现队列 264/20000 [[fork1]:3 [fork2]:6 [raw1]:6 [user1]:134 [user2]:115]
+[2026-08-05 16:22:21] [ThreadPoolExecutor-4_5]   👤 用户仓库: 5 个 → 主队列 5/200 发现队列 269/20000 [[fork1]:3 [fork2]:6 [raw1]:6 [user1]:134 [user2]:120]
+[2026-08-05 16:22:21] [ThreadPoolExecutor-4_3]   👤 用户仓库: 14 个 → 主队列 5/200 发现队列 283/20000 [[fork1]:3 [fork2]:6 [raw1]:6 [user1]:148 [user2]:120]
+[2026-08-05 16:22:21] [ThreadPoolExecutor-4_0]   👤 用户仓库: 22 个 → 主队列 5/200 发现队列 305/20000 [[fork1]:3 [fork2]:6 [raw1]:6 [user1]:170 [user2]:120]
+[2026-08-05 16:22:21] [W-14] ✅ 完成 [fork2] vsevolobo/multi-proxy-config-fetcher | 提取 0 | 新增 0 | 耗时 0s | 配额 4689/4800 08:22UTC | 主队列 5/200 发现队列 305/20000 [[fork1]:3 [fork2]:6 [raw1]:6 [user1]:170 [user2]:120]
+[2026-08-05 16:22:21] [W-7] 仓库 https://github.com/ninjastrikers/nexus-nodes 候选文件 286 个
+[2026-08-05 16:22:21] [W-9]   父仓库: V2RayRoot/V2RayConfig
+[2026-08-05 16:22:21] [W-6] 👤 遍历用户仓库: free-nodes
+[2026-08-05 16:22:21] [ThreadPoolExecutor-4_5]   用户 jiangxufeng 共查 5 个仓库
+[2026-08-05 16:22:21] [ThreadPoolExecutor-4_3]   用户 yanue 共查 14 个仓库
+[2026-08-05 16:22:22] [ThreadPoolExecutor-4_0]   用户 yichengchen 共查 22 个仓库
+[2026-08-05 16:22:22] [W-14] 🔧 开始处理 [fork2] aliFhd10/multi-proxy-config-fetcher
