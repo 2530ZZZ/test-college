@@ -131,7 +131,6 @@ class Collector:
         self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
         self._search_resume = threading.Event()         # Worker 唤醒搜索的信号
         self._search_resume.set()                       # 初始允许搜索
-        self._log_lock = threading.Lock()                # 日志打印锁（防挤行）
         self._reset_waiting = False                     # 配额等待去重标志
         self._worker_local = threading.local()          # 线程独立前缀
         self._disc_seq = None                             # 发现队列 PriorityQueue 序号（分配在 run 中）
@@ -252,10 +251,10 @@ class Collector:
                 pickle.dump(chunk, f)
 
     def _check_seen_cache(self, repo: str, pushed_at: str) -> bool:
-        """检查已处理仓库缓存。True=可跳过，False=需要处理。
+        """检查已处理仓库缓存（解析维度）。True=已解析可跳过解析，False=需要处理。
 
         命中时递增 hits 计数并更新 last_hit 时间。
-        兼容旧格式（纯 pushed_at 字符串）和新格式（dict with hits）。
+        兼容旧格式（纯 pushed_at 字符串）和新格式（dict with hits/parsed/traced）。
         """
         if not SEEN_REPOS_PERSIST_ENABLED or not pushed_at:
             return False
@@ -267,18 +266,23 @@ class Collector:
         if isinstance(entry, str):
             if entry == pushed_at:
                 self.seen_cache[r] = {"pushed_at": pushed_at, "hits": 1,
-                                      "last_hit": datetime.now(timezone.utc).isoformat()}
-                return True
+                                      "last_hit": datetime.now(timezone.utc).isoformat(),
+                                      "parsed": False, "traced": []}
+                return False  # 旧格式无 parsed 信息 → 需要解析
             return False
         # 新格式：dict
         if entry.get("pushed_at") == pushed_at:
             entry["hits"] = entry.get("hits", 0) + 1
             entry["last_hit"] = datetime.now(timezone.utc).isoformat()
-            return True
+            return bool(entry.get("parsed", False))
         return False
 
-    def _mark_seen_cache(self, repo: str, pushed_at: str):
-        """标记仓库已处理（保留已有 hits，更新 pushed_at）。"""
+    def _mark_seen_cache(self, repo: str, pushed_at: str, parsed: bool = True):
+        """标记仓库已处理（保留已有 hits，更新 pushed_at）。
+
+        Args:
+            parsed: 是否已解析过文件（默认 True，解析完成后调用）。
+        """
         if SEEN_REPOS_PERSIST_ENABLED and pushed_at:
             r = repo.lower()
             existing = self.seen_cache.get(r, {})
@@ -288,22 +292,51 @@ class Collector:
             existing["pushed_at"] = pushed_at
             existing.setdefault("hits", 1)
             existing["last_hit"] = datetime.now(timezone.utc).isoformat()
+            existing["parsed"] = parsed
+            existing.setdefault("traced", [])   # 追踪过的层数集合
             self.seen_cache[r] = existing
             if is_new:
                 self._wlog(f"📝 已处理缓存: {repo}")
 
-    def _wlog(self, msg: str, **kwargs):
-        """统一日志：优先用显式前缀，否则 fallback 到线程名。
+    def _mark_traced(self, repo: str, pushed_at: str, depth: int):
+        """记录仓库在指定层数被追踪过（低层覆盖高层：1 覆盖 1、2、3...）。"""
+        if not SEEN_REPOS_PERSIST_ENABLED or not pushed_at:
+            return
+        r = repo.lower()
+        existing = self.seen_cache.get(r, {})
+        if isinstance(existing, str):
+            existing = {}
+        existing["pushed_at"] = pushed_at
+        traced = existing.setdefault("traced", [])
+        if depth not in traced:
+            traced.append(depth)
+        existing.setdefault("hits", 1)
+        existing["last_hit"] = datetime.now(timezone.utc).isoformat()
+        self.seen_cache[r] = existing
 
-        加 _log_lock 保证多线程打印不挤行（print 非原子）。
+    def _is_traced(self, repo: str, pushed_at: str, depth: int) -> bool:
+        """检查仓库在指定层数是否已被追踪过（含低层覆盖）。
+
+        覆盖规则：已追踪层数 t ≤ depth 则视为已追踪（1 覆盖 1、2、3...）。
         """
+        if not pushed_at:
+            return False
+        entry = self.seen_cache.get(repo.lower())
+        if not isinstance(entry, dict):
+            return False
+        if entry.get("pushed_at") != pushed_at:
+            return False
+        traced = entry.get("traced", [])
+        return any(t <= depth for t in traced)
+
+    def _wlog(self, msg: str, **kwargs):
+        """统一日志：优先用显式前缀，否则 fallback 到线程名。"""
         tn = getattr(getattr(self, '_worker_local', None), 'prefix', None)
         if tn is None:
             tn = threading.current_thread().name
         prefix = f"[{tn}] " if tn else ""
         kwargs.setdefault('flush', True)
-        with self._log_lock:
-            print(f"[{now_str()}] {prefix}{msg}", **kwargs)
+        print(f"[{now_str()}] {prefix}{msg}", **kwargs)
 
     def _qs(self) -> str:
         """队列状态：主队列 + 发现队列 + 标志位分布。"""
@@ -925,6 +958,7 @@ class Collector:
                                     "tag": "[种子仓库]"})):
                 self._wlog(f"🗑️ 主队列满，丢弃种子 {repo}")
                 continue
+            self._add_seen(repo)  # 标记去重，防止 fork/用户追踪重复发现
             self.checked_count += 1
             self._main_queue_total += 1
             self._wlog(f"{_prefix} | {self._qt()} | {self._qs()}")
@@ -1414,7 +1448,12 @@ class Collector:
 
         user 类仓库（[userN]/[404userN]）只追踪 fork/raw，
         不追踪 user（否则 user→user 无限递归）。
+
+        同层（或低层覆盖）已追踪过 → 跳过（省 fork/用户 API）。
         """
+        depth = self._tag_depth(tag)
+        if self._is_traced(repo, pushed_at, depth):
+            return  # 该层数已追踪过（低层覆盖高层）
         kind = self._tag_kind(tag)
         if FORK_CHAIN_ENABLED:
             self._trace_child_forks(repo, branch, tag)
@@ -1422,6 +1461,7 @@ class Collector:
                 self._trace_fork_chain(repo, branch, pushed_at, tag)
         if USER_REPOS_ENABLED and kind not in ("user", "404user"):
             self._trace_user_repos(repo, branch, tag)
+        self._mark_traced(repo, pushed_at, depth)
 
     def process_repo(self, repo: str, branch: str = "main",
                      size: int = -1, disabled: bool = False,
@@ -1447,7 +1487,7 @@ class Collector:
 
         # ── 语言过滤（HTML 等无价值仓库跳过） ──
         if language and language in SKIP_LANGUAGES:
-            self._wlog(f"⏭️ 仓库 {github_url} 主要语言 {language}，跳过")
+            self._wlog(f"⏭️ {tag} 仓库 {github_url} 主要语言 {language}，跳过")
             return (0, 0)
 
         # ── pushed_at 为空 → 强制补查 repo info ──
@@ -1470,19 +1510,23 @@ class Collector:
                         repo, "main", self._child_tag(tag, "404user"))
                 return (0, 0)
 
-        # 已处理仓库缓存检查（pushed_at 未变→跳过解析，但仍追踪）
+        # 已处理仓库缓存检查（已解析 → 跳过解析，但按需追踪）
         if self._check_seen_cache(repo, pushed_at):
-            self._wlog(f"⏭️ 仓库 {github_url} 未更新，跳过解析（仍追踪）")
+            trace_txt = "（需追踪）" if (self._should_trace(tag)
+                                         and not self._is_traced(
+                                             repo, pushed_at,
+                                             self._tag_depth(tag))) else "（无需追踪）"
+            self._wlog(f"⏭️ {tag} 仓库 {github_url} 已解析，跳过解析{trace_txt}")
             if self._should_trace(tag):
                 self._trace_repo(repo, branch, pushed_at, tag)
             return (0, 0)
 
         # 有效性检查
         if size == 0:
-            self._wlog(f"⚠️ 仓库 {github_url} 大小为 0，跳过")
+            self._wlog(f"⚠️ {tag} 仓库 {github_url} 大小为 0，跳过")
             return (0, 0)
         if disabled:
-            self._wlog(f"⚠️ 仓库 {github_url} 已禁用，跳过")
+            self._wlog(f"⚠️ {tag} 仓库 {github_url} 已禁用，跳过")
             return (0, 0)
 
         # 仓库年龄过滤（统一入口：搜索结果、fork链、用户仓库、raw递归）
@@ -1494,9 +1538,13 @@ class Collector:
 
                 # 超过跳过阈值 → 不解析文件，但仍追踪 fork/用户仓库
                 if SKIP_PROCESSING_AGE_HOURS > 0 and age_hours > SKIP_PROCESSING_AGE_HOURS:
-                    self._mark_seen_cache(repo, pushed_at)
-                    self._wlog(f"⏭️ 仓库 {github_url} "
-                          f"{age_hours:.0f}h 未更新，跳过解析（仍追踪）")
+                    self._mark_seen_cache(repo, pushed_at, parsed=False)
+                    trace_txt = "（需追踪）" if (self._should_trace(tag)
+                                                 and not self._is_traced(
+                                                     repo, pushed_at,
+                                                     self._tag_depth(tag))) else "（无需追踪）"
+                    self._wlog(f"⏭️ {tag} 仓库 {github_url} "
+                          f"{age_hours:.0f}h 未更新，跳过解析{trace_txt}")
                     if self._should_trace(tag):
                         self._trace_repo(repo, branch, pushed_at, tag)
                     return (0, 0)
@@ -1505,7 +1553,7 @@ class Collector:
         if branch == "main" and repo in self._branch_cache and self._branch_cache[repo]:
             branch = self._branch_cache[repo]
 
-        self._wlog(f"仓库 {github_url} (分支: {branch}, "
+        self._wlog(f"{tag} 仓库 {github_url} (分支: {branch}, "
               f"size: {size}KB, pushed: {pushed_at})")
 
         has_nodes_flag = [False]
