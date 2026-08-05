@@ -38,7 +38,7 @@ from config import (
     PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
     FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
     FORK_CHILD_MAX, FORK_SIBLING_MAX, FORK_PARENT_TRACE_ENABLED, FORK_PER_PAGE,
-    MAX_TRACE_DEPTH, MAIN_PRODUCER_LIMIT, TRACE_USER_ON_404,
+    MAX_TRACE_DEPTH, TRACE_USER_ON_404,
     AUTO_SEED_ENABLED,
     TOPIC_SEARCH_ENABLED, TOPIC_QUERIES,
     README_SEARCH_ENABLED, README_QUERIES, README_MAX_PAGES,
@@ -138,7 +138,6 @@ class Collector:
         self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
         self._worker_repo_count: Dict[str, int] = {}   # Worker 处理仓库计数
         self._main_queue_total: int = 0                # 主队列总计（不含 fork/raw/用户）
-        self._main_producer = threading.Semaphore(MAIN_PRODUCER_LIMIT)  # 生产令牌
         self.seen_cache: Dict[str, str] = {}            # 已处理仓库持久化
         self._sub_urls_seen: Set[str] = set()           # 订阅链接跨文件去重
         self._sub_urls_seen.clear()
@@ -307,17 +306,34 @@ class Collector:
             print(f"[{now_str()}] {prefix}{msg}", **kwargs)
 
     def _qs(self) -> str:
-        """队列状态：主队列 + 发现队列。"""
+        """队列状态：主队列 + 发现队列 + 标志位分布。"""
         mq = getattr(self, '_task_queue', None)
         dq = getattr(self, '_disc_queue', None)
+        # 统计扩展队列中各标志位的仓库数量（遍历队列元素样本，最多 500）
+        tag_counts = {}
+        if dq is not None:
+            for _entry in list(dq.queue)[:500]:
+                if not isinstance(_entry, tuple) or len(_entry) < 4:
+                    continue  # sentinel 等异常元素跳过
+                _item = _entry[3]
+                if not isinstance(_item, tuple) or len(_item) < 3:
+                    continue
+                _kw = _item[2]
+                if not isinstance(_kw, dict):
+                    continue
+                _tag = _kw.get("tag", "?")
+                tag_counts[_tag] = tag_counts.get(_tag, 0) + 1
+        tag_str = " ".join(f"{k}:{v}" for k, v in
+                           sorted(tag_counts.items())) if tag_counts else "空"
         return (f"主队列 {mq.qsize() if mq else 0}/{MAIN_QUEUE_SIZE} "
-                f"发现队列 {dq.qsize() if dq else 0}/{DISCOVERY_QUEUE_SIZE}")
+                f"发现队列 {dq.qsize() if dq else 0}/{DISCOVERY_QUEUE_SIZE} "
+                f"[{tag_str}]")
 
     def _qt(self) -> str:
-        """配额状态：剩余/上限 + 北京时间。"""
-        from datetime import datetime, timezone, timedelta
-        bj = datetime.now(timezone(timedelta(hours=8))).strftime('%H:%M')
-        return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {bj}北京时间"
+        """配额状态：剩余/上限 + UTC 时间（看距整点刷新还有多久）。"""
+        from datetime import datetime, timezone
+        utc = datetime.now(timezone.utc).strftime('%H:%M')
+        return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {utc}UTC"
 
     def _disc_put(self, item: tuple, label: str = ""):
         """放入发现队列（PriorityQueue）。
@@ -889,7 +905,11 @@ class Collector:
     # ── 搜集实现 ──
 
     def _collect_seeds(self, task_queue: Queue):
-        """种子仓库阶段：逐个获取 repo info 并放入主队列。"""
+        """种子仓库阶段：纯入队（零 API）。
+
+        所有检查（404/禁用/大小为0/语言过滤/年龄/已处理/404追踪用户）
+        统一由 process_repo 处理——种子只需把仓库放进主队列。
+        """
         repo_seeds = self._repo_seeds
         seed_list = list(repo_seeds.keys())
         if not seed_list:
@@ -900,41 +920,14 @@ class Collector:
             if self._should_stop(): break
             if not self._wait_queue_slot(task_queue): break
             _prefix = f"🔵 [种子 {_idx}/{len(seed_list)}] {repo}"
-            try:
-                ri = self.http.get_json(
-                    f"https://api.github.com/repos/{repo}",
-                    timeout=FILE_DOWNLOAD_TIMEOUT,
-                    operation_name=f"repo info ({repo})")
-                if not ri:
-                    self._wlog(f"❌ {_prefix} 404 | {self._qt()} | {self._qs()}")
-                    # 种子被删除/隐藏 → 追踪该用户的其他仓库
-                    if USER_REPOS_ENABLED and TRACE_USER_ON_404:
-                        self._wlog(f"🔍 种子 {repo} 无法访问，追踪用户")
-                        self._trace_user_repos(repo, "main", "[404user1]")
-                    continue
-                if ri.get('disabled'):
-                    self._wlog(f"❌ {_prefix} 已禁用 | {self._qt()} | {self._qs()}")
-                    continue
-                if ri.get('size', 0) == 0:
-                    self._wlog(f"❌ {_prefix} 大小为0 | {self._qt()} | {self._qs()}")
-                    continue
-                pushed = ri.get("pushed_at", "")
-                br = ri.get("default_branch", "main")
-                if not self._main_put(("种子仓库", repo,
-                                       {"branch": br, "size": ri.get("size", -1),
-                                        "disabled": False, "pushed_at": pushed,
-                                        "seed_key": repo, "is_source": True,
-                                        "language": ri.get("language", ""),
-                                        "tag": "[种子仓库]"})):
-                    self._wlog(f"🗑️ 主队列满，丢弃种子 {repo}")
-                    continue
-                self._branch_cache[repo] = br
-                self._add_seen(repo)
-                self.checked_count += 1
-                self._main_queue_total += 1
-                self._wlog(f"{_prefix} | {self._qt()} | {self._qs()}")
-            except Exception as e:
-                self._wlog(f"⚠️ {_prefix}: {e} | {self._qt()}")
+            if not self._main_put(("种子仓库", repo,
+                                   {"seed_key": repo,
+                                    "tag": "[种子仓库]"})):
+                self._wlog(f"🗑️ 主队列满，丢弃种子 {repo}")
+                continue
+            self.checked_count += 1
+            self._main_queue_total += 1
+            self._wlog(f"{_prefix} | {self._qt()} | {self._qs()}")
             self._update_seed_entry(repo_seeds, repo, 0)
             time.sleep(REPO_SLEEP_SECONDS)
         self._worker_local.prefix = ""
@@ -989,7 +982,6 @@ class Collector:
         while True:
             item = None
             from_queue = None
-            producer_held = False
 
             # ═══ 阶段 0: 停止检查（运行时超时/限流 → 退出） ═══
             if self._runtime_exceeded() or self.limiter.should_stop():
@@ -1001,59 +993,32 @@ class Collector:
                 _, _, _, item = disc_queue.get_nowait()
                 from_queue = disc_queue
             except Empty:
-                # ═══ 阶段 2: 阈值调度 ═══
-                if disc_queue.qsize() >= DISC_FORCE_CONSUME_AT:
-                    # 发现队列积压 → 强制消费
+                # ═══ 阶段 2: 主队列（只有 disc 清空才取，一次一个主仓库） ═══
+                if disc_queue.qsize() <= DISC_MAIN_OK_AT:
+                    try:
+                        _, _, item = main_queue.get(timeout=30)
+                        from_queue = main_queue
+                        if main_queue.qsize() < 20:
+                            self._search_resume.set()
+                    except Empty:
+                        # 主队列也空 → 等发现队列（理论上 disc 空时才会到这）
+                        try:
+                            _, _, _, item = disc_queue.get(timeout=5)
+                            from_queue = disc_queue
+                        except Empty:
+                            tn = threading.current_thread().name
+                            last = self._worker_idle_since.get(tn, 0)
+                            if time.time() - last > 120:
+                                self._worker_idle_since[tn] = time.time()
+                                self._wlog(f"⏳ 等待任务中...")
+                            continue
+                else:
+                    # disc 非空 → 等发现队列
                     try:
                         _, _, _, item = disc_queue.get(timeout=5)
                         from_queue = disc_queue
                     except Empty:
                         continue
-                elif disc_queue.qsize() <= DISC_MAIN_OK_AT:
-                    # 发现队列少 → 可以取主队列（需生产令牌）
-                    if self._main_producer.acquire(blocking=False):
-                        producer_held = True
-                        try:
-                            _, _, item = main_queue.get(timeout=30)
-                            from_queue = main_queue
-                            if main_queue.qsize() < 20:
-                                self._search_resume.set()
-                        except Empty:
-                            # 主队列也空 → 等发现队列
-                            try:
-                                _, _, _, item = disc_queue.get(timeout=5)
-                                from_queue = disc_queue
-                            except Empty:
-                                tn = threading.current_thread().name
-                                last = self._worker_idle_since.get(tn, 0)
-                                if time.time() - last > 120:
-                                    self._worker_idle_since[tn] = time.time()
-                                    self._wlog(f"⏳ 等待任务中...")
-                                continue
-                    else:
-                        # 令牌被占满 → 等发现队列
-                        try:
-                            _, _, _, item = disc_queue.get(timeout=5)
-                            from_queue = disc_queue
-                        except Empty:
-                            continue
-                else:
-                    # 中间地带 → 优先取发现队列，超时后取主队列（需令牌）
-                    try:
-                        _, _, _, item = disc_queue.get(timeout=5)
-                        from_queue = disc_queue
-                    except Empty:
-                        if self._main_producer.acquire(blocking=False):
-                            producer_held = True
-                            try:
-                                _, _, item = main_queue.get(timeout=30)
-                                from_queue = main_queue
-                                if main_queue.qsize() < 20:
-                                    self._search_resume.set()
-                            except Empty:
-                                continue
-                        else:
-                            continue
 
             # ═══ 阶段 3: 处理任务 ═══
             try:
@@ -1093,8 +1058,6 @@ class Collector:
                 traceback.print_exc()
                 self._wlog(f"⚠️ Worker 异常: {repo if 'repo' in dir() else '?'}: {e}")
             finally:
-                if producer_held:
-                    self._main_producer.release()
                 if from_queue is not None:
                     try:
                         from_queue.task_done()
@@ -1510,7 +1473,8 @@ class Collector:
         # 已处理仓库缓存检查（pushed_at 未变→跳过解析，但仍追踪）
         if self._check_seen_cache(repo, pushed_at):
             self._wlog(f"⏭️ 仓库 {github_url} 未更新，跳过解析（仍追踪）")
-            self._trace_repo(repo, branch, pushed_at, tag)
+            if self._should_trace(tag):
+                self._trace_repo(repo, branch, pushed_at, tag)
             return (0, 0)
 
         # 有效性检查
@@ -1533,7 +1497,8 @@ class Collector:
                     self._mark_seen_cache(repo, pushed_at)
                     self._wlog(f"⏭️ 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，跳过解析（仍追踪）")
-                    self._trace_repo(repo, branch, pushed_at, tag)
+                    if self._should_trace(tag):
+                        self._trace_repo(repo, branch, pushed_at, tag)
                     return (0, 0)
             except Exception:
                 pass  # 时间解析失败，放行
@@ -1586,8 +1551,9 @@ class Collector:
                 self._update_seed_entry(seeds, repo, repo_nodes, pushed_at)
                 self._wlog(f"🌱 加入种子: {repo} (+{repo_nodes} 节点)")
 
-        # Fork 链追踪 + 用户仓库遍历（不受节点产出限制）
-        self._trace_repo(repo, branch, pushed_at, tag)
+        # Fork 链追踪 + 用户仓库遍历（按标志位判定是否追踪）
+        if self._should_trace(tag):
+            self._trace_repo(repo, branch, pushed_at, tag)
 
         return (repo_stats[0], repo_stats[1])
 
