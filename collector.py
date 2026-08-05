@@ -38,7 +38,7 @@ from config import (
     PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
     FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
     FORK_CHILD_MAX, FORK_SIBLING_MAX, FORK_PARENT_TRACE_ENABLED, FORK_PER_PAGE,
-    MAX_TRACE_DEPTH, TRACE_USER_ON_404,
+    MAX_TRACE_DEPTH, TRACE_USER_ON_404, MAIN_TAKE_COOLDOWN,
     AUTO_SEED_ENABLED,
     TOPIC_SEARCH_ENABLED, TOPIC_QUERIES,
     README_SEARCH_ENABLED, README_QUERIES, README_MAX_PAGES,
@@ -156,7 +156,8 @@ class Collector:
         self._search_resume = threading.Event()         # Worker 唤醒搜索的信号
         self._search_resume.set()                       # 初始允许搜索
         self._log_sink = LogSink()                      # 日志汇聚（单消费者线程）
-        self._main_gate = threading.Semaphore(1)        # 主队列闸门：同时最多 1 个源头活跃
+        self._main_take_lock = threading.Lock()         # 取主队列互斥锁（原子性）
+        self._worker_last_main = {}                      # thread name → 上次取主队列时间
         self._reset_waiting = False                     # 配额等待去重标志
         self._worker_local = threading.local()          # 线程独立前缀
         self._disc_seq = None                             # 发现队列 PriorityQueue 序号（分配在 run 中）
@@ -1031,20 +1032,46 @@ class Collector:
         self._worker_local.prefix = ""
         self._save_seed_file(SEED_REPOS_FILE, "repos", self._repo_seeds)
 
+    def _try_take_main(self, main_queue: Queue, disc_queue: PriorityQueue):
+        """原子取主队列：互斥锁 + 冷却 + disc 阈值。
+
+        锁只保护"取"的动作（毫秒级），不持有到处理完。
+        每个 Worker 取完后进入冷却期（MAIN_TAKE_COOLDOWN），
+        冷却结束且 disc 低于阈值才补充下一个源头。
+
+        Returns:
+            (item, True) 取到主队列任务；(None, False) 未取。
+        """
+        if not self._main_take_lock.acquire(blocking=False):
+            return None, False  # 其他 Worker 正在取
+        try:
+            tn = threading.current_thread().name
+            last = self._worker_last_main.get(tn, 0)
+            if time.time() - last < MAIN_TAKE_COOLDOWN:
+                return None, False  # 冷却中
+            if disc_queue.qsize() > DISC_MAIN_OK_AT:
+                return None, False  # disc 未低于阈值
+            try:
+                _, _, item = main_queue.get(timeout=5)
+                self._worker_last_main[tn] = time.time()  # 记录取的时间
+                return item, True
+            except Empty:
+                return None, False  # 主队列空
+        finally:
+            self._main_take_lock.release()
+
     def _pool_worker(self, main_queue: Queue, disc_queue: PriorityQueue):
         """共用线程池 Worker — 阈值调度模式。
 
         策略：
           1. 永远优先消费发现队列（PriorityQueue，旧的优先处理）
           2. 发现队列 ≥ DISC_FORCE_CONSUME_AT → 强制消费发现队列
-          3. 发现队列 ≤ DISC_MAIN_OK_AT → 可以取主队列
-          4. 中间地带自由竞争
-          5. 次级限流时自动降级等待
+          3. 发现队列 ≤ DISC_MAIN_OK_AT → 原子取主队列（互斥+冷却）
+          4. 次级限流时自动降级等待
         """
         while True:
             item = None
             from_queue = None
-            gate_held = False
 
             # ═══ 阶段 0: 停止检查（运行时超时/限流 → 退出） ═══
             if self._runtime_exceeded() or self.limiter.should_stop():
@@ -1056,17 +1083,17 @@ class Collector:
                 _, _, _, item = disc_queue.get_nowait()
                 from_queue = disc_queue
             except Empty:
-                # ═══ 阶段 2: 主队列（disc 清空 + 闸门互斥，一次一个源头） ═══
-                if disc_queue.qsize() <= DISC_MAIN_OK_AT \
-                        and self._main_gate.acquire(blocking=False):
-                    gate_held = True
-                    try:
-                        _, _, item = main_queue.get(timeout=30)
+                # ═══ 阶段 2: 主队列（原子取：互斥 + 冷却 + disc 阈值） ═══
+                # 只有 disc 低于阈值且本 Worker 冷却结束才取主队列；
+                # 锁保证同一瞬间只有一个 Worker 执行取动作。
+                if disc_queue.qsize() <= DISC_MAIN_OK_AT:
+                    item, took = self._try_take_main(main_queue, disc_queue)
+                    if took:
                         from_queue = main_queue
                         if main_queue.qsize() < 20:
                             self._search_resume.set()
-                    except Empty:
-                        # 主队列也空 → 等发现队列（理论上 disc 空时才会到这）
+                    else:
+                        # 未取到（冷却中/主队列空）→ 等发现队列
                         try:
                             _, _, _, item = disc_queue.get(timeout=5)
                             from_queue = disc_queue
@@ -1123,8 +1150,6 @@ class Collector:
                 traceback.print_exc()
                 self._wlog(f"⚠️ Worker 异常: {repo if 'repo' in dir() else '?'}: {e}")
             finally:
-                if gate_held:
-                    self._main_gate.release()
                 if from_queue is not None:
                     try:
                         from_queue.task_done()
