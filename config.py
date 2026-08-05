@@ -865,11 +865,9 @@ ENABLE_RAW_RECURSIVE = True
 # 最多递归发现的仓库数量
 # 默认 500。README/聚合文件中的链接发现价值高，限制太狠会漏掉来源仓库。
 # 注意：每个发现的仓库都会触发 repo info 查询（消耗 API 配额）。
+# 递归深度不再单独配置——统一由 MAX_TRACE_DEPTH 控制（_should_trace），
+# 防止 [raw2]/[raw3] 继续发现产生 [user3]/[raw4] 等超层条目。
 MAX_RECURSIVE_REPOS = 500
-
-# 最大 raw 递归深度。
-# 默认 5。层数越深发现越多，但仓库重复度也越高。
-MAX_RECURSIVE_DEPTH = 5
 
 # ==================== Partial Clone（大仓库处理） ====================
 

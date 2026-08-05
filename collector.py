@@ -51,7 +51,7 @@ from config import (
     DISC_FORCE_CONSUME_AT, DISC_MAIN_OK_AT, DISC_PUT_BACKPRESSURE,
     API_MAX_PER_MINUTE, API_PAUSE_AT_RATE, API_RESUME_AT_RATE,
     SECONDARY_RATE_LIMIT_DEGRADE, DEGRADE_WORKERS,
-    ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS, MAX_RECURSIVE_DEPTH,
+    ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS,
     PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT,
     AUTO_SEED_MIN_NODES_FOR_SEED,
     SEED_MAX_AGE_HOURS, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
@@ -2326,7 +2326,9 @@ class Collector:
             self._flush_batch()
 
         # ---- raw 链接递归发现 ----
-        if ENABLE_RAW_RECURSIVE and raw_depth < MAX_RECURSIVE_DEPTH \
+        # 深度由 MAX_TRACE_DEPTH 统一控制（_should_trace），
+        # 防止 [raw2]/[raw3] 继续发现产生 [user3]/[raw4] 等超层条目。
+        if ENABLE_RAW_RECURSIVE and self._should_trace(tag) \
                 and self.recursive_count < MAX_RECURSIVE_REPOS:
             self._discover_recursive(raw_url, content, raw_depth, tag)
 
