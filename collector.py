@@ -21,7 +21,7 @@ import re
 import pickle
 import subprocess
 import threading
-from queue import Queue, PriorityQueue, Empty
+from queue import Queue, PriorityQueue, Empty, Full as QueueFull
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
@@ -75,6 +75,30 @@ from parsers import (
 )
 from utils import now_str
 from quota_manager import QuotaManager
+
+
+class LogSink:
+    """日志汇聚器：Worker 只做 put_nowait（不阻塞），单消费者线程唯一打印。
+
+    解决：多线程直接 print 挤行（无锁）vs 全局锁阻塞生产（有锁）的矛盾。
+    - 无挤行：单线程打印，天然有序
+    - 不阻塞：队列满时丢弃（日志不拖慢生产）
+    """
+
+    def __init__(self, maxsize: int = 20000):
+        self._q = queue.Queue(maxsize=maxsize)
+        threading.Thread(target=self._run, name="LogSink", daemon=True).start()
+
+    def emit(self, msg: str):
+        try:
+            self._q.put_nowait(msg)
+        except queue.Full:
+            pass  # 日志队列满 → 丢弃（高水位保护）
+
+    def _run(self):
+        while True:
+            msg = self._q.get()
+            print(msg, flush=True)
 
 
 class Collector:
@@ -131,6 +155,8 @@ class Collector:
         self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
         self._search_resume = threading.Event()         # Worker 唤醒搜索的信号
         self._search_resume.set()                       # 初始允许搜索
+        self._log_sink = LogSink()                      # 日志汇聚（单消费者线程）
+        self._main_gate = threading.Semaphore(1)        # 主队列闸门：同时最多 1 个源头活跃
         self._reset_waiting = False                     # 配额等待去重标志
         self._worker_local = threading.local()          # 线程独立前缀
         self._disc_seq = None                             # 发现队列 PriorityQueue 序号（分配在 run 中）
@@ -330,13 +356,15 @@ class Collector:
         return any(t <= depth for t in traced)
 
     def _wlog(self, msg: str, **kwargs):
-        """统一日志：优先用显式前缀，否则 fallback 到线程名。"""
+        """统一日志：优先用显式前缀，否则 fallback 到线程名。
+
+        经 LogSink 队列输出：单消费者线程打印，不挤行、不阻塞生产线程。
+        """
         tn = getattr(getattr(self, '_worker_local', None), 'prefix', None)
         if tn is None:
             tn = threading.current_thread().name
         prefix = f"[{tn}] " if tn else ""
-        kwargs.setdefault('flush', True)
-        print(f"[{now_str()}] {prefix}{msg}", **kwargs)
+        self._log_sink.emit(f"[{now_str()}] {prefix}{msg}")
 
     def _qs(self) -> str:
         """队列状态：主队列 + 发现队列 + 标志位分布。"""
@@ -1016,6 +1044,7 @@ class Collector:
         while True:
             item = None
             from_queue = None
+            gate_held = False
 
             # ═══ 阶段 0: 停止检查（运行时超时/限流 → 退出） ═══
             if self._runtime_exceeded() or self.limiter.should_stop():
@@ -1027,8 +1056,10 @@ class Collector:
                 _, _, _, item = disc_queue.get_nowait()
                 from_queue = disc_queue
             except Empty:
-                # ═══ 阶段 2: 主队列（只有 disc 清空才取，一次一个主仓库） ═══
-                if disc_queue.qsize() <= DISC_MAIN_OK_AT:
+                # ═══ 阶段 2: 主队列（disc 清空 + 闸门互斥，一次一个源头） ═══
+                if disc_queue.qsize() <= DISC_MAIN_OK_AT \
+                        and self._main_gate.acquire(blocking=False):
+                    gate_held = True
                     try:
                         _, _, item = main_queue.get(timeout=30)
                         from_queue = main_queue
@@ -1092,6 +1123,8 @@ class Collector:
                 traceback.print_exc()
                 self._wlog(f"⚠️ Worker 异常: {repo if 'repo' in dir() else '?'}: {e}")
             finally:
+                if gate_held:
+                    self._main_gate.release()
                 if from_queue is not None:
                     try:
                         from_queue.task_done()
@@ -1422,16 +1455,14 @@ class Collector:
         """根据标志位判断是否需继续追踪。
 
         - 源头（[种子仓库] 等）→ 追踪
-        - [userN]/[404userN] → 追踪（只 fork/raw，不追踪 user，见 _trace_repo）
-        - [forkN]/[rawN] 且 N < MAX_TRACE_DEPTH → 追踪
-        - [forkN]/[rawN] 且 N >= MAX_TRACE_DEPTH → 不追踪
+        - [userN]/[404userN]/[forkN]/[rawN] 且 N < MAX_TRACE_DEPTH → 追踪
+        - N >= MAX_TRACE_DEPTH → 不追踪（user 类同样受层数限制，
+          防止 [user1]→[fork2]→[user2]→[fork3]... 无底洞）
         """
         if tag in self.SOURCE_TAGS:
             return True
         kind = self._tag_kind(tag)
-        if kind in ("user", "404user"):
-            return True  # user 类可追踪（fork/raw）
-        if kind in ("fork", "raw"):
+        if kind in ("user", "404user", "fork", "raw"):
             return self._tag_depth(tag) < MAX_TRACE_DEPTH
         return True  # 未知标志位默认追踪（保守）
 
@@ -1504,7 +1535,9 @@ class Collector:
                 language = ri.get("language", language)
             else:
                 # 仓库无法访问（404/隐藏/删除）→ 追踪该用户的其他仓库
-                if USER_REPOS_ENABLED and TRACE_USER_ON_404:
+                # user 类仓库不追踪 user（防 user→user 无底洞）
+                if USER_REPOS_ENABLED and TRACE_USER_ON_404 \
+                        and self._tag_kind(tag) not in ("user", "404user"):
                     self._wlog(f"🔍 仓库 {repo} 无法访问，追踪用户")
                     self._trace_user_repos(
                         repo, "main", self._child_tag(tag, "404user"))
@@ -1617,7 +1650,7 @@ class Collector:
           2. 获取父仓库的 fork 列表
           3. 逐个处理未在 seen_repos 中的 fork 仓库
         """
-        self._wlog(f"🔗 开始 Fork 链追踪 ({repo})")
+        self._wlog(f"🔗 {tag} 开始 Fork 链追踪 ({repo})")
 
         # 1. 查父仓库
         repo_data = self.http.get_json(
@@ -1632,7 +1665,7 @@ class Collector:
         parent_name = parent.get("full_name")
         if not parent_name:
             return
-        self._wlog(f"  父仓库: {parent_name}")
+        self._wlog(f"  {tag} 父仓库: {parent_name}")
 
         # 2. 如果父仓库还没处理过，先处理父仓库
         if not self._is_seen(parent_name):
@@ -1695,7 +1728,7 @@ class Collector:
     def _trace_child_forks(self, repo: str, branch: str,
                            tag: str = "[种子仓库]"):
         """遍历本仓库的直接 fork（子仓库），查其节点产出。"""
-        self._wlog(f"🔗 查子仓库: {repo}")
+        self._wlog(f"🔗 {tag} 查子仓库: {repo}")
         qualified = []
         max_pages = (FORK_CHILD_MAX // FORK_PER_PAGE) + 1
         for page in range(1, max_pages + 1):
@@ -1755,7 +1788,7 @@ class Collector:
         通过 GET /users/{owner}/repos API 获取仓库列表，逐个检查。
         """
         owner = repo.split("/")[0]
-        self._wlog(f"👤 遍历用户仓库: {owner}")
+        self._wlog(f"👤 {tag} 遍历用户仓库: {owner}")
 
         repo_pattern = re.compile(
             r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
@@ -2356,7 +2389,7 @@ class Collector:
             if self.recursive_count >= MAX_RECURSIVE_REPOS:
                 break
 
-            self._wlog(f"🔗 递归发现仓库 {full_name} "
+            self._wlog(f"🔗 {tag} 递归发现仓库 {full_name} "
                   f"(来源 {source_url})")
             self.recursive_count += 1
             time.sleep(REPO_SLEEP_SECONDS)
@@ -2376,7 +2409,9 @@ class Collector:
                     if not repo_info:
                         self._mark_repo_not_found(full_name)
                         # 仓库被删除 → 追踪该用户的其他仓库（[404userN] 标志）
-                        if USER_REPOS_ENABLED and TRACE_USER_ON_404:
+                        # user 类仓库不追踪 user（防 user→user 无底洞）
+                        if USER_REPOS_ENABLED and TRACE_USER_ON_404 \
+                                and self._tag_kind(tag) not in ("user", "404user"):
                             owner = full_name.split("/")[0]
                             self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户 {owner}")
                             self._trace_user_repos(
@@ -2420,7 +2455,7 @@ class Collector:
             if self.recursive_count >= MAX_RECURSIVE_REPOS:
                 break
 
-            self._wlog(f"🔗 发现仓库链接 {full_name} "
+            self._wlog(f"🔗 {tag} 发现仓库链接 {full_name} "
                   f"(来源 {source_url})")
             self.recursive_count += 1
             time.sleep(REPO_SLEEP_SECONDS)
@@ -2439,7 +2474,8 @@ class Collector:
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
                         self._mark_repo_not_found(full_name)
-                        if USER_REPOS_ENABLED and TRACE_USER_ON_404:
+                        if USER_REPOS_ENABLED and TRACE_USER_ON_404 \
+                                and self._tag_kind(tag) not in ("user", "404user"):
                             owner = full_name.split("/")[0]
                             self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户 {owner}")
                             self._trace_user_repos(
@@ -2452,7 +2488,9 @@ class Collector:
             self._branch_cache[full_name] = branch
             # README/聚合文件中的来源仓库 → 直接追踪该用户的所有仓库
             # （来源仓库的 owner 大概率有多个节点仓库，tag=[userN+1]）
-            if USER_REPOS_ENABLED:
+            # user 类仓库不追踪 user（防 user→user 无底洞）
+            if USER_REPOS_ENABLED \
+                    and self._tag_kind(tag) not in ("user", "404user"):
                 self._wlog(f"👤 来源仓库 {full_name} → 追踪用户 {full_name.split('/')[0]}")
                 self._trace_user_repos(full_name, branch,
                                        self._child_tag(tag, "user"))
