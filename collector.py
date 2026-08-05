@@ -86,13 +86,13 @@ class LogSink:
     """
 
     def __init__(self, maxsize: int = 20000):
-        self._q = queue.Queue(maxsize=maxsize)
+        self._q = Queue(maxsize=maxsize)
         threading.Thread(target=self._run, name="LogSink", daemon=True).start()
 
     def emit(self, msg: str):
         try:
             self._q.put_nowait(msg)
-        except queue.Full:
+        except QueueFull:
             pass  # 日志队列满 → 丢弃（高水位保护）
 
     def _run(self):
