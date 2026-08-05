@@ -591,11 +591,11 @@ DISC_FORCE_CONSUME_AT = 19000
 
 # 发现队列允许取主队列阈值。
 # 作用：发现队列 ≤ 此值时，Worker 可以取主队列（补充源头）。
-# 原理：disc 低于 Worker 数（24）时队列快空了，Worker 取主队列补源头；
-#       disc ≥ 24 时全部消费 disc（队列非空，Worker 满负荷不空转）。
+# 原理：disc 低于此值时队列快空了，Worker 取主队列补源头；
+#       disc ≥ 此值时全部消费 disc（队列非空，Worker 满负荷不空转）。
 #       源头数量自然受限：disc 增长后自动停止补充。
-# 默认值：24（= SHARED_POOL_WORKERS，保证 disc 不长期为空）。
-DISC_MAIN_OK_AT = 24
+# 默认值：200（disc 低于 200 就积极补源头，扩展队列空的时间更少）。
+DISC_MAIN_OK_AT = 200
 
 # 主队列取仓库冷却时间（秒）。
 # 作用：Worker 取完一个主队列仓库后，必须等此时间才能再取。
