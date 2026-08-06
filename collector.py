@@ -54,6 +54,7 @@ from config import (
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS,
     PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT, PARTIAL_CLONE_CONCURRENCY,
     CONTENTS_API_FALLBACK_ENABLED, MONITOR_INTERVAL,
+    MAIN_SOURCE_LIMIT, TRACE_RETRY_DAYS,
     AUTO_SEED_MIN_NODES_FOR_SEED,
     SEED_MAX_AGE_HOURS, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
     SEEN_REPOS_PERSIST_ENABLED, SEEN_REPOS_DIR, SEEN_REPOS_MAX_BYTES,
@@ -136,6 +137,8 @@ class Collector:
         # 日志走模块级单例 log_sink（http_client/quota_manager 共用，全程序统一）
         self._main_take_lock = threading.Lock()         # 取主队列互斥锁（原子性）
         self._worker_last_main = {}                      # thread name → 上次取主队列时间
+        self._source_sem = threading.Semaphore(
+            MAIN_SOURCE_LIMIT if MAIN_SOURCE_LIMIT > 0 else SHARED_POOL_WORKERS)  # 源头并发限制
         self._worker_state = {}                          # thread name → 当前状态（监控用）
         self._clone_sem = threading.Semaphore(PARTIAL_CLONE_CONCURRENCY)  # clone 并发限制
         self._repos_by_result = {"clone_ok": [], "clone_fail": []}  # 结果分类（汇总展示）
@@ -314,7 +317,10 @@ class Collector:
                 self._wlog(f"📝 已处理缓存: {repo}")
 
     def _mark_traced(self, repo: str, pushed_at: str, depth: int):
-        """记录仓库在指定层数被追踪过（低层覆盖高层：1 覆盖 1、2、3...）。"""
+        """记录仓库在指定层数被追踪过（低层覆盖高层：1 覆盖 1、2、3...）。
+
+        记录最近追踪时间 last_traced_at（全局一个，任意层追踪都刷新）。
+        """
         if not SEEN_REPOS_PERSIST_ENABLED or not pushed_at:
             return
         r = repo.lower()
@@ -325,14 +331,16 @@ class Collector:
         traced = existing.setdefault("traced", [])
         if depth not in traced:
             traced.append(depth)
+        existing["last_traced_at"] = time.time()  # 最近追踪时间（超期重追踪用）
         existing.setdefault("hits", 1)
         existing["last_hit"] = datetime.now(timezone.utc).isoformat()
         self.seen_cache[r] = existing
 
     def _is_traced(self, repo: str, pushed_at: str, depth: int) -> bool:
-        """检查仓库在指定层数是否已被追踪过（含低层覆盖）。
+        """检查仓库在指定层数是否已被追踪过（含低层覆盖 + 超期重试）。
 
-        覆盖规则：已追踪层数 t ≤ depth 则视为已追踪（1 覆盖 1、2、3...）。
+        覆盖规则：已追踪层数 t ≤ depth 则视为已追踪（小数字覆盖大数字）。
+        超期：距上次追踪超过 TRACE_RETRY_DAYS 天 → 需要再追踪。
         """
         if not pushed_at:
             return False
@@ -342,7 +350,12 @@ class Collector:
         if entry.get("pushed_at") != pushed_at:
             return False
         traced = entry.get("traced", [])
-        return any(t <= depth for t in traced)
+        if not traced or min(traced) > depth:
+            return False  # 未覆盖（min 小数字覆盖大数字）
+        if TRACE_RETRY_DAYS <= 0:
+            return True  # 不重追踪
+        last = entry.get("last_traced_at", 0)
+        return time.time() - last < TRACE_RETRY_DAYS * 86400
 
     def _wlog(self, msg: str, **kwargs):
         """统一日志：优先用显式前缀，否则 fallback 到线程名。
@@ -1082,10 +1095,11 @@ class Collector:
     # ── 搜集实现 ──
 
     def _collect_seeds(self, task_queue: Queue):
-        """种子仓库阶段：纯入队（零 API）。
+        """种子仓库阶段：零 API 入队 + 主线程前置跳过。
 
-        所有检查（404/禁用/大小为0/语言过滤/年龄/已处理/404追踪用户）
-        统一由 process_repo 处理——种子只需把仓库放进主队列。
+        追踪跳过在主线程判断（seen_cache 内存查询，0 API）：
+          已解析 + 已追踪（0 层覆盖且未超期）→ 不入队（无价值）。
+        解析跳过仍在 process_repo 内（补查后判断，省 API）。
         """
         repo_seeds = self._repo_seeds
         seed_list = list(repo_seeds.keys())
@@ -1097,6 +1111,13 @@ class Collector:
             if self._should_stop(): break
             if not self._wait_queue_slot(task_queue): break
             _prefix = f"🔵 [种子 {_idx}/{len(seed_list)}] {repo}"
+            # 主线程前置判断：已解析 + 已追踪（0 层覆盖未超期）→ 不入队
+            entry = self.seen_cache.get(repo.lower())
+            if isinstance(entry, dict) and entry.get("parsed") \
+                    and self._is_traced(repo, entry.get("pushed_at", ""), 0):
+                self._wlog(f"⏭️ {_prefix} 已解析且已追踪，跳过")
+                self._update_seed_entry(repo_seeds, repo, 0)
+                continue
             if not self._main_put(("种子仓库", repo,
                                    {"seed_key": repo,
                                     "tag": "[种子仓库]"})):
@@ -1148,30 +1169,35 @@ class Collector:
         self._save_seed_file(SEED_REPOS_FILE, "repos", self._repo_seeds)
 
     def _try_take_main(self, main_queue: Queue, disc_queue: PriorityQueue):
-        """原子取主队列：互斥锁 + 冷却 + disc 阈值。
+        """原子取主队列：互斥锁 + 冷却 + disc 阈值 + 源头并发限制。
 
         锁只保护"取"的动作（毫秒级），不持有到处理完。
         每个 Worker 取完后进入冷却期（MAIN_TAKE_COOLDOWN），
         冷却结束且 disc 低于阈值才补充下一个源头。
+        源头并发：Semaphore(MAIN_SOURCE_LIMIT) 限制同时处理的源头仓库数。
 
         Returns:
-            (item, True) 取到主队列任务；(None, False) 未取。
+            (item, True, source_held) 取到并持有源头令牌；
+            (None, False, False) 未取。
         """
         if not self._main_take_lock.acquire(blocking=False):
-            return None, False  # 其他 Worker 正在取
+            return None, False, False  # 其他 Worker 正在取
         try:
             tn = threading.current_thread().name
             last = self._worker_last_main.get(tn, 0)
             if time.time() - last < MAIN_TAKE_COOLDOWN:
-                return None, False  # 冷却中
+                return None, False, False  # 冷却中
             if disc_queue.qsize() > DISC_MAIN_OK_AT:
-                return None, False  # disc 未低于阈值
+                return None, False, False  # disc 未低于阈值
+            if not self._source_sem.acquire(blocking=False):
+                return None, False, False  # 源头并发已满
             try:
                 _, _, item = main_queue.get(timeout=5)
                 self._worker_last_main[tn] = time.time()  # 记录取的时间
-                return item, True
+                return item, True, True   # 取到并持有源头令牌（处理完 release）
             except Empty:
-                return None, False  # 主队列空
+                self._source_sem.release()
+                return None, False, False  # 主队列空
         finally:
             self._main_take_lock.release()
 
@@ -1187,6 +1213,7 @@ class Collector:
         while True:
             item = None
             from_queue = None
+            source_held = False
 
             # ═══ 阶段 0: 停止检查（运行时超时/限流 → 退出） ═══
             if self._runtime_exceeded() or self.limiter.should_stop():
@@ -1198,17 +1225,19 @@ class Collector:
                 _, _, _, item = disc_queue.get_nowait()
                 from_queue = disc_queue
             except Empty:
-                # ═══ 阶段 2: 主队列（原子取：互斥 + 冷却 + disc 阈值） ═══
+                # ═══ 阶段 2: 主队列（原子取：互斥 + 冷却 + disc 阈值 + 源头并发） ═══
                 # 只有 disc 低于阈值且本 Worker 冷却结束才取主队列；
-                # 锁保证同一瞬间只有一个 Worker 执行取动作。
+                # 锁保证同一瞬间只有一个 Worker 执行取动作；
+                # Semaphore 限制同时处理的源头仓库数。
                 if disc_queue.qsize() <= DISC_MAIN_OK_AT:
-                    item, took = self._try_take_main(main_queue, disc_queue)
+                    item, took, source_held = self._try_take_main(
+                        main_queue, disc_queue)
                     if took:
                         from_queue = main_queue
                         if main_queue.qsize() < 20:
                             self._search_resume.set()
                     else:
-                        # 未取到（冷却中/主队列空）→ 等发现队列
+                        # 未取到（冷却中/源头满/主队列空）→ 等发现队列
                         try:
                             _, _, _, item = disc_queue.get(timeout=5)
                             from_queue = disc_queue
@@ -1267,6 +1296,8 @@ class Collector:
                 self._wlog(f"⚠️ Worker 异常: {repo if 'repo' in dir() else '?'}: {e}")
             finally:
                 self._set_worker_state("空闲")
+                if source_held:
+                    self._source_sem.release()
                 if from_queue is not None:
                     try:
                         from_queue.task_done()
@@ -1674,6 +1705,9 @@ class Collector:
                 self._trace_fork_chain(repo, branch, pushed_at, tag)
         if USER_REPOS_ENABLED and kind not in ("user", "404user"):
             self._trace_user_repos(repo, branch, tag)
+        # 关键词/Code 搜索是新鲜源头（pushed:>24h），每次都要追踪，不记录
+        if tag in ("[关键词搜索]", "[code搜索]"):
+            return
         self._mark_traced(repo, pushed_at, depth)
 
     def process_repo(self, repo: str, branch: str = "main",
