@@ -21,7 +21,7 @@ import re
 import pickle
 import subprocess
 import threading
-from queue import Queue, PriorityQueue, Empty, Full as QueueFull
+from queue import Queue, PriorityQueue, Empty
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
@@ -76,30 +76,7 @@ from parsers import (
 )
 from utils import now_str
 from quota_manager import QuotaManager
-
-
-class LogSink:
-    """日志汇聚器：Worker 只做 put_nowait（不阻塞），单消费者线程唯一打印。
-
-    解决：多线程直接 print 挤行（无锁）vs 全局锁阻塞生产（有锁）的矛盾。
-    - 无挤行：单线程打印，天然有序
-    - 不阻塞：队列满时丢弃（日志不拖慢生产）
-    """
-
-    def __init__(self, maxsize: int = 20000):
-        self._q = Queue(maxsize=maxsize)
-        threading.Thread(target=self._run, name="LogSink", daemon=True).start()
-
-    def emit(self, msg: str):
-        try:
-            self._q.put_nowait(msg)
-        except QueueFull:
-            pass  # 日志队列满 → 丢弃（高水位保护）
-
-    def _run(self):
-        while True:
-            msg = self._q.get()
-            print(msg, flush=True)
+from log_sink import log_sink
 
 
 class Collector:
@@ -156,13 +133,15 @@ class Collector:
         self._repo_checking: Set[str] = set()          # 正在 API 检查中的仓库
         self._search_resume = threading.Event()         # Worker 唤醒搜索的信号
         self._search_resume.set()                       # 初始允许搜索
-        self._log_sink = LogSink()                      # 日志汇聚（单消费者线程）
+        # 日志走模块级单例 log_sink（http_client/quota_manager 共用，全程序统一）
         self._main_take_lock = threading.Lock()         # 取主队列互斥锁（原子性）
         self._worker_last_main = {}                      # thread name → 上次取主队列时间
         self._worker_state = {}                          # thread name → 当前状态（监控用）
         self._clone_sem = threading.Semaphore(PARTIAL_CLONE_CONCURRENCY)  # clone 并发限制
         self._repos_by_result = {"clone_ok": [], "clone_fail": []}  # 结果分类（汇总展示）
         self._quota_exhausted_times = []                # 配额耗尽时间（UTC）
+        self._skip_counts = {"lang": 0, "size0": 0, "disabled": 0,
+                             "stale": 0}                # 跳过原因计数（汇总展示）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
         self._net_bytes_start = self._read_net_bytes()  # 网络基准（程序启动）
@@ -374,7 +353,7 @@ class Collector:
         if tn is None:
             tn = threading.current_thread().name
         prefix = f"[{tn}] " if tn else ""
-        self._log_sink.emit(f"[{now_str()}] {prefix}{msg}")
+        log_sink.emit(f"[{now_str()}] {prefix}{msg}")
 
     def _qs(self) -> str:
         """队列状态：主队列 + 发现队列 + 标志位分布。"""
@@ -442,66 +421,88 @@ class Collector:
             pass
 
     def _net_status(self) -> dict:
-        """网络状态：累计总量/平均/峰值 + 近 60 秒。"""
+        """网络状态（近 60 秒滑动窗口）：总下载/平均/峰值。
+
+        独立 10 秒采样循环维护 _net_samples（60 秒窗口内 6 个点），
+        修复峰值恒 0（之前采样频率 = 输出频率）。
+        """
         now = time.time()
+        # 当前采样（若超过 10 秒未采样则补一个点）
         cur = self._read_net_bytes()
-        # 10 秒采样维护
         if not self._net_samples or now - self._net_samples[-1][0] >= 10:
             self._net_samples.append((now, cur))
             while self._net_samples and now - self._net_samples[0][0] > 60:
                 self._net_samples.pop(0)
-        # 近 60 秒速率（首尾差值）
-        rate_60 = 0.0
-        if len(self._net_samples) >= 2:
-            dt = self._net_samples[-1][0] - self._net_samples[0][0]
-            db = self._net_samples[-1][1] - self._net_samples[0][1]
-            if dt > 0:
-                rate_60 = db / dt / 1024 / 1024  # MB/s
-                self._net_peak = max(self._net_peak, rate_60)
-        # 累计
-        total_mb = (cur - self._net_bytes_start) / 1024 / 1024
-        elapsed = max(1, now - self._monitor_start)
-        avg_mb = total_mb / elapsed
+        if len(self._net_samples) < 2:
+            return {"total_mb": 0.0, "avg_mb": 0.0, "peak_mb": 0.0}
+        # 近 60 秒：首尾差值
+        dt = self._net_samples[-1][0] - self._net_samples[0][0]
+        db = self._net_samples[-1][1] - self._net_samples[0][1]
+        total_mb = max(0, db) / 1024 / 1024
+        avg_mb = total_mb / dt if dt > 0 else 0.0
+        # 峰值：相邻采样点差值的最大速率
+        peak_mb = 0.0
+        for i in range(1, len(self._net_samples)):
+            dti = self._net_samples[i][0] - self._net_samples[i - 1][0]
+            dbi = self._net_samples[i][1] - self._net_samples[i - 1][1]
+            if dti > 0:
+                peak_mb = max(peak_mb, dbi / dti / 1024 / 1024)
+        self._net_peak = max(self._net_peak, peak_mb)
         return {"total_mb": total_mb, "avg_mb": avg_mb,
-                "rate60_mb": rate_60, "peak_mb": self._net_peak}
+                "peak_mb": self._net_peak}
 
     def _monitor_loop(self):
-        """监控线程：每 MONITOR_INTERVAL 秒打印系统状态。
+        """监控线程：每 MONITOR_INTERVAL 秒输出一个集中监控块。
 
-        内容：运行时长/CPU/内存/网络(累计+近60s)/API/队列/Worker 状态。
+        内容（全部近 60 秒数据）：CPU 负载比例/内存比例/网络/API/队列/Worker。
+        采样循环：每 10 秒维护网络采样点（独立于输出）。
         """
+        last_sample = 0.0
         while True:
-            time.sleep(MONITOR_INTERVAL)
+            time.sleep(5)  # 5 秒循环（内部负责 10 秒采样 + 60 秒输出）
             try:
-                elapsed = time.time() - self._monitor_start
-                # CPU 负载
+                now = time.time()
+                # 网络 10 秒采样（独立维护）
+                if now - last_sample >= 10:
+                    last_sample = now
+                    self._net_status()
+                # 60 秒输出
+                if now - self._monitor_start < MONITOR_INTERVAL:
+                    continue
+                if now - getattr(self, '_last_monitor_out', 0) < MONITOR_INTERVAL:
+                    continue
+                self._last_monitor_out = now
+                elapsed = now - self._monitor_start
                 try:
                     load = os.getloadavg()[0]
+                    cpu_pct = min(100, load / 2.0 * 100)  # 2 核，满载 = 2.0
                 except Exception:
-                    load = -1
+                    load, cpu_pct = -1, 0
                 used_gb, total_gb = self._read_mem_gb()
+                mem_pct = used_gb / total_gb * 100 if total_gb else 0
                 net = self._net_status()
-                # Worker 状态
-                wc = []
-                for tn, st in list(self._worker_state.items())[:12]:
-                    wc.append(f"{tn} {st['what']}({time.time()-st['since']:.0f}s)")
-                ws = " | ".join(wc) if wc else "无"
-                print(f"[{now_str()}] 📊 运行 {elapsed:.0f}s | "
-                      f"CPU负载 {load:.2f}(2核满=2.0) | 内存 {used_gb:.1f}/{total_gb:.1f}GB",
-                      flush=True)
-                print(f"[{now_str()}] 📊 网络累计: 总下载 {net['total_mb']/1024:.2f}GB | "
-                      f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s(10秒采样)",
-                      flush=True)
-                print(f"[{now_str()}] 📊 网络近60s: 速率 {net['rate60_mb']:.2f}MB/s",
-                      flush=True)
                 _hw = getattr(getattr(self, 'http', None), '_raw_window', [])
-                _raw60 = sum(b for _, b in _hw) / 1024 / 1024
-                print(f"[{now_str()}] 📊 {self._qt()} | 放行速率 "
-                      f"{self.api_gate.current_rate()}/分钟(近60秒) | "
-                      f"raw下载 {len(_hw)}文件/{_raw60:.1f}MB/近60s",
-                      flush=True)
-                print(f"[{now_str()}] 📊 {self._qs()}", flush=True)
-                print(f"[{now_str()}] 📊 Worker: {ws}", flush=True)
+                _raw60_mb = sum(b for _, b in _hw) / 1024 / 1024
+                # Worker 状态（全部按编号排序）
+                wc = []
+                for i in range(SHARED_POOL_WORKERS):
+                    st = self._worker_state.get(f"W-{i}",
+                                                {"what": "无记录", "since": now})
+                    wc.append(f"W-{i} {st['what']}({now-st['since']:.0f}s)")
+                lines = [
+                    f"📊 [{now.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
+                    f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
+                    f"内存: {mem_pct:.0f}% ({used_gb:.1f}/{total_gb:.1f}GB)",
+                    f"   网络近60s: 总下载 {net['total_mb']/1024:.2f}GB | "
+                    f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s",
+                    f"   API: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
+                    f"放行 {self.api_gate.current_rate()}/分钟 | "
+                    f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB",
+                    f"   {self._qs()}",
+                    f"   Worker: " + " | ".join(wc),
+                ]
+                _ts = now_str()
+                log_sink.emit(f"[{_ts}] " + f"\n[{_ts}] ".join(lines))
             except Exception:
                 pass  # 监控失败不影响主流程
 
@@ -1520,6 +1521,14 @@ class Collector:
             print(f"  配额耗尽: {len(self._quota_exhausted_times)} 次 "
                   f"({', '.join(self._quota_exhausted_times)}) UTC", flush=True)
 
+        # ── 跳过/失败统计 ──
+        print(f"\n===== 仓库处理统计 =====", flush=True)
+        print(f"  404 仓库: {len(self._repo_not_found)} 个（已追踪用户）", flush=True)
+        print(f"  403 仓库: {len(self._repo_forbidden)} 个", flush=True)
+        sk = self._skip_counts
+        print(f"  语言过滤跳过: {sk['lang']} | 空仓库: {sk['size0']} | "
+              f"已禁用: {sk['disabled']} | 超龄跳过解析: {sk['stale']}", flush=True)
+
         # ── 仓库处理结果汇总（clone 相关） ──
         cok = self._repos_by_result.get("clone_ok", [])
         cfail = self._repos_by_result.get("clone_fail", [])
@@ -1691,6 +1700,7 @@ class Collector:
 
         # ── 语言过滤（HTML 等无价值仓库跳过） ──
         if language and language in SKIP_LANGUAGES:
+            self._skip_counts["lang"] += 1
             self._wlog(f"⏭️ {tag} 仓库 {github_url} 主要语言 {language}，跳过")
             return (0, 0)
 
@@ -1729,9 +1739,11 @@ class Collector:
 
         # 有效性检查
         if size == 0:
+            self._skip_counts["size0"] += 1
             self._wlog(f"⚠️ {tag} 仓库 {github_url} 大小为 0，跳过")
             return (0, 0)
         if disabled:
+            self._skip_counts["disabled"] += 1
             self._wlog(f"⚠️ {tag} 仓库 {github_url} 已禁用，跳过")
             return (0, 0)
 
@@ -1749,6 +1761,7 @@ class Collector:
                                                  and not self._is_traced(
                                                      repo, pushed_at,
                                                      self._tag_depth(tag))) else "（无需追踪）"
+                    self._skip_counts["stale"] += 1
                     self._wlog(f"⏭️ {tag} 仓库 {github_url} "
                           f"{age_hours:.0f}h 未更新，跳过解析{trace_txt}")
                     if self._should_trace(tag):

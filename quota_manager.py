@@ -12,6 +12,8 @@ import time
 import threading
 from datetime import datetime, timezone, timedelta
 
+from log_sink import log_sink
+
 
 class QuotaManager:
     """全局 API 配额管理器。
@@ -122,10 +124,11 @@ class QuotaManager:
         window = int(time.time() // 3600)
         if window != self._current_utc_window:
             if self._window_calls > 0:
-                print(f"[{self._bj_now()}] "
-                      f"🕐 UTC {window-1:02d}:00 窗口已用 "
-                      f"{self._window_calls}/{self.max_per_hour} 配额",
-                      flush=True)
+                prev_hh = datetime.fromtimestamp(
+                    (window - 1) * 3600, tz=timezone.utc).strftime('%H:%M')
+                log_sink.emit(f"[{self._bj_now()}] "
+                              f"🕐 UTC {prev_hh} 窗口已用 "
+                              f"{self._window_calls}/{self.max_per_hour} 配额")
             self._current_utc_window = window
             self._window_calls = 0
         self._window_calls += 1
@@ -192,7 +195,7 @@ class QuotaManager:
                     self._reset_time = 0
                     self.exceeded = False
                     if _logged:
-                        print(f"[{self._bj_now()}] 🔄 配额恢复，继续工作", flush=True)
+                        log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
                     return True
                 # 估算：window_start + 3600
                 if now - self.window_start >= 3600:
@@ -211,9 +214,8 @@ class QuotaManager:
                 reset_bj = datetime.fromtimestamp(
                     time.time() + wait, tz=timezone(timedelta(hours=8))
                 ).strftime('%H:%M')
-                print(f"[{self._bj_now()}] "
-                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait/60:.0f}min 至 {reset_bj} 北京时间",
-                      flush=True)
+                log_sink.emit(f"[{self._bj_now()}] "
+                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait/60:.0f}min 至 {reset_bj} 北京时间")
             # 计算等待时长
             if self._reset_time:
                 wait = max(0, self._reset_time - time.time()) + 2

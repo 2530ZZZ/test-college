@@ -20,6 +20,7 @@ from typing import Optional, Dict, Tuple
 from rate_limiter import RateLimiter
 from quota_manager import QuotaManager
 from config import GITHUB_TOKEN
+from log_sink import log_sink
 
 
 class HttpClient:
@@ -268,23 +269,23 @@ class HttpClient:
                 # 202 / 404 / 409：快速失败，不重试
                 # 202 = DuckDuckGo 限流信号，重试只会加重限流
                 if resp.status_code == 202:
-                    print(f"[{_now()}] {operation_name} 202 (限流)，跳过", flush=True)
+                    log_sink.emit(f"[{_now()}] {operation_name} 202 (限流)，跳过")
                     return None
                 if resp.status_code == 404:
-                    print(f"[{_now()}] {operation_name} 404，跳过", flush=True)
+                    log_sink.emit(f"[{_now()}] {operation_name} 404，跳过")
                     return None
                 if resp.status_code == 409:
-                    print(f"[{_now()}] {operation_name} 409，跳过", flush=True)
+                    log_sink.emit(f"[{_now()}] {operation_name} 409，跳过")
                     return None
 
-                print(f"[{_now()}] {operation_name} 返回 {resp.status_code} "
-                      f"(尝试 {attempt}/{max_retries})", flush=True)
+                log_sink.emit(f"[{_now()}] {operation_name} 返回 {resp.status_code} "
+                      f"(尝试 {attempt}/{max_retries})")
 
                 # ---- 403 处理 ----
                 if resp.status_code == 403:
                     wait_seconds = self._parse_ratelimit_wait(resp)
                     if wait_seconds <= 0:
-                        print(f"[{_now()}] {operation_name} 403（访问拒绝），跳过", flush=True)
+                        log_sink.emit(f"[{_now()}] {operation_name} 403（访问拒绝），跳过")
                         return None
 
                     # 检查剩余配额：X-RateLimit-Remaining > 0 说明没限流，是访问控制
@@ -293,22 +294,22 @@ class HttpClient:
                         body = (resp.text or "").lower()
                         if "secondary rate limit" in body:
                             self.quota.secondary_limited = True
-                            print(f"[{_now()}] ⚠️ 次级限流！等待 60s...", flush=True)
+                            log_sink.emit(f"[{_now()}] ⚠️ 次级限流！等待 60s...")
                             time.sleep(60)
                             self.quota.secondary_limited = False
                             continue  # 重试
-                        print(f"[{_now()}] {operation_name} 403（访问被拒，"
-                              f"配额剩余 {int(remaining_hdr)}），跳过", flush=True)
+                        log_sink.emit(f"[{_now()}] {operation_name} 403（访问被拒，"
+                              f"配额剩余 {int(remaining_hdr)}），跳过")
                         return None
 
                     # 计算是否会导致超限
                     if self.limiter.total_wait + wait_seconds > self.limiter.max_wait:
-                        print(f"[{_now()}] 限流等待 {wait_seconds}s 后将超过阈值 "
-                              f"（累计 {self.limiter.total_wait:.0f}s），放弃后续请求", flush=True)
+                        log_sink.emit(f"[{_now()}] 限流等待 {wait_seconds}s 后将超过阈值 "
+                              f"（累计 {self.limiter.total_wait:.0f}s），放弃后续请求")
                         self.limiter.exceeded = True
                         return None
 
-                    print(f"[{_now()}] 触发限流，等待 {wait_seconds}s ...", flush=True)
+                    log_sink.emit(f"[{_now()}] 触发限流，等待 {wait_seconds}s ...")
                     ok = self.limiter.record_wait(wait_seconds)
                     if not ok:
                         return None
@@ -316,18 +317,18 @@ class HttpClient:
 
                 # 其他可重试错误（500, 502, 503 等）
                 wait = 3 + attempt * 2
-                print(f"[{_now()}] {operation_name} 错误，等待 {wait}s 后重试...", flush=True)
+                log_sink.emit(f"[{_now()}] {operation_name} 错误，等待 {wait}s 后重试...")
                 time.sleep(wait)
 
             except requests.exceptions.Timeout:
-                print(f"[{_now()}] {operation_name} 超时 (尝试 {attempt}/{max_retries})", flush=True)
+                log_sink.emit(f"[{_now()}] {operation_name} 超时 (尝试 {attempt}/{max_retries})")
             except requests.exceptions.ConnectionError:
-                print(f"[{_now()}] {operation_name} 连接错误 (尝试 {attempt}/{max_retries})", flush=True)
+                log_sink.emit(f"[{_now()}] {operation_name} 连接错误 (尝试 {attempt}/{max_retries})")
             except Exception as e:
-                print(f"[{_now()}] {operation_name} 异常: {e} (尝试 {attempt}/{max_retries})", flush=True)
+                log_sink.emit(f"[{_now()}] {operation_name} 异常: {e} (尝试 {attempt}/{max_retries})")
                 time.sleep(3 * attempt)
 
-        print(f"[{_now()}] {operation_name} 多次失败，已跳过", flush=True)
+        log_sink.emit(f"[{_now()}] {operation_name} 多次失败，已跳过")
         return None
 
     def get_json(self, url: str, timeout: Tuple[float, float] = (8, 15),
@@ -347,7 +348,7 @@ class HttpClient:
         try:
             return resp.json()
         except Exception as e:
-            print(f"[{_now()}] {operation_name} JSON 解析失败: {e}", flush=True)
+            log_sink.emit(f"[{_now()}] {operation_name} JSON 解析失败: {e}")
             return None
 
     # ---- 私有方法 ----
