@@ -595,7 +595,7 @@ DISC_FORCE_CONSUME_AT = 19000
 #       disc ≥ 此值时全部消费 disc（队列非空，Worker 满负荷不空转）。
 #       源头数量自然受限：disc 增长后自动停止补充。
 # 默认值：200（disc 低于 200 就积极补源头，扩展队列空的时间更少）。
-DISC_MAIN_OK_AT = 200
+DISC_MAIN_OK_AT = 500
 
 # 主队列取仓库冷却时间（秒）。
 # 作用：Worker 取完一个主队列仓库后，必须等此时间才能再取。
@@ -603,14 +603,14 @@ DISC_MAIN_OK_AT = 200
 #       disc 低于阈值（DISC_MAIN_OK_AT）且冷却结束才补充下一个源头。
 #       锁（_main_take_lock）保证同一瞬间只有一个 Worker 执行取动作（原子性）。
 # 默认值：60。建议 30-120。设 0 = 无冷却（不推荐，源头会过快补充）。
-MAIN_TAKE_COOLDOWN = 60
+MAIN_TAKE_COOLDOWN = 30
 
 # 同时允许几个源头仓库（从主队列取出正在处理）运行。
 # 作用：限制扩展仓库的"产生方"数量，防队列膨胀。
 # 原理：Semaphore(N)——Worker 取主队列前 acquire，处理完 release。
 #       与 MAIN_TAKE_COOLDOWN（每 Worker 冷却）互补：冷却限频、此限并发。
 # 默认值：2。设 0 = 不限制（等于 Worker 数）。
-MAIN_SOURCE_LIMIT = 2
+MAIN_SOURCE_LIMIT = 0
 
 # 追踪重试间隔（天）。
 # 作用：已追踪过（同层覆盖）的仓库，距上次追踪超过此天数 → 再追踪。
