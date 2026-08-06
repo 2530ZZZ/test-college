@@ -64,6 +64,11 @@ class HttpClient:
         # API 调用统计（当前实例）
         self.stats = {"total": 0, "by_endpoint": {}, "by_status": {}}
 
+        # raw 下载统计（滑动窗口，最近 60 秒）
+        self._raw_window = []          # [(timestamp, bytes)]
+        self._raw_total = 0            # 累计字节
+        self._raw_count = 0            # 累计文件数
+
         # 构建带重试策略的 Session
         self.session = self._create_session(pool_connections, pool_maxsize)
 
@@ -248,6 +253,16 @@ class HttpClient:
 
                 # 成功
                 if resp.status_code == 200:
+                    # raw 下载统计（滑动窗口 60 秒）
+                    if not is_api_call:
+                        now = time.time()
+                        size = len(resp.content)
+                        self._raw_window.append((now, size))
+                        self._raw_total += size
+                        self._raw_count += 1
+                        while self._raw_window and \
+                                now - self._raw_window[0][0] > 60:
+                            self._raw_window.pop(0)
                     return resp
 
                 # 202 / 404 / 409：快速失败，不重试

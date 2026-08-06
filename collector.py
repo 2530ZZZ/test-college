@@ -52,7 +52,8 @@ from config import (
     API_MAX_PER_MINUTE, API_PAUSE_AT_RATE, API_RESUME_AT_RATE,
     SECONDARY_RATE_LIMIT_DEGRADE, DEGRADE_WORKERS,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS,
-    PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT,
+    PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT, PARTIAL_CLONE_CONCURRENCY,
+    CONTENTS_API_FALLBACK_ENABLED, MONITOR_INTERVAL,
     AUTO_SEED_MIN_NODES_FOR_SEED,
     SEED_MAX_AGE_HOURS, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
     SEEN_REPOS_PERSIST_ENABLED, SEEN_REPOS_DIR, SEEN_REPOS_MAX_BYTES,
@@ -158,7 +159,15 @@ class Collector:
         self._log_sink = LogSink()                      # 日志汇聚（单消费者线程）
         self._main_take_lock = threading.Lock()         # 取主队列互斥锁（原子性）
         self._worker_last_main = {}                      # thread name → 上次取主队列时间
+        self._worker_state = {}                          # thread name → 当前状态（监控用）
+        self._clone_sem = threading.Semaphore(PARTIAL_CLONE_CONCURRENCY)  # clone 并发限制
+        self._repos_by_result = {"clone_ok": [], "clone_fail": []}  # 结果分类（汇总展示）
+        self._quota_exhausted_times = []                # 配额耗尽时间（UTC）
         self._reset_waiting = False                     # 配额等待去重标志
+        self._monitor_start = time.time()               # 监控基准
+        self._net_bytes_start = self._read_net_bytes()  # 网络基准（程序启动）
+        self._net_samples = []                           # [(time, bytes)] 10 秒采样
+        self._net_peak = 0.0                            # 峰值速率（MB/s）
         self._worker_local = threading.local()          # 线程独立前缀
         self._disc_seq = None                             # 发现队列 PriorityQueue 序号（分配在 run 中）
         self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
@@ -397,6 +406,105 @@ class Collector:
         utc = datetime.now(timezone.utc).strftime('%H:%M')
         return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {utc}UTC"
 
+    # ── 系统观测（监控线程） ──
+
+    @staticmethod
+    def _read_net_bytes() -> int:
+        """读 /proc/net/dev 所有接口接收字节总和（系统级总网络下载量）。"""
+        try:
+            with open('/proc/net/dev') as f:
+                lines = f.readlines()[2:]
+            return sum(int(l.split()[1]) for l in lines)
+        except Exception:
+            return 0
+
+    @staticmethod
+    def _read_mem_gb() -> tuple:
+        """读内存使用/总量（GB）。"""
+        try:
+            with open('/proc/meminfo') as f:
+                d = {}
+                for line in f:
+                    k, v = line.split(':', 1)
+                    d[k] = int(v.strip().split()[0])
+            used = (d.get('MemTotal', 0) - d.get('MemAvailable', d.get('MemFree', 0))) / 1024 / 1024
+            total = d.get('MemTotal', 0) / 1024 / 1024
+            return used, total
+        except Exception:
+            return 0.0, 0.0
+
+    def _set_worker_state(self, what: str):
+        """记录当前 Worker 状态（监控显示用）。"""
+        try:
+            self._worker_state[threading.current_thread().name] = \
+                {"what": what, "since": time.time()}
+        except Exception:
+            pass
+
+    def _net_status(self) -> dict:
+        """网络状态：累计总量/平均/峰值 + 近 60 秒。"""
+        now = time.time()
+        cur = self._read_net_bytes()
+        # 10 秒采样维护
+        if not self._net_samples or now - self._net_samples[-1][0] >= 10:
+            self._net_samples.append((now, cur))
+            while self._net_samples and now - self._net_samples[0][0] > 60:
+                self._net_samples.pop(0)
+        # 近 60 秒速率（首尾差值）
+        rate_60 = 0.0
+        if len(self._net_samples) >= 2:
+            dt = self._net_samples[-1][0] - self._net_samples[0][0]
+            db = self._net_samples[-1][1] - self._net_samples[0][1]
+            if dt > 0:
+                rate_60 = db / dt / 1024 / 1024  # MB/s
+                self._net_peak = max(self._net_peak, rate_60)
+        # 累计
+        total_mb = (cur - self._net_bytes_start) / 1024 / 1024
+        elapsed = max(1, now - self._monitor_start)
+        avg_mb = total_mb / elapsed
+        return {"total_mb": total_mb, "avg_mb": avg_mb,
+                "rate60_mb": rate_60, "peak_mb": self._net_peak}
+
+    def _monitor_loop(self):
+        """监控线程：每 MONITOR_INTERVAL 秒打印系统状态。
+
+        内容：运行时长/CPU/内存/网络(累计+近60s)/API/队列/Worker 状态。
+        """
+        while True:
+            time.sleep(MONITOR_INTERVAL)
+            try:
+                elapsed = time.time() - self._monitor_start
+                # CPU 负载
+                try:
+                    load = os.getloadavg()[0]
+                except Exception:
+                    load = -1
+                used_gb, total_gb = self._read_mem_gb()
+                net = self._net_status()
+                # Worker 状态
+                wc = []
+                for tn, st in list(self._worker_state.items())[:12]:
+                    wc.append(f"{tn} {st['what']}({time.time()-st['since']:.0f}s)")
+                ws = " | ".join(wc) if wc else "无"
+                print(f"[{now_str()}] 📊 运行 {elapsed:.0f}s | "
+                      f"CPU负载 {load:.2f}(2核满=2.0) | 内存 {used_gb:.1f}/{total_gb:.1f}GB",
+                      flush=True)
+                print(f"[{now_str()}] 📊 网络累计: 总下载 {net['total_mb']/1024:.2f}GB | "
+                      f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s(10秒采样)",
+                      flush=True)
+                print(f"[{now_str()}] 📊 网络近60s: 速率 {net['rate60_mb']:.2f}MB/s",
+                      flush=True)
+                _hw = getattr(getattr(self, 'http', None), '_raw_window', [])
+                _raw60 = sum(b for _, b in _hw) / 1024 / 1024
+                print(f"[{now_str()}] 📊 {self._qt()} | 放行速率 "
+                      f"{self.api_gate.current_rate()}/分钟(近60秒) | "
+                      f"raw下载 {len(_hw)}文件/{_raw60:.1f}MB/近60s",
+                      flush=True)
+                print(f"[{now_str()}] 📊 {self._qs()}", flush=True)
+                print(f"[{now_str()}] 📊 Worker: {ws}", flush=True)
+            except Exception:
+                pass  # 监控失败不影响主流程
+
     def _disc_put(self, item: tuple, label: str = ""):
         """放入发现队列（PriorityQueue）。
 
@@ -448,6 +556,9 @@ class Collector:
                 first = True
         if first:
             self._wlog(f"⏳ 配额耗尽 | {self._qs()}")
+            self._quota_exhausted_times.append(
+                datetime.now(timezone.utc).strftime('%H:%M'))
+        self._set_worker_state("等待配额")
         try:
             return self.quota_mgr.wait_for_reset(self._runtime_exceeded)
         finally:
@@ -870,6 +981,9 @@ class Collector:
                                     name=f"W-{i}", daemon=True)
                    for i in range(SHARED_POOL_WORKERS)]
         for w in workers: w.start()
+        # 监控线程（系统状态观测）
+        threading.Thread(target=self._monitor_loop, name="Monitor",
+                         daemon=True).start()
 
         # 阶段专用 http
         http = HttpClient(token=self.token, rate_limiter=self.limiter,
@@ -1137,6 +1251,7 @@ class Collector:
                                        quota_manager=self.quota_mgr,
                                        api_gate=self.api_gate)
                 _t0 = time.time()
+                self._set_worker_state(f"处理 {tag} {repo}")
                 self._wlog(f"🔧 开始处理 {tag} {repo}")
                 extracted, added = self.process_repo(repo, **kwargs)
                 self._wlog(f"✅ 完成 {tag} {repo} | 提取 {extracted} | 新增 {added} "
@@ -1150,6 +1265,7 @@ class Collector:
                 traceback.print_exc()
                 self._wlog(f"⚠️ Worker 异常: {repo if 'repo' in dir() else '?'}: {e}")
             finally:
+                self._set_worker_state("空闲")
                 if from_queue is not None:
                     try:
                         from_queue.task_done()
@@ -1382,6 +1498,38 @@ class Collector:
         fc = len(self.failed_candidates_buffer)
         if fc > 0:
             print(f"  解析失败文件: {fc} 个 → 详见 failed_candidates.txt", flush=True)
+
+        # ── 系统数据 ──
+        net = self._net_status()
+        try:
+            load = os.getloadavg()[0]
+        except Exception:
+            load = -1
+        used_gb, total_gb = self._read_mem_gb()
+        print(f"\n===== 系统数据 =====", flush=True)
+        print(f"  运行时长: {elapsed_seconds:.0f}s", flush=True)
+        print(f"  CPU 平均负载: {load:.2f}（2核满=2.0）", flush=True)
+        print(f"  内存: {used_gb:.1f}/{total_gb:.1f}GB", flush=True)
+        print(f"  网络: 总下载 {net['total_mb']/1024:.2f}GB | "
+              f"平均 {net['avg_mb']:.2f}MB/s | "
+              f"峰值 {net['peak_mb']:.2f}MB/s(10秒采样)", flush=True)
+        raw_agg = getattr(self.http, '_raw_total', 0) if hasattr(self, 'http') else 0
+        raw_cnt = getattr(self.http, '_raw_count', 0) if hasattr(self, 'http') else 0
+        print(f"  raw 下载: {raw_cnt} 文件 / {raw_agg/1024/1024:.1f}MB", flush=True)
+        if self._quota_exhausted_times:
+            print(f"  配额耗尽: {len(self._quota_exhausted_times)} 次 "
+                  f"({', '.join(self._quota_exhausted_times)}) UTC", flush=True)
+
+        # ── 仓库处理结果汇总（clone 相关） ──
+        cok = self._repos_by_result.get("clone_ok", [])
+        cfail = self._repos_by_result.get("clone_fail", [])
+        print(f"\n===== Partial Clone 结果 =====", flush=True)
+        print(f"  clone 成功: {len(cok)} 个", flush=True)
+        print(f"  clone 失败(放弃): {len(cfail)} 个", flush=True)
+        for u in cfail[:50]:
+            print(f"    {u}", flush=True)
+        if len(cfail) > 50:
+            print(f"    ... 其余 {len(cfail)-50} 个略", flush=True)
         print(f"{'='*60}", flush=True)
 
     def search_query(self, query: str):
@@ -1631,20 +1779,23 @@ class Collector:
                         repo, actual_branch, has_nodes_flag, raw_depth, repo_stats, tag)
 
             if not success:
-                self._wlog(f"树 API 失败，回退到 Contents API")
+                if CONTENTS_API_FALLBACK_ENABLED:
+                    self._wlog(f"树 API 失败，回退到 Contents API")
+                    try:
+                        self.process_file_tree(repo, "", branch, has_nodes_flag,
+                                               repo_stats, tag)
+                    except RuntimeError:
+                        raise
+                else:
+                    self._wlog(f"树 API 失败，放弃（Contents 已关闭）")
+        else:
+            # USE_RECURSIVE_TREE=False 路径
+            if CONTENTS_API_FALLBACK_ENABLED:
                 try:
                     self.process_file_tree(repo, "", branch, has_nodes_flag,
                                            repo_stats, tag)
                 except RuntimeError:
                     raise
-        else:
-            # 回退路径：Contents API 逐层遍历
-            # 直接调用（大仓库保证处理完，配额由 ApiRateGate 管控）
-            try:
-                self.process_file_tree(repo, "", branch, has_nodes_flag,
-                                       repo_stats, tag)
-            except RuntimeError:
-                raise
 
         # 标记已处理
         self._mark_seen_cache(repo, pushed_at)
@@ -1881,10 +2032,23 @@ class Collector:
                     # entries 与 tree API 格式相同，走共用过滤逻辑
                     return self._process_file_list(repo, branch, entries,
                                                    has_nodes, raw_depth, stats, tag)
-                self._wlog(f"Partial Clone 失败，回退到 Contents API")
+                # clone 失败 → 看 Contents 开关
+                if CONTENTS_API_FALLBACK_ENABLED:
+                    self._wlog(f"Partial Clone 失败，回退到 Contents API")
+                    return False
+                # 默认关闭：放弃（大仓库 Contents 遍历是配额黑洞）
+                self._wlog(f"Partial Clone 失败，放弃（Contents 已关闭）")
+                self._repos_by_result["clone_fail"].append(
+                    f"https://github.com/{repo}")
+                return True  # 视为处理完成（无节点）
             else:
-                self._wlog(f"树数据被截断，回退到 Contents API")
-            return False
+                self._wlog(f"树数据被截断（Partial Clone 关闭），放弃")
+                return True
+        entries = data.get('tree', [])
+        if not entries:
+            return True
+        return self._process_file_list(repo, branch, entries, has_nodes,
+                                       raw_depth, stats, tag)
 
         entries = data.get('tree', [])
         if not entries:
@@ -2009,29 +2173,53 @@ class Collector:
         git clone --filter=blob:none 只下载 commit + tree 对象（路径名），
         不下载文件内容（blob）。git ls-tree -r HEAD 输出完整路径。
 
+        并发限制：Semaphore(PARTIAL_CLONE_CONCURRENCY) 防资源竞争。
+        超时处理：Popen(start_new_session) 独立进程组，killpg 只杀自己的 git
+        （不误杀其他 Worker 的 clone）。结果记录到 _repos_by_result 供汇总展示。
+
         Returns:
             [{path, sha, size, type}, ...] 或 None（失败）
         """
         import tempfile
+        import signal
         tmp = tempfile.mkdtemp(prefix="pclone_")
+        acquired = False
         try:
             token = self.token or GITHUB_TOKEN
             if not token:
                 self._wlog(f"⚠️ Partial Clone 无 token，跳过")
                 return None
+            # 并发限制（最多 PARTIAL_CLONE_CONCURRENCY 个 clone）
+            self._clone_sem.acquire()
+            acquired = True
+            self._set_worker_state(f"PartialClone {repo}")
             clone_url = f"https://x-access-token:{token}@github.com/{repo}.git"
-            r = subprocess.run(
+            p = subprocess.Popen(
                 ["git", "clone", "--depth", "1", "--filter=blob:none",
                  "--no-checkout", "--single-branch", f"--branch={branch}",
                  clone_url, tmp],
-                capture_output=True, text=True, timeout=900)
-            if r.returncode != 0:
-                self._wlog(f"⚠️ Partial Clone 失败: {(r.stderr or '')[:200]}")
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                start_new_session=True)  # 独立进程组，killpg 只杀自己
+            try:
+                _, err_text = p.communicate(timeout=PARTIAL_CLONE_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                os.killpg(p.pid, signal.SIGKILL)  # 只杀自己的 git 进程组
+                p.communicate()
+                self._repos_by_result["clone_fail"].append(
+                    f"https://github.com/{repo}")  # 汇总展示
+                self._wlog(f"⚠️ Partial Clone 超时（{PARTIAL_CLONE_TIMEOUT}s），放弃")
+                return None
+            if p.returncode != 0:
+                self._repos_by_result["clone_fail"].append(
+                    f"https://github.com/{repo}")
+                self._wlog(f"⚠️ Partial Clone 失败: {(err_text or '')[:200]}")
                 return None
             r2 = subprocess.run(
                 ["git", "-C", tmp, "ls-tree", "-r", "-l", "HEAD"],
                 capture_output=True, text=True, timeout=300)
             if r2.returncode != 0:
+                self._repos_by_result["clone_fail"].append(
+                    f"https://github.com/{repo}")
                 self._wlog(f"⚠️ ls-tree 失败")
                 return None
             entries = []
@@ -2052,15 +2240,17 @@ class Collector:
                     sz = 0
                 entries.append({"path": path, "sha": sha, "size": sz,
                                 "type": "blob"})
+            self._repos_by_result["clone_ok"].append(
+                f"https://github.com/{repo}")  # 汇总展示
             self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）")
             return entries
-        except subprocess.TimeoutExpired:
-            self._wlog(f"⚠️ Partial Clone 超时（900s），放弃")
-            return None
         except Exception as e:
             self._wlog(f"⚠️ Partial Clone 异常: {e}")
             return None
         finally:
+            if acquired:
+                self._clone_sem.release()
+            self._set_worker_state("空闲")
             shutil.rmtree(tmp, ignore_errors=True)
 
     # ==================== 懒分支名解析 ====================

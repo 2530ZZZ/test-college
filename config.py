@@ -879,12 +879,32 @@ MAX_RECURSIVE_REPOS = 500
 # 原理：Contents API 逐目录遍历每个目录 1 次 API（大仓库 1000-3000 次），
 #       partial clone 只消耗 git 网络流量（~100MB 级 tree 对象）。
 # 默认值：True。建议保持开启。
-# 失败时自动回退到 Contents API 遍历。
 PARTIAL_CLONE_ENABLED = True
 
 # Partial Clone clone 超时（秒）。
 # 默认 900（15 分钟）。大仓库 tree 对象 ~100MB 需 30-60s。
 PARTIAL_CLONE_TIMEOUT = 900
+
+# Partial Clone 同时并发数。
+# 作用：限制同时进行的 git clone 数量，避免资源竞争（网络/磁盘/内存）。
+# 原理：git clone --filter=blob:none 下载 tree 对象 + 本地索引，
+#       并发过多会互相拖慢导致超时（曾 17 次 900s 超时）。
+#       超时 kill 用进程组隔离（start_new_session），只杀自己的 git。
+# 默认值：2。建议 1-4。设 1 = 完全串行。
+PARTIAL_CLONE_CONCURRENCY = 2
+
+# 是否回退到 Contents API 逐目录遍历。
+# 作用：tree 失败 + Partial Clone 失败时的最后手段。
+# 原理：tree+clone 都失败的仓库必然超大（几万目录），
+#       Contents 遍历每目录 1 次核心 API → 配额黑洞（4800/小时被单仓库吃光）。
+#       默认关闭：tree+clone 失败直接放弃（结果在汇总展示）。
+# 默认值：False（关闭，避免配额黑洞）。开启需谨慎。
+CONTENTS_API_FALLBACK_ENABLED = False
+
+# 监控输出间隔（秒）。
+# 作用：监控线程每此间隔打印一次系统状态（CPU/内存/网络/API/队列/Worker）。
+# 默认值：60。建议 30-120。
+MONITOR_INTERVAL = 60
 
 # ==================== 输出配置 ====================
 
