@@ -388,9 +388,11 @@ class Collector:
                 tag_counts[_tag] = tag_counts.get(_tag, 0) + 1
         tag_str = " ".join(f"{k}:{v}" for k, v in
                            sorted(tag_counts.items())) if tag_counts else "空"
+        # Worker 工作率
+        _w, _i, _r = self._worker_stats()
         return (f"主队列 {mq.qsize() if mq else 0}/{MAIN_QUEUE_SIZE} "
                 f"发现队列 {dq.qsize() if dq else 0}/{DISCOVERY_QUEUE_SIZE} "
-                f"[{tag_str}]")
+                f"[{tag_str}] | Worker {_w}忙/{_i}闲({_r}%)")
 
     def _qt(self) -> str:
         """配额状态：剩余/上限 + UTC 时间（看距整点刷新还有多久）。"""
@@ -432,6 +434,20 @@ class Collector:
                 {"what": what, "since": time.time()}
         except Exception:
             pass
+
+    def _worker_stats(self) -> tuple:
+        """Worker 统计：(工作中数, 空闲数, 工作率%)。
+
+        工作 = 状态非"空闲"且非"等待配额"。
+        """
+        working = 0
+        for st in self._worker_state.values():
+            w = st.get("what", "")
+            if w and w not in ("空闲", "等待配额"):
+                working += 1
+        idle = SHARED_POOL_WORKERS - working
+        rate = working * 100 // SHARED_POOL_WORKERS
+        return working, idle, rate
 
     def _net_status(self) -> dict:
         """网络状态（近 60 秒滑动窗口）：总下载/平均/峰值。
@@ -482,7 +498,8 @@ class Collector:
                 # 60 秒输出
                 if now - self._monitor_start < MONITOR_INTERVAL:
                     continue
-                if now - getattr(self, '_last_monitor_out', 0) < MONITOR_INTERVAL:
+                last_out = getattr(self, '_last_monitor_out', None)
+                if last_out is not None and now - last_out < MONITOR_INTERVAL:
                     continue
                 self._last_monitor_out = now
                 elapsed = now - self._monitor_start
@@ -502,6 +519,7 @@ class Collector:
                     st = self._worker_state.get(f"W-{i}",
                                                 {"what": "无记录", "since": now})
                     wc.append(f"W-{i} {st['what']}({now-st['since']:.0f}s)")
+                _w, _i, _r = self._worker_stats()
                 lines = [
                     f"📊 [{now.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
                     f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
@@ -512,7 +530,7 @@ class Collector:
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
                     f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB",
                     f"   {self._qs()}",
-                    f"   Worker: " + " | ".join(wc),
+                    f"   Worker: {_w}忙/{_i}闲({_r}%) | " + " | ".join(wc),
                 ]
                 _ts = now_str()
                 log_sink.emit(f"[{_ts}] " + f"\n[{_ts}] ".join(lines))
@@ -1219,41 +1237,42 @@ class Collector:
             if self._runtime_exceeded() or self.limiter.should_stop():
                 break
 
-            # ═══ 阶段 1: 优先消费发现队列 ═══
-            # disc 元素: (priority, ts, seq, item)，priority 0=不追踪先消费
-            try:
-                _, _, _, item = disc_queue.get_nowait()
-                from_queue = disc_queue
-            except Empty:
-                # ═══ 阶段 2: 主队列（原子取：互斥 + 冷却 + disc 阈值 + 源头并发） ═══
-                # 只有 disc 低于阈值且本 Worker 冷却结束才取主队列；
-                # 锁保证同一瞬间只有一个 Worker 执行取动作；
-                # Semaphore 限制同时处理的源头仓库数。
-                if disc_queue.qsize() <= DISC_MAIN_OK_AT:
-                    item, took, source_held = self._try_take_main(
-                        main_queue, disc_queue)
-                    if took:
-                        from_queue = main_queue
-                        if main_queue.qsize() < 20:
-                            self._search_resume.set()
-                    else:
-                        # 未取到（冷却中/源头满/主队列空）→ 等发现队列
-                        try:
-                            _, _, _, item = disc_queue.get(timeout=5)
-                            from_queue = disc_queue
-                        except Empty:
-                            tn = threading.current_thread().name
-                            last = self._worker_idle_since.get(tn, 0)
-                            if time.time() - last > 120:
-                                self._worker_idle_since[tn] = time.time()
-                                self._wlog(f"⏳ 等待任务中...")
-                            continue
+            # ═══ 阶段 0.5: 阈值+冷却 → 强制取主队列（优先补充源头） ═══
+            # disc 低于阈值且冷却结束 → 先尝试取主队列（原子+源头并发），
+            # 防止 Worker 只消费 disc 到 0 才取主队列（扩展队列长期低值）。
+            if disc_queue.qsize() <= DISC_MAIN_OK_AT:
+                item, took, source_held = self._try_take_main(
+                    main_queue, disc_queue)
+                if took:
+                    from_queue = main_queue
+                    if main_queue.qsize() < 20:
+                        self._search_resume.set()
+                    # 取到源头 → 直接进入阶段 3 处理（不消费 disc）
+                    return_to_phase1 = False
                 else:
-                    # disc 非空 → 等发现队列
+                    # 未取到（冷却中/源头满/主队列空）→ 继续消费 disc
+                    return_to_phase1 = True
+            else:
+                # disc ≥ 阈值 → 不取主队列，消费 disc
+                return_to_phase1 = True
+
+            if return_to_phase1:
+                # ═══ 阶段 1: 消费发现队列 ═══
+                # disc 元素: (priority, ts, seq, item)，priority 0=不追踪先消费
+                try:
+                    _, _, _, item = disc_queue.get_nowait()
+                    from_queue = disc_queue
+                except Empty:
+                    # ═══ 阶段 2: 等待发现队列（disc 空 + 未取到主队列） ═══
                     try:
                         _, _, _, item = disc_queue.get(timeout=5)
                         from_queue = disc_queue
                     except Empty:
+                        tn = threading.current_thread().name
+                        last = self._worker_idle_since.get(tn, 0)
+                        if time.time() - last > 120:
+                            self._worker_idle_since[tn] = time.time()
+                            self._wlog(f"⏳ 等待任务中...")
                         continue
 
             # ═══ 阶段 3: 处理任务 ═══
