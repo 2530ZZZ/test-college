@@ -1191,7 +1191,13 @@ class Collector:
         self._wlog(f"🔵 种子仓库: {len(seed_list)} 个 → 队列")
         for _idx, repo in enumerate(seed_list, 1):
             if self._should_stop(): break
-            if not self._wait_queue_slot(task_queue): break
+            # 种子纯入队：用"队列满才等"（不用搜索阶段的 80/20 背压）。
+            # 主队列保持高水位（200 满时等 work 取走再放）→ 调度平滑，
+            # work 取走一个补一个；种子线程本身毫秒级，
+            # 总时长受 work 处理速度（配额限速 + 大仓库）限制。
+            while task_queue.full() and not self._should_stop():
+                time.sleep(0.5)
+            if self._should_stop(): break
             _prefix = f"[种子 {_idx}/{len(seed_list)}]"
             if not self._main_put(("种子仓库", repo,
                                    {"seed_key": repo,
