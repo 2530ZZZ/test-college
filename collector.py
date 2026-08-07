@@ -155,6 +155,7 @@ class Collector:
         self._cd_progress = ""                          # 如 "2/5 第3/5页"
         self._clone_repos = 0                           # Partial Clone 成功仓库数
         self._clone_files = 0                           # Partial Clone 列出文件数
+        self._last_activity = 0.0                       # 最近一次 _wlog 时间（监控降频信号）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
         self._net_bytes_start = self._read_net_bytes()  # 网络基准（程序启动）
@@ -403,7 +404,10 @@ class Collector:
         """统一日志：优先用显式前缀，否则 fallback 到线程名。
 
         经 LogSink 队列输出：单消费者线程打印，不挤行、不阻塞生产线程。
+        同时刷新 _last_activity（监控降频信号）——任何 work/主线程活动
+        必然打日志；监控块走 log_sink.emit 不经此函数，不污染信号。
         """
+        self._last_activity = time.time()
         tn = getattr(getattr(self, '_worker_local', None), 'prefix', None)
         if tn is None:
             tn = threading.current_thread().name
@@ -537,11 +541,22 @@ class Collector:
                 if now - last_sample >= 10:
                     last_sample = now
                     self._net_status()
-                # 60 秒输出
-                if now - self._monitor_start < MONITOR_INTERVAL:
+                # 动态输出间隔（活动信号判断）：配额耗尽且 60 秒无任何日志
+                # （所有 work 真停，干等配额恢复）→ 10 分钟一次，避免刷屏；
+                # work 仍在处理（0 API 仓库，_last_activity 持续刷新）→
+                # 保持分钟级（额度耗尽期间 work 还能干活，需要监控数据）。
+                # interval 每 5 秒循环重算：配额恢复（exceeded False）或
+                # work 恢复活动（新日志刷新 _last_activity）→ 下一轮立即
+                # 回 60 秒，last_out 已过期 → 立刻输出第一条，及时恢复分钟级。
+                _w, _i, _r = self._worker_stats()
+                if self.quota_mgr.exceeded and now - self._last_activity > 60:
+                    interval = MONITOR_INTERVAL * 10
+                else:
+                    interval = MONITOR_INTERVAL
+                if now - self._monitor_start < interval:
                     continue
                 last_out = getattr(self, '_last_monitor_out', None)
-                if last_out is not None and now - last_out < MONITOR_INTERVAL:
+                if last_out is not None and now - last_out < interval:
                     continue
                 self._last_monitor_out = now
                 elapsed = now - self._monitor_start
@@ -561,7 +576,6 @@ class Collector:
                     st = self._worker_state.get(f"W-{i}",
                                                 {"what": "无记录", "since": now})
                     wc.append(f"W-{i} {st['what']}({now-st['since']:.0f}s)")
-                _w, _i, _r = self._worker_stats()
                 _now_dt = datetime.fromtimestamp(now, tz=timezone.utc)
                 lines = [
                     f"📊 [{_now_dt.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
