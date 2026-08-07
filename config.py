@@ -69,6 +69,7 @@ MAX_TOTAL_RATE_LIMIT_WAIT = 7200
 # 程序最大运行时间（秒），超出后停止搜集、开始保存。
 # GA 默认超时 6 小时（21600s），提前 2 小时收尾留足队列清空 + 保存时间。
 # 默认 14400（4 小时）。设为 0 或 None 表示不限制。
+# 18000(5小时) 19800(5.5小时)
 MAX_RUNTIME_SECONDS = 14400
 
 # ==================== 搜集渠道开关 ====================
@@ -556,7 +557,7 @@ PARALLEL_DOWNLOAD_WORKERS = 8
 # 次级限流保护：API 队列端点限速 + 遇到 403 自动降级。
 # 注意：增大 Worker 时需同步调小 PARALLEL_DOWNLOAD_WORKERS，
 #       避免并行下载线程总数（Worker × 下载线程）超出 GA runner 内存。
-SHARED_POOL_WORKERS = 24
+SHARED_POOL_WORKERS = 36
 
 # 主队列最大长度（搜索渠道：种子/关键词/Code Search）。
 # 作用：满时搜索线程阻塞（背压），防止搜索结果浪费 API 配额。

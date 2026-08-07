@@ -148,6 +148,13 @@ class Collector:
         self._skip_counts = {"lang": 0, "size0": 0, "disabled": 0,
                              "stale": 0}                # 跳过原因计数（汇总展示）
         self._backfill_count = 0                        # 信息补查次数（INFO_BACKFILL 统计）
+        # 阶段进度（监控/完成日志显示）：种子/关键词/Code 处理到第几个
+        self._seed_progress = ""                        # 如 "505/634"
+        self._kw_total = 0                              # 关键词总数（_collect_keywords 设置）
+        self._kw_progress = ""                          # 如 "3/105 第2/5页"
+        self._cd_progress = ""                          # 如 "2/5 第3/5页"
+        self._clone_repos = 0                           # Partial Clone 成功仓库数
+        self._clone_files = 0                           # Partial Clone 列出文件数
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
         self._net_bytes_start = self._read_net_bytes()  # 网络基准（程序启动）
@@ -564,7 +571,11 @@ class Collector:
                     f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s",
                     f"   API: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
-                    f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB",
+                    f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB | "
+                    f"clone {self._clone_repos}仓库/{self._clone_files}文件",
+                    f"   进度: 种子 {self._seed_progress or '-'} | "
+                    f"关键词 {self._kw_progress or '-'} | "
+                    f"Code {self._cd_progress or '-'}",
                     f"   {self._qs()}",
                     f"   Worker: {_w}忙/{_i}闲({_r}%) | " + " | ".join(wc),
                 ]
@@ -1199,6 +1210,7 @@ class Collector:
                 time.sleep(0.5)
             if self._should_stop(): break
             _prefix = f"[种子 {_idx}/{len(seed_list)}]"
+            self._seed_progress = f"{_idx}/{len(seed_list)}"  # 监控显示
             if not self._main_put(("种子仓库", repo,
                                    {"seed_key": repo,
                                     "tag": "[种子仓库]",
@@ -1233,6 +1245,7 @@ class Collector:
                 all_queries.append(q)
 
         self._wlog(f"🔵 关键词: {len(all_queries)} 个")
+        self._kw_total = len(all_queries)  # 进度显示用
         for idx, query in enumerate(all_queries, 1):
             nb = len(self.unique_nodes)
             qs = time.time()
@@ -1401,6 +1414,7 @@ class Collector:
                 if not self._wait_reset():
                     return
             if not self._wait_queue_slot(task_queue): return
+            self._kw_progress = f"{q_idx}/{self._kw_total} 第{page}/{max_p}页"  # 监控显示
             url = (f"https://api.github.com/search/repositories"
                    f"?q={query}&sort=updated&order=desc"
                    f"&per_page={PER_PAGE}&page={page}")
@@ -1429,7 +1443,7 @@ class Collector:
                                         "is_source": True,
                                         "language": item.get("language", ""),
                                         "tag": f"[kw{KEYWORD_TRACE_DEPTH}]",
-                                        "pos": f"[关键词 {q_idx} 第{page}页]"})):
+                                        "pos": f"[关键词 {q_idx}/{self._kw_total} 第{page}/{max_p}页]"})):
                     self._wlog(f"🗑️ 主队列满，丢弃 {repo}")
             time.sleep(PAGE_SLEEP_SECONDS)
 
@@ -1468,6 +1482,7 @@ class Collector:
                     if not self._wait_reset():
                         return
                 if not self._wait_queue_slot(task_queue): return
+                self._cd_progress = f"{idx}/{len(CODE_QUERIES)} 第{page}/{CODE_MAX_PAGES}页"  # 监控显示
 
                 url = (f"https://api.github.com/search/code"
                        f"?q={quote(full_query)}&sort=indexed&order=desc"
@@ -1516,7 +1531,7 @@ class Collector:
                                             "is_source": True,
                                             "language": repo_data.get("language", ""),
                                             "tag": cd_tag,
-                                            "pos": f"[Code {idx}/{len(CODE_QUERIES)} 第{page}页]"})):
+                                            "pos": f"[Code {idx}/{len(CODE_QUERIES)} 第{page}/{CODE_MAX_PAGES}页]"})):
                             self.checked_count += 1
                             self._main_queue_total += 1
                         else:
@@ -2397,6 +2412,9 @@ class Collector:
                                 "type": "blob"})
             self._repos_by_result["clone_ok"].append(
                 f"https://github.com/{repo}")  # 汇总展示
+            with self._state_lock:
+                self._clone_repos += 1
+                self._clone_files += len(entries)
             self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）")
             return entries
         except Exception as e:
