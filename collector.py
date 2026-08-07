@@ -555,8 +555,9 @@ class Collector:
                                                 {"what": "无记录", "since": now})
                     wc.append(f"W-{i} {st['what']}({now-st['since']:.0f}s)")
                 _w, _i, _r = self._worker_stats()
+                _now_dt = datetime.fromtimestamp(now, tz=timezone.utc)
                 lines = [
-                    f"📊 [{now.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
+                    f"📊 [{_now_dt.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
                     f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
                     f"内存: {mem_pct:.0f}% ({used_gb:.1f}/{total_gb:.1f}GB)",
                     f"   网络近60s: 总下载 {net['total_mb']/1024:.2f}GB | "
@@ -1744,10 +1745,14 @@ class Collector:
         """
         return self._tag_depth(tag) < MAX_TRACE_DEPTH
 
-    def _child_tag(self, tag: str, kind: str) -> str:
-        """生成子仓库标志位（层数 = 父层数 + 1）。"""
+    def _child_tag(self, tag: str, kind: str, depth_offset: int = 1) -> str:
+        """生成子仓库标志位（层数 = 父层数 + depth_offset）。
+
+        depth_offset 默认 1（子 = 父层+1）；404 补偿路径用 0
+        （子 = 父层——"死仓库的同层顶上"，源头 404 → [user0] 成为新源头）。
+        """
         depth = self._tag_depth(tag)
-        return f"[{kind}{depth + 1}]"
+        return f"[{kind}{depth + depth_offset}]"
 
     def _trace_repo(self, repo: str, branch: str, pushed_at: str, tag: str):
         """追踪 fork/用户仓库（不受 has_nodes/已处理/超龄限制）。
@@ -1824,8 +1829,10 @@ class Collector:
                 if USER_REPOS_ENABLED \
                         and self._tag_kind(tag) not in ("user", "404user"):
                     self._wlog(f"🔍 仓库 {repo} 不存在（404），追踪用户")
-                    self._trace_user_repos(repo, "main",
-                                           self._child_tag(tag, "404user"))
+                    # 404 补偿：同层顶上（depth_offset=0，子 = 父层）。
+                    # 源头 404 → [user0] 成为新源头可追踪扩展；[raw1] 404 → [user1]。
+                    # 传父 tag（内部自动 child 一层，防双重 child 绕过层级）
+                    self._trace_user_repos(repo, "main", tag, depth_offset=0)
                 return (0, 0)
             # 网络错误/其他 → 不跳过：用已有信息继续处理
 
@@ -2095,11 +2102,17 @@ class Collector:
         self._wlog(f"  {label}: {enqueued}/{len(forks)} 个 → {self._qs()}")
 
     def _trace_user_repos(self, repo: str, branch: str,
-                          tag: str = "[种子仓库]"):
+                          tag: str = "[种子仓库]", depth_offset: int = 1):
         """遍历同用户名下的所有公开仓库，查是否有节点产出。
 
         触发条件：仓库产出了节点（不管是否重复）。
         通过 GET /users/{owner}/repos API 获取仓库列表，逐个检查。
+
+        Args:
+            tag: 父仓库标志位（内部自动 _child_tag 生成子仓库层级）。
+            depth_offset: 子仓库层数偏移（默认 1 = 父层+1）；
+                404 补偿路径传 0（子 = 父层，"同层顶上"，
+                源头 404 → [user0] 成为新源头，可追踪扩展）。
         """
         owner = repo.split("/")[0]
         self._wlog(f"👤 {tag} 遍历用户仓库: {owner}")
@@ -2129,7 +2142,7 @@ class Collector:
 
         if qualified:
             self._run_fork_batch(qualified, branch, "👤 用户仓库",
-                                 self._child_tag(tag, "user"))
+                                 self._child_tag(tag, "user", depth_offset))
         self._wlog(f"  用户 {owner} 共查 {len(qualified)} 个仓库")
 
     # ==================== 递归树 API 处理 ====================
@@ -2761,14 +2774,15 @@ class Collector:
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
                         if f"repo info ({full_name})" in self.http.last_404:
-                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）
+                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）。
+                            # 传父 tag（内部自动 child 一层，防双重 child 绕过层级）
                             self._mark_repo_not_found(full_name)
                             if USER_REPOS_ENABLED \
                                     and self._tag_kind(tag) not in ("user", "404user"):
                                 self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户")
+                                # 404 补偿：同层顶上（depth_offset=0）
                                 self._trace_user_repos(
-                                    full_name, "main",
-                                    self._child_tag(tag, "404user"))
+                                    full_name, "main", tag, depth_offset=0)
                     continue
             finally:
                 self._repo_checking.discard(rl)
@@ -2835,14 +2849,15 @@ class Collector:
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
                         if f"repo info ({full_name})" in self.http.last_404:
-                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）
+                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）。
+                            # 传父 tag（内部自动 child 一层，防双重 child 绕过层级）
                             self._mark_repo_not_found(full_name)
                             if USER_REPOS_ENABLED \
                                     and self._tag_kind(tag) not in ("user", "404user"):
                                 self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户")
+                                # 404 补偿：同层顶上（depth_offset=0）
                                 self._trace_user_repos(
-                                    full_name, "main",
-                                    self._child_tag(tag, "404user"))
+                                    full_name, "main", tag, depth_offset=0)
                     continue
             finally:
                 self._repo_checking.discard(rl)
@@ -2862,7 +2877,9 @@ class Collector:
                                        repo_info.get("pushed_at", ""),
                                        self._tag_depth(user_tag)):
                     self._wlog(f"👤 来源仓库 {full_name} → 追踪用户 {full_name.split('/')[0]}")
-                    self._trace_user_repos(full_name, branch, user_tag)
+                    # 传父 tag：内部自动 child 一层生成 [user{父层+1}]。
+                    # 不能传已 child 的 user_tag（内部再 child → 层级 +2 绕过 MAX）
+                    self._trace_user_repos(full_name, branch, tag)
             link_tag = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"  # README 链接也算 raw（层数封顶）
             # 入队前追踪判断：已追踪（覆盖且未超期）→ 不入扩展队列
             if self._is_traced(full_name, repo_info.get("pushed_at", ""),
