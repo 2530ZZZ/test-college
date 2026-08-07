@@ -1,0 +1,848 @@
+[2026-08-07 18:55:22] 🚀 程序启动
+[2026-08-07 18:55:22] 关键词: 105 个
+[2026-08-07 18:55:22] [MainThread] 加载 SHA 缓存 282296 条 (1 分片)
+[2026-08-07 18:55:22] [MainThread] 加载已处理仓库缓存 24101 条
+[2026-08-07 18:55:22] [MainThread] 🚀 程序启动 | 配额上限 4800/小时
+[2026-08-07 18:55:22] [MainThread] 🔵 阶段 1: 种子仓库 (634 个)
+[2026-08-07 18:55:22] [种子] 🔵 种子仓库: 634 个 → 队列
+[2026-08-07 18:55:22] [种子] 🔵 [种子 1/634] Raad63/v2ray-configs-sub-5 | 配额 4800/4800 10:55UTC | 主队列 1/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 2/634] wang1680/proxypool | 配额 4800/4800 10:55UTC | 主队列 2/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 3/634] Pawdroid/Free-servers | 配额 4800/4800 10:55UTC | 主队列 3/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 4/634] LoneKingCode/free-proxy-db | 配额 4800/4800 10:55UTC | 主队列 4/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 5/634] gfpcom/free-proxy-list | 配额 4800/4800 10:55UTC | 主队列 5/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 6/634] mahdibland/get_v2 | 配额 4800/4800 10:55UTC | 主队列 6/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 7/634] MhdiTaheri/V2rayCollector | 配额 4800/4800 10:55UTC | 主队列 7/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 8/634] Raad63/nirevil | 配额 4800/4800 10:55UTC | 主队列 8/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 9/634] cysk003/yebekhe-TVC | 配额 4800/4800 10:55UTC | 主队列 9/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 10/634] chaoduzj/V2RayAutoConfig | 配额 4800/4800 10:55UTC | 主队列 10/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 11/634] sclyxcn/airport-free | 配额 4800/4800 10:55UTC | 主队列 11/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 12/634] MhdiTaheri/V2rayCollector_Py | 配额 4800/4800 10:55UTC | 主队列 12/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 13/634] mr-mohamad-mr/multi-proxy-config-fetcher | 配额 4800/4800 10:55UTC | 主队列 13/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 14/634] miladkantoori/multi-proxy-config-fetcher | 配额 4800/4800 10:55UTC | 主队列 14/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 15/634] Rayan-Config/C-Sub | 配额 4800/4800 10:55UTC | 主队列 15/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 16/634] mfuu/v2ray | 配额 4800/4800 10:55UTC | 主队列 16/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 17/634] mahdibland/SSAggregator | 配额 4800/4800 10:55UTC | 主队列 17/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 18/634] mahdibland/ShadowsocksAggregator | 配额 4800/4800 10:55UTC | 主队列 18/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 19/634] free-nodes/clashfree | 配额 4800/4800 10:55UTC | 主队列 19/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 20/634] ninjastrikers/nexus-nodes | 配额 4800/4800 10:55UTC | 主队列 20/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 21/634] chaoduzj/aggregator | 配额 4800/4800 10:55UTC | 主队列 21/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 22/634] Airuop/cross | 配额 4800/4800 10:55UTC | 主队列 22/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 23/634] SkillfulElectro/V2RayCollector | 配额 4800/4800 10:55UTC | 主队列 23/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 24/634] aiboboxx/v2rayfree | 配额 4800/4800 10:55UTC | 主队列 24/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 25/634] iswhat/Chat2DB | 配额 4800/4800 10:55UTC | 主队列 25/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 26/634] pooriaredorg/pooriaredorg | 配额 4800/4800 10:55UTC | 主队列 26/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 27/634] ssrsub/ssr | 配额 4800/4800 10:55UTC | 主队列 27/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 28/634] peasoft/NoMoreWalls | 配额 4800/4800 10:55UTC | 主队列 28/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 29/634] 4n0nymou3/multi-proxy-config-fetcher | 配额 4800/4800 10:55UTC | 主队列 29/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 30/634] wenxig/free-nodes-sub | 配额 4800/4800 10:55UTC | 主队列 30/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 31/634] 10ium/multi-proxy-config-fetcher | 配额 4800/4800 10:55UTC | 主队列 31/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 32/634] sclyxcn/v2ray-reaper | 配额 4800/4800 10:55UTC | 主队列 32/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 33/634] cysk003/Epodonios-v2ray-configs | 配额 4800/4800 10:55UTC | 主队列 33/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 34/634] cysk003/NoMoreWalls | 配额 4800/4800 10:55UTC | 主队列 34/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 35/634] Misaka-blog/chromego_merge | 配额 4800/4800 10:55UTC | 主队列 35/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 36/634] Aethersailor/SubConverter-Extended | 配额 4800/4800 10:55UTC | 主队列 36/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 37/634] kafeixiang/mihomo | 配额 4800/4800 10:55UTC | 主队列 37/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 38/634] anaer/Sub | 配额 4800/4800 10:55UTC | 主队列 38/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 39/634] Leon406/SubCrawler | 配额 4800/4800 10:55UTC | 主队列 39/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 40/634] Baobei321/-AutoMergePublicNodes | 配额 4800/4800 10:55UTC | 主队列 40/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 41/634] ts-sf/fly | 配额 4800/4800 10:55UTC | 主队列 41/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 42/634] chaoduzj/subs-check | 配额 4800/4800 10:55UTC | 主队列 42/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 43/634] chaoduzj/pac2 | 配额 4800/4800 10:55UTC | 主队列 43/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)Traceback (most recent call last):
+
+[2026-08-07 18:55:22] [种子] 🔵 [种子 44/634] ws94666ws/awesome-vpn | 配额 4800/4800 10:55UTC | 主队列 44/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 45/634] ab13643832129/awesome-vpn | 配额 4800/4800 10:55UTC | 主队列 45/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:22] [种子] 🔵 [种子 46/634] xwcyg6/airport-free | 配额 4800/4800 10:55UTC | 主队列 46/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 47/634] BiHuDeH/multi-proxy-config-fetcher | 配额 4800/4800 10:55UTC | 主队列 47/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 48/634] sami4030/multi-proxy-config-fetcher | 配额 4800/4800 10:55UTC | 主队列 48/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 49/634] ermaozi/get_subscribe | 配额 4800/4800 10:55UTC | 主队列 49/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 50/634] Airuop/archive | 配额 4800/4800 10:55UTC | 主队列 50/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 51/634] AtenaPV/PL4 | 配额 4800/4800 10:55UTC | 主队列 51/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 52/634] AtenaPV/Main-DB | 配额 4800/4800 10:55UTC | 主队列 52/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 53/634] AtenaPV/Sub-Sync | 配额 4800/4800 10:55UTC | 主队列 53/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 54/634] sevcator/5ubscrpt10n | 配额 4800/4800 10:55UTC | 主队列 54/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 55/634] V2RayRoot/V2RayConfig | 配额 4800/4800 10:55UTC | 主队列 55/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 56/634] ehsanghaffar/config-sub-platform | 配额 4800/4800 10:55UTC | 主队列 56/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 57/634] Airuop/config-fetcher | 配额 4800/4800 10:55UTC | 主队列 57/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 58/634] free-nodes/v2rayfree | 配额 4800/4800 10:55UTC | 主队列 58/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 59/634] crashgfw/free-airport-nodes | 配额 4800/4800 10:55UTC | 主队列 59/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 60/634] lza6/free-VPN | 配额 4800/4800 10:55UTC | 主队列 60/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 61/634] guying23/AutoMergePublicNodes | 配额 4800/4800 10:55UTC | 主队列 61/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 62/634] wzdnzd/aggregator | 配额 4800/4800 10:55UTC | 主队列 62/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 63/634] bruceblink/free-v2ray | 配额 4800/4800 10:55UTC | 主队列 63/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 64/634] alanbobs999/TopFreeProxies | 配额 4800/4800 10:55UTC | 主队列 64/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 65/634] wrfree/free | 配额 4800/4800 10:55UTC | 主队列 65/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 66/634] learnhard-cn/free_proxy_ss | 配额 4800/4800 10:55UTC | 主队列 66/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 67/634] mahsanet/MahsaFreeConfig | 配额 4800/4800 10:55UTC | 主队列 67/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 68/634] Ashkan-m/v2ray | 配额 4800/4800 10:55UTC | 主队列 68/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 69/634] Kamyar19/configMs | 配额 4800/4800 10:55UTC | 主队列 69/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 70/634] junjun266/FreeProxyGo | 配额 4800/4800 10:55UTC | 主队列 70/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 71/634] imalyzer/mihomo-node-checker | 配额 4800/4800 10:55UTC | 主队列 71/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 72/634] lerjtl/Testfree | 配额 4800/4800 10:55UTC | 主队列 72/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 73/634] superokde/free-nodes | 配额 4800/4800 10:55UTC | 主队列 73/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 74/634] XHegit/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 74/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 75/634] Yannik666/nodes | 配额 4800/4800 10:55UTC | 主队列 75/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 76/634] wanvfx/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 76/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 77/634] luochen1975/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 77/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 78/634] yangfh158/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 78/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 79/634] chengege666/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 79/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] 🔵 [种子 80/634] gwcctv/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 80/200 发现队列 0/20000 [空] | Worker 0忙/24闲(0%)
+[2026-08-07 18:55:22] [种子] ⏸️  主队列 ≥ 80（80/200），搜索暂停
+[2026-08-07 18:55:22] [W-0] 🔧 开始处理 [种子仓库] Raad63/v2ray-configs-sub-5 [种子 1/634]
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:22] [W-0] ⚠️ Worker 异常: Raad63/v2ray-configs-sub-5: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:27] [W-1] ⏳ 等待任务中...Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:27] [W-1] 🔧 开始处理 [种子仓库] wang1680/proxypool [种子 2/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-8] ⏳ 等待任务中...
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:27] [W-8] 🔧 开始处理 [种子仓库] Pawdroid/Free-servers [种子 3/634]TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-6] ⏳ 等待任务中...TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:27] [W-6] 🔧 开始处理 [种子仓库] LoneKingCode/free-proxy-db [种子 4/634]
+[2026-08-07 18:55:27] [W-14] ⏳ 等待任务中...TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:27] [W-14] 🔧 开始处理 [种子仓库] gfpcom/free-proxy-list [种子 5/634]
+[2026-08-07 18:55:27] [W-4] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-4] 🔧 开始处理 [种子仓库] mahdibland/get_v2 [种子 6/634]TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:27] [W-10] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-10] 🔧 开始处理 [种子仓库] MhdiTaheri/V2rayCollector [种子 7/634]
+[2026-08-07 18:55:27] [W-5] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-5] 🔧 开始处理 [种子仓库] Raad63/nirevil [种子 8/634]
+[2026-08-07 18:55:27] [W-12] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-12] 🔧 开始处理 [种子仓库] cysk003/yebekhe-TVC [种子 9/634]
+[2026-08-07 18:55:27] [W-7] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-7] 🔧 开始处理 [种子仓库] chaoduzj/V2RayAutoConfig [种子 10/634]
+[2026-08-07 18:55:27] [W-15] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-15] 🔧 开始处理 [种子仓库] sclyxcn/airport-free [种子 11/634]
+[2026-08-07 18:55:27] [W-16] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-16] 🔧 开始处理 [种子仓库] MhdiTaheri/V2rayCollector_Py [种子 12/634]
+[2026-08-07 18:55:27] [W-17] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-17] 🔧 开始处理 [种子仓库] mr-mohamad-mr/multi-proxy-config-fetcher [种子 13/634]
+[2026-08-07 18:55:27] [W-3] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-3] 🔧 开始处理 [种子仓库] miladkantoori/multi-proxy-config-fetcher [种子 14/634]
+[2026-08-07 18:55:27] [W-19] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-19] 🔧 开始处理 [种子仓库] Rayan-Config/C-Sub [种子 15/634]
+[2026-08-07 18:55:27] [W-20] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-20] 🔧 开始处理 [种子仓库] mfuu/v2ray [种子 16/634]
+[2026-08-07 18:55:27] [W-22] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-22] 🔧 开始处理 [种子仓库] mahdibland/SSAggregator [种子 17/634]
+[2026-08-07 18:55:27] [W-23] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-23] 🔧 开始处理 [种子仓库] mahdibland/ShadowsocksAggregator [种子 18/634]
+[2026-08-07 18:55:27] [W-11] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-11] 🔧 开始处理 [种子仓库] free-nodes/clashfree [种子 19/634]
+[2026-08-07 18:55:27] [W-2] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-2] 🔧 开始处理 [种子仓库] ninjastrikers/nexus-nodes [种子 20/634]
+[2026-08-07 18:55:27] [W-13] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-13] 🔧 开始处理 [种子仓库] chaoduzj/aggregator [种子 21/634]
+[2026-08-07 18:55:27] [W-18] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-18] 🔧 开始处理 [种子仓库] Airuop/cross [种子 22/634]
+[2026-08-07 18:55:27] [W-21] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-21] 🔧 开始处理 [种子仓库] SkillfulElectro/V2RayCollector [种子 23/634]
+[2026-08-07 18:55:27] [W-9] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-9] 🔧 开始处理 [种子仓库] aiboboxx/v2rayfree [种子 24/634]
+[2026-08-07 18:55:27] [W-0] ⏳ 等待任务中...
+[2026-08-07 18:55:27] [W-9] ⚠️ Worker 异常: aiboboxx/v2rayfree: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:27] [W-6] ⚠️ Worker 异常: LoneKingCode/free-proxy-db: Collector.process_repo() got an unexpected keyword argument 'pos'  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+[2026-08-07 18:55:27] [W-4] ⚠️ Worker 异常: mahdibland/get_v2: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-13] ⚠️ Worker 异常: chaoduzj/aggregator: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-20] ⚠️ Worker 异常: mfuu/v2ray: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-18] ⚠️ Worker 异常: Airuop/cross: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-17] ⚠️ Worker 异常: mr-mohamad-mr/multi-proxy-config-fetcher: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-16] ⚠️ Worker 异常: MhdiTaheri/V2rayCollector_Py: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-3] ⚠️ Worker 异常: miladkantoori/multi-proxy-config-fetcher: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-23] ⚠️ Worker 异常: mahdibland/ShadowsocksAggregator: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-8] ⚠️ Worker 异常: Pawdroid/Free-servers: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-1] ⚠️ Worker 异常: wang1680/proxypool: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-19] ⚠️ Worker 异常: Rayan-Config/C-Sub: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-7] ⚠️ Worker 异常: chaoduzj/V2RayAutoConfig: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-5] ⚠️ Worker 异常: Raad63/nirevil: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-15] ⚠️ Worker 异常: sclyxcn/airport-free: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-22] ⚠️ Worker 异常: mahdibland/SSAggregator: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-10] ⚠️ Worker 异常: MhdiTaheri/V2rayCollector: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-14] ⚠️ Worker 异常: gfpcom/free-proxy-list: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-2] ⚠️ Worker 异常: ninjastrikers/nexus-nodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-21] ⚠️ Worker 异常: SkillfulElectro/V2RayCollector: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-12] ⚠️ Worker 异常: cysk003/yebekhe-TVC: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:27] [W-11] ⚠️ Worker 异常: free-nodes/clashfree: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:32] [W-0] 🔧 开始处理 [种子仓库] iswhat/Chat2DB [种子 25/634]
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:32] [W-0] ⚠️ Worker 异常: iswhat/Chat2DB: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:37] [W-9] 🔧 开始处理 [种子仓库] pooriaredorg/pooriaredorg [种子 26/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:37] [W-9] ⚠️ Worker 异常: pooriaredorg/pooriaredorg: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+Traceback (most recent call last):
+[2026-08-07 18:55:37] [W-6] 🔧 开始处理 [种子仓库] ssrsub/ssr [种子 27/634]Traceback (most recent call last):
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+[2026-08-07 18:55:37] [W-4] 🔧 开始处理 [种子仓库] peasoft/NoMoreWalls [种子 28/634]Traceback (most recent call last):
+
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:37] [W-13] 🔧 开始处理 [种子仓库] 4n0nymou3/multi-proxy-config-fetcher [种子 29/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:37] [W-20] 🔧 开始处理 [种子仓库] wenxig/free-nodes-sub [种子 30/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-18] 🔧 开始处理 [种子仓库] 10ium/multi-proxy-config-fetcher [种子 31/634]TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:37] [W-17] 🔧 开始处理 [种子仓库] sclyxcn/v2ray-reaper [种子 32/634]TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-3] 🔧 开始处理 [种子仓库] cysk003/Epodonios-v2ray-configs [种子 33/634]TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:37] [W-8] 🔧 开始处理 [种子仓库] cysk003/NoMoreWalls [种子 34/634]
+[2026-08-07 18:55:37] [W-16] 🔧 开始处理 [种子仓库] Misaka-blog/chromego_merge [种子 35/634]TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:37] [W-1] 🔧 开始处理 [种子仓库] Aethersailor/SubConverter-Extended [种子 36/634]
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-19] 🔧 开始处理 [种子仓库] kafeixiang/mihomo [种子 37/634]
+[2026-08-07 18:55:37] [W-7] 🔧 开始处理 [种子仓库] anaer/Sub [种子 38/634]
+[2026-08-07 18:55:37] [W-14] 🔧 开始处理 [种子仓库] Leon406/SubCrawler [种子 39/634]
+[2026-08-07 18:55:37] [W-23] 🔧 开始处理 [种子仓库] Baobei321/-AutoMergePublicNodes [种子 40/634]
+[2026-08-07 18:55:37] [W-22] 🔧 开始处理 [种子仓库] ts-sf/fly [种子 41/634]
+[2026-08-07 18:55:37] [W-15] 🔧 开始处理 [种子仓库] chaoduzj/subs-check [种子 42/634]
+[2026-08-07 18:55:37] [W-21] 🔧 开始处理 [种子仓库] chaoduzj/pac2 [种子 43/634]
+[2026-08-07 18:55:37] [W-11] 🔧 开始处理 [种子仓库] ws94666ws/awesome-vpn [种子 44/634]
+[2026-08-07 18:55:37] [W-10] 🔧 开始处理 [种子仓库] ab13643832129/awesome-vpn [种子 45/634]
+[2026-08-07 18:55:37] [W-2] 🔧 开始处理 [种子仓库] xwcyg6/airport-free [种子 46/634]
+[2026-08-07 18:55:37] [W-5] 🔧 开始处理 [种子仓库] BiHuDeH/multi-proxy-config-fetcher [种子 47/634]
+[2026-08-07 18:55:37] [W-12] 🔧 开始处理 [种子仓库] sami4030/multi-proxy-config-fetcher [种子 48/634]
+[2026-08-07 18:55:37] [W-13] ⚠️ Worker 异常: 4n0nymou3/multi-proxy-config-fetcher: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-12] ⚠️ Worker 异常: sami4030/multi-proxy-config-fetcher: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-20] ⚠️ Worker 异常: wenxig/free-nodes-sub: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-6] ⚠️ Worker 异常: ssrsub/ssr: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-1] ⚠️ Worker 异常: Aethersailor/SubConverter-Extended: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-18] ⚠️ Worker 异常: 10ium/multi-proxy-config-fetcher: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-11] ⚠️ Worker 异常: ws94666ws/awesome-vpn: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-3] ⚠️ Worker 异常: cysk003/Epodonios-v2ray-configs: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-17] ⚠️ Worker 异常: sclyxcn/v2ray-reaper: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-4] ⚠️ Worker 异常: peasoft/NoMoreWalls: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-23] ⚠️ Worker 异常: Baobei321/-AutoMergePublicNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-21] ⚠️ Worker 异常: chaoduzj/pac2: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-19] ⚠️ Worker 异常: kafeixiang/mihomo: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-10] ⚠️ Worker 异常: ab13643832129/awesome-vpn: Collector.process_repo() got an unexpected keyword argument 'pos'TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:37] [W-16] ⚠️ Worker 异常: Misaka-blog/chromego_merge: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-8] ⚠️ Worker 异常: cysk003/NoMoreWalls: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-5] ⚠️ Worker 异常: BiHuDeH/multi-proxy-config-fetcher: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-7] ⚠️ Worker 异常: anaer/Sub: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-2] ⚠️ Worker 异常: xwcyg6/airport-free: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-14] ⚠️ Worker 异常: Leon406/SubCrawler: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-22] ⚠️ Worker 异常: ts-sf/fly: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:37] [W-15] ⚠️ Worker 异常: chaoduzj/subs-check: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:42] [W-0] 🔧 开始处理 [种子仓库] ermaozi/get_subscribe [种子 49/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:42] [W-0] ⚠️ Worker 异常: ermaozi/get_subscribe: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:47] [W-9] 🔧 开始处理 [种子仓库] Airuop/archive [种子 50/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:47] [W-9] ⚠️ Worker 异常: Airuop/archive: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:47] [W-13] 🔧 开始处理 [种子仓库] AtenaPV/PL4 [种子 51/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-13] ⚠️ Worker 异常: AtenaPV/PL4: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:47] [W-12] 🔧 开始处理 [种子仓库] AtenaPV/Main-DB [种子 52/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-12] ⚠️ Worker 异常: AtenaPV/Main-DB: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:47] [W-20] 🔧 开始处理 [种子仓库] AtenaPV/Sub-Sync [种子 53/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+[2026-08-07 18:55:47] [W-1] 🔧 开始处理 [种子仓库] sevcator/5ubscrpt10n [种子 54/634]Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-11] 🔧 开始处理 [种子仓库] V2RayRoot/V2RayConfig [种子 55/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-6] 🔧 开始处理 [种子仓库] ehsanghaffar/config-sub-platform [种子 56/634]
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:47] [W-3] 🔧 开始处理 [种子仓库] Airuop/config-fetcher [种子 57/634]TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:47] [W-17] 🔧 开始处理 [种子仓库] free-nodes/v2rayfree [种子 58/634]
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-18] 🔧 开始处理 [种子仓库] crashgfw/free-airport-nodes [种子 59/634]
+[2026-08-07 18:55:47] [W-4] 🔧 开始处理 [种子仓库] lza6/free-VPN [种子 60/634]
+[2026-08-07 18:55:47] [W-21] 🔧 开始处理 [种子仓库] guying23/AutoMergePublicNodes [种子 61/634]
+[2026-08-07 18:55:47] [W-23] 🔧 开始处理 [种子仓库] wzdnzd/aggregator [种子 62/634]
+[2026-08-07 18:55:47] [种子] ▶️ 主队列 < 20（18/200），搜索恢复
+[2026-08-07 18:55:47] [种子] 🔵 [种子 81/634] HakurouKen/free-node | 配额 4800/4800 10:55UTC | 主队列 19/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 82/634] PENZA84/free-node | 配额 4800/4800 10:55UTC | 主队列 20/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 83/634] soufranciscoescola-png/Criar-fonte-TTF---BR---draw-your-font | 配额 4800/4800 10:55UTC | 主队列 21/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 84/634] cheryomukhin/draw-your-font | 配额 4800/4800 10:55UTC | 主队列 22/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 85/634] dhiaeddine-ayh/draw-your-font | 配额 4800/4800 10:55UTC | 主队列 23/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 86/634] rrzt/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 24/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 87/634] cyj4215/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 25/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 88/634] shenguidao/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 26/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 89/634] jiayou88/FreeNodes- | 配额 4800/4800 10:55UTC | 主队列 27/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 90/634] 4258806/FreeNodes | 配额 4800/4800 10:55UTC | 主队列 28/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 91/634] muxd93/awesome-vpn | 配额 4800/4800 10:55UTC | 主队列 29/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 92/634] Andyworldclub/openproxylist | 配额 4800/4800 10:55UTC | 主队列 30/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 93/634] toda-adot/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 31/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 94/634] superduke/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 32/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 95/634] housaiyinmamaide/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 33/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 96/634] fenwehome/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 34/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 97/634] sclyxcn/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 35/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 98/634] lilikimi/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 36/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 99/634] zhalkzs/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 37/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 100/634] orionmeetartemis/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 38/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 101/634] cmliu/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 39/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 102/634] zwdnwlm/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 40/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 103/634] csxjf/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 41/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 104/634] yilong001/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 42/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 105/634] FaceAce1/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 43/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 106/634] njuFerret/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 44/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 107/634] kimmax603/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 45/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 108/634] chris202010/ACL4SSR | 配额 4800/4800 10:55UTC | 主队列 46/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 109/634] wjs876046992/subconverter | 配额 4800/4800 10:55UTC | 主队列 47/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 110/634] Wyatt36/SubConverter-Extended | 配额 4800/4800 10:55UTC | 主队列 48/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 111/634] clift190/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 49/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 112/634] 2dust/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 50/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 113/634] clift190/v2rayN | 配额 4800/4800 10:55UTC | 主队列 51/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 114/634] hncsjmj/v2rayN | 配额 4800/4800 10:55UTC | 主队列 52/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 115/634] flyhong666/v2rayN | 配额 4800/4800 10:55UTC | 主队列 53/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 116/634] alxprgs/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 54/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 117/634] AvetGR8/EasyV2raySub | 配额 4800/4800 10:55UTC | 主队列 55/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 118/634] Devindan/EasyV2raySub | 配额 4800/4800 10:55UTC | 主队列 56/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 119/634] symantes/v2rayN | 配额 4800/4800 10:55UTC | 主队列 57/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 120/634] maoxikun/v2rayN | 配额 4800/4800 10:55UTC | 主队列 58/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 121/634] maoxikun/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 59/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 122/634] sec-js/v2rayN | 配额 4800/4800 10:55UTC | 主队列 60/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 123/634] selenologist99/v2rayN | 配额 4800/4800 10:55UTC | 主队列 61/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 124/634] kafeixiang/v2rayN | 配额 4800/4800 10:55UTC | 主队列 62/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 125/634] chizee/v2rayN | 配额 4800/4800 10:55UTC | 主队列 63/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 126/634] lwhx/v2rayN | 配额 4800/4800 10:55UTC | 主队列 64/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 127/634] Orynomnix/v2rayN | 配额 4800/4800 10:55UTC | 主队列 65/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 128/634] OmiSummy/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 66/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 129/634] iswhat/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 67/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 130/634] cysk003/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 68/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 131/634] Kiterepo/v2rayN-2 | 配额 4800/4800 10:55UTC | 主队列 69/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 132/634] soitun/v2rayN | 配额 4800/4800 10:55UTC | 主队列 70/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 133/634] xiechangan123/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 71/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 134/634] LHONG1008/v2rayN | 配额 4800/4800 10:55UTC | 主队列 72/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 135/634] Superoldman96/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 73/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 136/634] fenwehome/v2rayN | 配额 4800/4800 10:55UTC | 主队列 74/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 137/634] Mu-L/v2rayN | 配额 4800/4800 10:55UTC | 主队列 75/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 138/634] ipx2001/v2rayN | 配额 4800/4800 10:55UTC | 主队列 76/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 139/634] Little-Star888/v2rayN | 配额 4800/4800 10:55UTC | 主队列 77/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 140/634] sujun2021/v2rayNG | 配额 4800/4800 10:55UTC | 主队列 78/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 141/634] pthis/v2rayN | 配额 4800/4800 10:55UTC | 主队列 79/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] 🔵 [种子 142/634] a1wjun/v2rayN | 配额 4800/4800 10:55UTC | 主队列 80/200 发现队列 0/20000 [空] | Worker 10忙/14闲(41%)
+[2026-08-07 18:55:47] [种子] ⏸️  主队列 ≥ 80（80/200），搜索暂停
+[2026-08-07 18:55:47] [W-10] 🔧 开始处理 [种子仓库] bruceblink/free-v2ray [种子 63/634]
+[2026-08-07 18:55:47] [W-8] 🔧 开始处理 [种子仓库] alanbobs999/TopFreeProxies [种子 64/634]
+[2026-08-07 18:55:47] [W-7] 🔧 开始处理 [种子仓库] wrfree/free [种子 65/634]
+[2026-08-07 18:55:47] [W-14] 🔧 开始处理 [种子仓库] learnhard-cn/free_proxy_ss [种子 66/634]
+[2026-08-07 18:55:47] [W-22] 🔧 开始处理 [种子仓库] mahsanet/MahsaFreeConfig [种子 67/634]
+[2026-08-07 18:55:47] [W-19] 🔧 开始处理 [种子仓库] Ashkan-m/v2ray [种子 68/634]
+[2026-08-07 18:55:47] [W-16] 🔧 开始处理 [种子仓库] Kamyar19/configMs [种子 69/634]
+[2026-08-07 18:55:47] [W-5] 🔧 开始处理 [种子仓库] junjun266/FreeProxyGo [种子 70/634]
+[2026-08-07 18:55:47] [W-15] 🔧 开始处理 [种子仓库] imalyzer/mihomo-node-checker [种子 71/634]
+[2026-08-07 18:55:47] [W-2] 🔧 开始处理 [种子仓库] lerjtl/Testfree [种子 72/634]
+[2026-08-07 18:55:47] [W-20] ⚠️ Worker 异常: AtenaPV/Sub-Sync: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-18] ⚠️ Worker 异常: crashgfw/free-airport-nodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-10] ⚠️ Worker 异常: bruceblink/free-v2ray: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-17] ⚠️ Worker 异常: free-nodes/v2rayfree: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-8] ⚠️ Worker 异常: alanbobs999/TopFreeProxies: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-4] ⚠️ Worker 异常: lza6/free-VPN: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-22] ⚠️ Worker 异常: mahsanet/MahsaFreeConfig: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-14] ⚠️ Worker 异常: learnhard-cn/free_proxy_ss: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-5] ⚠️ Worker 异常: junjun266/FreeProxyGo: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-6] ⚠️ Worker 异常: ehsanghaffar/config-sub-platform: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-2] ⚠️ Worker 异常: lerjtl/Testfree: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-3] ⚠️ Worker 异常: Airuop/config-fetcher: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-15] ⚠️ Worker 异常: imalyzer/mihomo-node-checker: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-19] ⚠️ Worker 异常: Ashkan-m/v2ray: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-21] ⚠️ Worker 异常: guying23/AutoMergePublicNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-11] ⚠️ Worker 异常: V2RayRoot/V2RayConfig: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-1] ⚠️ Worker 异常: sevcator/5ubscrpt10n: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-23] ⚠️ Worker 异常: wzdnzd/aggregator: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-7] ⚠️ Worker 异常: wrfree/free: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:47] [W-16] ⚠️ Worker 异常: Kamyar19/configMs: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:52] [W-0] 🔧 开始处理 [种子仓库] superokde/free-nodes [种子 73/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:52] [W-0] ⚠️ Worker 异常: superokde/free-nodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:57] [W-9] 🔧 开始处理 [种子仓库] XHegit/FreeNodes [种子 74/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+
+[2026-08-07 18:55:57] [W-9] ⚠️ Worker 异常: XHegit/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:57] [W-13] 🔧 开始处理 [种子仓库] Yannik666/nodes [种子 75/634]
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-13] ⚠️ Worker 异常: Yannik666/nodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:57] [W-12] 🔧 开始处理 [种子仓库] wanvfx/FreeNodes [种子 76/634]
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-12] ⚠️ Worker 异常: wanvfx/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:57] [W-20] 🔧 开始处理 [种子仓库] luochen1975/FreeNodes [种子 77/634]
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-20] ⚠️ Worker 异常: luochen1975/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+[2026-08-07 18:55:57] [W-18] 🔧 开始处理 [种子仓库] yangfh158/FreeNodes [种子 78/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+[2026-08-07 18:55:57] [W-10] 🔧 开始处理 [种子仓库] chengege666/FreeNodes [种子 79/634]
+Traceback (most recent call last):
+Traceback (most recent call last):
+[2026-08-07 18:55:57] [W-17] 🔧 开始处理 [种子仓库] gwcctv/FreeNodes [种子 80/634]Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:57] [W-4] 🔧 开始处理 [种子仓库] HakurouKen/free-node [种子 81/634]
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-8] 🔧 开始处理 [种子仓库] PENZA84/free-node [种子 82/634]  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+[2026-08-07 18:55:57] [W-5] 🔧 开始处理 [种子仓库] soufranciscoescola-png/Criar-fonte-TTF---BR---draw-your-font [种子 83/634]
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-22] 🔧 开始处理 [种子仓库] cheryomukhin/draw-your-font [种子 84/634]
+[2026-08-07 18:55:57] [W-14] 🔧 开始处理 [种子仓库] dhiaeddine-ayh/draw-your-font [种子 85/634]
+[2026-08-07 18:55:57] [W-15] 🔧 开始处理 [种子仓库] rrzt/FreeNodes [种子 86/634]
+[2026-08-07 18:55:57] [W-19] 🔧 开始处理 [种子仓库] cyj4215/FreeNodes [种子 87/634]
+[2026-08-07 18:55:57] [W-6] 🔧 开始处理 [种子仓库] shenguidao/FreeNodes [种子 88/634]
+[2026-08-07 18:55:57] [W-3] 🔧 开始处理 [种子仓库] jiayou88/FreeNodes- [种子 89/634]
+[2026-08-07 18:55:57] [W-23] 🔧 开始处理 [种子仓库] 4258806/FreeNodes [种子 90/634]
+[2026-08-07 18:55:57] [W-16] 🔧 开始处理 [种子仓库] muxd93/awesome-vpn [种子 91/634]
+[2026-08-07 18:55:57] [W-11] 🔧 开始处理 [种子仓库] Andyworldclub/openproxylist [种子 92/634]
+[2026-08-07 18:55:57] [W-2] 🔧 开始处理 [种子仓库] toda-adot/ACL4SSR [种子 93/634]
+[2026-08-07 18:55:57] [W-21] 🔧 开始处理 [种子仓库] superduke/ACL4SSR [种子 94/634]
+[2026-08-07 18:55:57] [W-7] 🔧 开始处理 [种子仓库] housaiyinmamaide/ACL4SSR [种子 95/634]
+[2026-08-07 18:55:57] [W-1] 🔧 开始处理 [种子仓库] fenwehome/ACL4SSR [种子 96/634]
+[2026-08-07 18:55:57] [W-18] ⚠️ Worker 异常: yangfh158/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-22] ⚠️ Worker 异常: cheryomukhin/draw-your-font: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-23] ⚠️ Worker 异常: 4258806/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-11] ⚠️ Worker 异常: Andyworldclub/openproxylist: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[2026-08-07 18:55:57] [W-6] ⚠️ Worker 异常: shenguidao/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-16] ⚠️ Worker 异常: muxd93/awesome-vpn: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-10] ⚠️ Worker 异常: chengege666/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-1] ⚠️ Worker 异常: fenwehome/ACL4SSR: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-14] ⚠️ Worker 异常: dhiaeddine-ayh/draw-your-font: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-17] ⚠️ Worker 异常: gwcctv/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+  File "/home/runner/work/test-college/test-college/collector.py", line 1364, in _pool_worker
+    extracted, added = self.process_repo(repo, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+TypeError: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-21] ⚠️ Worker 异常: superduke/ACL4SSR: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-2] ⚠️ Worker 异常: toda-adot/ACL4SSR: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-15] ⚠️ Worker 异常: rrzt/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-4] ⚠️ Worker 异常: HakurouKen/free-node: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-19] ⚠️ Worker 异常: cyj4215/FreeNodes: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-3] ⚠️ Worker 异常: jiayou88/FreeNodes-: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-7] ⚠️ Worker 异常: housaiyinmamaide/ACL4SSR: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-8] ⚠️ Worker 异常: PENZA84/free-node: Collector.process_repo() got an unexpected keyword argument 'pos'
+[2026-08-07 18:55:57] [W-5] ⚠️ Worker 异常: soufranciscoescola-png/Criar-fonte-TTF---BR---draw-your-font: Collector.process_repo() got an unexpected keyword argument 'pos'
