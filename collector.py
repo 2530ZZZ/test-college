@@ -1778,7 +1778,8 @@ class Collector:
                      size: int = -1, disabled: bool = False,
                      pushed_at: str = "", raw_depth: int = 0,
                      seed_key: str = None, is_source: bool = False,
-                     language: str = "", tag: str = "[种子仓库]"):
+                     language: str = "", tag: str = "[种子仓库]",
+                     pos: str = ""):
         """处理单个仓库。
 
         使用搜索结果的字段代替 GET /repos/{repo} 调用，
@@ -1793,6 +1794,7 @@ class Collector:
             raw_depth: raw 递归发现深度
             is_source: 是否源头仓库（种子/搜索/Code 直接发现）
             language: 主要语言（SKIP_LANGUAGES 过滤用，空则放行）
+            pos: 位置信息（种子序号/关键词页码，仅日志透传，处理逻辑不用）
         """
         github_url = f"https://github.com/{repo}"
 
