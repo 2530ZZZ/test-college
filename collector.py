@@ -38,7 +38,7 @@ from config import (
     PARALLEL_DOWNLOAD_THRESHOLD, PARALLEL_DOWNLOAD_WORKERS,
     FORK_CHAIN_ENABLED, FORK_CHAIN_MAX_FORKS,
     FORK_CHILD_MAX, FORK_SIBLING_MAX, FORK_PARENT_TRACE_ENABLED, FORK_PER_PAGE,
-    MAX_TRACE_DEPTH, TRACE_USER_ON_404, MAIN_TAKE_COOLDOWN,
+    MAX_TRACE_DEPTH, MAIN_TAKE_COOLDOWN,
     AUTO_SEED_ENABLED,
     TOPIC_SEARCH_ENABLED, TOPIC_QUERIES,
     README_SEARCH_ENABLED, README_QUERIES, README_MAX_PAGES,
@@ -55,6 +55,7 @@ from config import (
     PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT, PARTIAL_CLONE_CONCURRENCY,
     CONTENTS_API_FALLBACK_ENABLED, MONITOR_INTERVAL,
     MAIN_SOURCE_LIMIT, TRACE_RETRY_DAYS,
+    KEYWORD_TRACE_DEPTH, CODE_TRACE_DEPTH, INFO_BACKFILL_ENABLED,
     AUTO_SEED_MIN_NODES_FOR_SEED,
     SEED_MAX_AGE_HOURS, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
     SEEN_REPOS_PERSIST_ENABLED, SEEN_REPOS_DIR, SEEN_REPOS_MAX_BYTES,
@@ -145,6 +146,7 @@ class Collector:
         self._quota_exhausted_times = []                # 配额耗尽时间（UTC）
         self._skip_counts = {"lang": 0, "size0": 0, "disabled": 0,
                              "stale": 0}                # 跳过原因计数（汇总展示）
+        self._backfill_count = 0                        # 信息补查次数（INFO_BACKFILL 统计）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
         self._net_bytes_start = self._read_net_bytes()  # 网络基准（程序启动）
@@ -295,11 +297,21 @@ class Collector:
             return bool(entry.get("parsed", False))
         return False
 
-    def _mark_seen_cache(self, repo: str, pushed_at: str, parsed: bool = True):
+    def _mark_seen_cache(self, repo: str, pushed_at: str, parsed: bool = True,
+                         nodes_extracted: int = None, nodes_added: int = None,
+                         language: str = ""):
         """标记仓库已处理（保留已有 hits，更新 pushed_at）。
+
+        hits 语义 = 记录被处理的次数：新建记录初始 1，已有记录 +1
+        （解析/跳过解析/追踪/跳过追踪四种情况都先经过此处或 _check_seen_cache，
+        两处合计覆盖全部命中）。
 
         Args:
             parsed: 是否已解析过文件（默认 True，解析完成后调用）。
+            nodes_extracted: 本仓库解析提取出的有效节点数（含重复）。
+                None = 本次未解析（不更新历史值）；>=0 = 解析过（覆盖）。
+            nodes_added: 全局去重后新增节点数（同上语义）。
+            language: 仓库主要语言（记录用于统计/快速过滤）。
         """
         if SEEN_REPOS_PERSIST_ENABLED and pushed_at:
             r = repo.lower()
@@ -308,10 +320,19 @@ class Collector:
                 existing = {}
             is_new = "pushed_at" not in existing
             existing["pushed_at"] = pushed_at
-            existing.setdefault("hits", 1)
+            if is_new:
+                existing["hits"] = 1
+            else:
+                existing["hits"] = existing.get("hits", 0) + 1
             existing["last_hit"] = datetime.now(timezone.utc).isoformat()
             existing["parsed"] = parsed
             existing.setdefault("traced", [])   # 追踪过的层数集合
+            if nodes_extracted is not None:
+                existing["nodes_extracted"] = nodes_extracted
+            if nodes_added is not None:
+                existing["nodes_added"] = nodes_added
+            if language:
+                existing["language"] = language
             self.seen_cache[r] = existing
             if is_new:
                 self._wlog(f"📝 已处理缓存: {repo}")
@@ -1113,11 +1134,11 @@ class Collector:
     # ── 搜集实现 ──
 
     def _collect_seeds(self, task_queue: Queue):
-        """种子仓库阶段：零 API 入队 + 主线程前置跳过。
+        """种子仓库阶段：主线程纯供应（零查询零判断）。
 
-        追踪跳过在主线程判断（seen_cache 内存查询，0 API）：
-          已解析 + 已追踪（0 层覆盖且未超期）→ 不入队（无价值）。
-        解析跳过仍在 process_repo 内（补查后判断，省 API）。
+        所有种子去重后入主队列（不带仓库信息，pushed_at 留空——
+        强制 work 消费时补查 repo info，判断全部基于最新信息）。
+        是否追踪/是否解析全部由 work 在 process_repo 内判断。
         """
         repo_seeds = self._repo_seeds
         seed_list = list(repo_seeds.keys())
@@ -1129,13 +1150,6 @@ class Collector:
             if self._should_stop(): break
             if not self._wait_queue_slot(task_queue): break
             _prefix = f"🔵 [种子 {_idx}/{len(seed_list)}] {repo}"
-            # 主线程前置判断：已解析 + 已追踪（0 层覆盖未超期）→ 不入队
-            entry = self.seen_cache.get(repo.lower())
-            if isinstance(entry, dict) and entry.get("parsed") \
-                    and self._is_traced(repo, entry.get("pushed_at", ""), 0):
-                self._wlog(f"⏭️ {_prefix} 已解析且已追踪，跳过")
-                self._update_seed_entry(repo_seeds, repo, 0)
-                continue
             if not self._main_put(("种子仓库", repo,
                                    {"seed_key": repo,
                                     "tag": "[种子仓库]"})):
@@ -1358,23 +1372,23 @@ class Collector:
                                         "pushed_at": pushed,
                                         "is_source": True,
                                         "language": item.get("language", ""),
-                                        "tag": "[关键词搜索]"})):
+                                        "tag": f"[kw{KEYWORD_TRACE_DEPTH}]"})):
                     self._wlog(f"🗑️ 主队列满，丢弃 {repo}")
             time.sleep(PAGE_SLEEP_SECONDS)
 
     def _collect_code(self, task_queue: Queue):
-        """GitHub Code Search：直接搜索文件内容中的节点 URI。
+        """GitHub Code Search：搜索文件内容中的节点 URI（方案 a：主线程纯供应）。
 
         与 _collect_github 的区别：
           - API: /search/code（搜文件内容）vs /search/repositories（搜仓库名）
-          - 粒度: 直接定位到文件，不需要扫描整个仓库
-          - 策略: 主线程 raw 下载（零 API 配额）+ 发现仓库进共用池
+          - 策略: 主线程只做搜索 + 把命中仓库带全信息入主队列，由 work 整仓解析
+                  （不再直接下载/解析文件，架构与[种子]/[关键词]主线程一致）
 
         流程：
           1. 遍历 CODE_QUERIES，构建搜索词（加 24h 时间限定）
           2. 翻页调用 /search/code API
-          3. 对每个结果：下载 raw 文件 → 提取节点
-          4. 对产出了节点的仓库 → task_queue.put() 触发 fork/用户遍历
+          3. 所有命中仓库 → 入主队列（tag 层级由 CODE_TRACE_DEPTH 决定：
+             0 = 追踪到最大层级；= MAX_TRACE_DEPTH = 只解析不追踪）
         """
         if not CODE_QUERIES:
             return
@@ -1383,13 +1397,11 @@ class Collector:
         time_sfx = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime(
             '%Y-%m-%dT%H:%M:%SZ')
 
-        code_nodes_before = len(self.unique_nodes)
         code_files = 0
         repos_found = set()
 
         for idx, query in enumerate(CODE_QUERIES, 1):
             qs = time.time()
-            nb = len(self.unique_nodes)
             full_query = f"{query} pushed:>{time_sfx}"
 
             for page in range(1, CODE_MAX_PAGES + 1):
@@ -1417,24 +1429,11 @@ class Collector:
 
                     repo_data = item.get("repository", {})
                     repo_name = repo_data.get("full_name", "")
-                    file_path = item.get("path", "")
-                    file_sha = item.get("sha", "")
-
-                    if not repo_name or not file_path:
+                    if not repo_name:
                         continue
 
                     code_files += 1  # 统计搜索命中数（在过滤之前）
                     repos_found.add(repo_name)
-
-                    github_url = f"https://github.com/{repo_name}"
-
-                    # SHA 缓存检查：避免重复下载相同内容
-                    if file_sha and self._sha_in_cache(file_sha):
-                        continue
-
-                    ext = os.path.splitext(file_path)[1].lower()
-                    if ext not in ALLOWED_EXTENSIONS:
-                        continue
 
                     # 获取分支：优先从搜索结果 → 缓存 → "main"
                     default_branch = repo_data.get("default_branch", "")
@@ -1443,45 +1442,31 @@ class Collector:
                     else:
                         self._branch_cache[repo_name] = default_branch
 
-                    # 直接 raw 下载并提取节点（不计 API 配额）
-                    has_nodes_flag = [False]
-                    try:
-                        self._handle_one_file(
-                            repo_name, default_branch, file_path,
-                            file_sha, has_nodes_flag, raw_depth=0,
-                            tag="[code搜索]")
-                    except RuntimeError:
-                        return  # 限流超限
-                    except Exception:
-                        pass
-
-                    if has_nodes_flag[0]:
-                        # 产出节点的仓库 → 进共用线程池触发 fork/用户遍历
-                        if self._check_and_add_seen(repo_name):
-                            pushed = repo_data.get("pushed_at", "")
-                            if self._main_put(("Code", repo_name,
-                                               {"branch": default_branch,
-                                                "size": repo_data.get("size", -1),
-                                                "disabled": False,
-                                                "pushed_at": pushed,
-                                                "is_source": True,
-                                                "language": repo_data.get("language", ""),
-                                                "tag": "[code搜索]"})):
-                                self.checked_count += 1
-                                self._main_queue_total += 1
-                            else:
-                                self._wlog(f"🗑️ 主队列满，丢弃 Code 仓库 {repo_name}")
+                    # 主线程纯供应：命中仓库带全信息入主队列，由 work 整仓解析。
+                    # 不直接下载/解析文件；查询已限 pushed:>24h，
+                    # work 侧年龄判断自然通过，不会跳过。
+                    if self._check_and_add_seen(repo_name):
+                        cd_tag = f"[cd{CODE_TRACE_DEPTH}]"
+                        if self._main_put(("Code", repo_name,
+                                           {"branch": default_branch,
+                                            "size": repo_data.get("size", -1),
+                                            "disabled": False,
+                                            "pushed_at": repo_data.get("pushed_at", ""),
+                                            "is_source": True,
+                                            "language": repo_data.get("language", ""),
+                                            "tag": cd_tag})):
+                            self.checked_count += 1
+                            self._main_queue_total += 1
+                        else:
+                            self._wlog(f"🗑️ 主队列满，丢弃 Code 仓库 {repo_name}")
 
                 time.sleep(PAGE_SLEEP_SECONDS)
 
             self._wlog(f"⏱️ Code [{idx}/{len(CODE_QUERIES)}] "
                   f"{query[:60]} | {time.time() - qs:.0f}s | "
-                  f"+{len(self.unique_nodes) - nb} 节点 | "
                   f"{self._qt()}")
 
-        # 记录统计
-        with self._state_lock:
-            self._channel_new_nodes["Code"] = len(self.unique_nodes) - code_nodes_before
+        # 记录统计（主线程不解析，节点计数由 work 侧 _channel_new_nodes 累加）
         self._code_files_found = code_files
         self._code_repos_processed = len(repos_found)
         self._worker_local.prefix = ""
@@ -1573,11 +1558,13 @@ class Collector:
 
         # ── 跳过/失败统计 ──
         print(f"\n===== 仓库处理统计 =====", flush=True)
-        print(f"  404 仓库: {len(self._repo_not_found)} 个（已追踪用户）", flush=True)
-        print(f"  403 仓库: {len(self._repo_forbidden)} 个", flush=True)
+        print(f"  404 仓库: {len(self._repo_not_found)} 个 | 403 仓库: {len(self._repo_forbidden)} 个", flush=True)
         sk = self._skip_counts
         print(f"  语言过滤跳过: {sk['lang']} | 空仓库: {sk['size0']} | "
               f"已禁用: {sk['disabled']} | 超龄跳过解析: {sk['stale']}", flush=True)
+        print(f"  信息补查: {self._backfill_count} 次"
+              f"（约 {self._backfill_count / QUOTA_MAX_PER_HOUR:.1%} 配额）"
+              if self._backfill_count else "  信息补查: 0 次", flush=True)
 
         # ── 仓库处理结果汇总（clone 相关） ──
         cok = self._repos_by_result.get("clone_ok", [])
@@ -1669,34 +1656,28 @@ class Collector:
 
     # ── 标志位系统 ──
 
-    SOURCE_TAGS = ("[种子仓库]", "[code搜索]", "[关键词搜索]")
-
     @staticmethod
     def _tag_depth(tag: str) -> int:
         """从标志位提取层数（源头为 0）。"""
-        m = re.match(r'\[(?:user|fork|raw)(\d+)\]', tag)
+        m = re.match(r'\[(?:user|fork|raw|kw|cd)(\d+)\]', tag)
         return int(m.group(1)) if m else 0
 
     @staticmethod
     def _tag_kind(tag: str) -> str:
-        """从标志位提取来源类型（user/404user/fork/raw/空=源头）。"""
-        m = re.match(r'\[(404user|user|fork|raw)(\d+)\]', tag)
+        """从标志位提取来源类型（user/404user/fork/raw/kw/cd/空=源头）。"""
+        m = re.match(r'\[(404user|user|fork|raw|kw|cd)(\d+)\]', tag)
         return m.group(1) if m else ""
 
     def _should_trace(self, tag: str) -> bool:
-        """根据标志位判断是否需继续追踪。
+        """根据标志位判断是否需继续追踪（行为与层级解耦）。
 
-        - 源头（[种子仓库] 等）→ 追踪
-        - [userN]/[404userN]/[forkN]/[rawN] 且 N < MAX_TRACE_DEPTH → 追踪
-        - N >= MAX_TRACE_DEPTH → 不追踪（user 类同样受层数限制，
-          防止 [user1]→[fork2]→[user2]→[fork3]... 无底洞）
+        统一规则：层数 N < MAX_TRACE_DEPTH → 追踪；N >= MAX_TRACE_DEPTH → 不追踪。
+        - 源头 [种子仓库]/[kw0]/[cd0]（depth 0）→ 追踪（0 < MAX 恒成立）
+        - 源头配置为最大层级 [kw2]/[cd2]（MAX=2）→ 只解析不追踪
+        - [userN]/[404userN]/[forkN]/[rawN] → 按层数判断，
+          防止 [user1]→[fork2]→[user2]→[fork3]... 无底洞
         """
-        if tag in self.SOURCE_TAGS:
-            return True
-        kind = self._tag_kind(tag)
-        if kind in ("user", "404user", "fork", "raw"):
-            return self._tag_depth(tag) < MAX_TRACE_DEPTH
-        return True  # 未知标志位默认追踪（保守）
+        return self._tag_depth(tag) < MAX_TRACE_DEPTH
 
     def _child_tag(self, tag: str, kind: str) -> str:
         """生成子仓库标志位（层数 = 父层数 + 1）。"""
@@ -1724,9 +1705,8 @@ class Collector:
                 self._trace_fork_chain(repo, branch, pushed_at, tag)
         if USER_REPOS_ENABLED and kind not in ("user", "404user"):
             self._trace_user_repos(repo, branch, tag)
-        # 关键词/Code 搜索是新鲜源头（pushed:>24h），每次都要追踪，不记录
-        if tag in ("[关键词搜索]", "[code搜索]"):
-            return
+        # 统一记录：所有渠道执行追踪都记录层数（关键词/Code 按配置为 0 层，
+        # 与种子共享 0 层覆盖判断，30 天内不重复追踪未更新的仓库）
         self._mark_traced(repo, pushed_at, depth)
 
     def process_repo(self, repo: str, branch: str = "main",
@@ -1751,33 +1731,29 @@ class Collector:
         """
         github_url = f"https://github.com/{repo}"
 
-        # ── 语言过滤（HTML 等无价值仓库跳过） ──
-        if language and language in SKIP_LANGUAGES:
-            self._skip_counts["lang"] += 1
-            self._wlog(f"⏭️ {tag} 仓库 {github_url} 主要语言 {language}，跳过")
-            return (0, 0)
-
-        # ── pushed_at 为空 → 强制补查 repo info ──
-        if not pushed_at:
+        # ── 信息补全（判断前置）：缺字段 → 补查一次 repo info ──
+        # 语言过滤/已解析跳过/年龄判断都需完整信息，缺什么补什么（1 次 API）。
+        # 查不到（404/网络错误）→ 不跳过：用已有信息继续处理，
+        # 缺字段的对应判断自动退化（pushed_at 空 → 不跳过解析/年龄），
+        # 后续解析尝试失败自然返回（不再做"追踪用户"动作）。
+        if INFO_BACKFILL_ENABLED and (not pushed_at or not language):
+            self._backfill_count += 1
             ri = self.http.get_json(
                 f"https://api.github.com/repos/{repo}",
                 timeout=FILE_DOWNLOAD_TIMEOUT,
                 operation_name=f"repo info ({repo})")
             if ri:
-                pushed_at = ri.get("pushed_at", "")
+                pushed_at = ri.get("pushed_at", pushed_at)
                 branch = ri.get("default_branch", branch)
                 size = ri.get("size", size)
                 disabled = ri.get("disabled", disabled)
                 language = ri.get("language", language)
-            else:
-                # 仓库无法访问（404/隐藏/删除）→ 追踪该用户的其他仓库
-                # user 类仓库不追踪 user（防 user→user 无底洞）
-                if USER_REPOS_ENABLED and TRACE_USER_ON_404 \
-                        and self._tag_kind(tag) not in ("user", "404user"):
-                    self._wlog(f"🔍 仓库 {repo} 无法访问，追踪用户")
-                    self._trace_user_repos(
-                        repo, "main", self._child_tag(tag, "404user"))
-                return (0, 0)
+
+        # ── 语言过滤（HTML 等无价值仓库跳过）── 统一在补查后判断 ──
+        if language and language in SKIP_LANGUAGES:
+            self._skip_counts["lang"] += 1
+            self._wlog(f"⏭️ {tag} 仓库 {github_url} 主要语言 {language}，跳过")
+            return (0, 0)
 
         # 已处理仓库缓存检查（已解析 → 跳过解析，但按需追踪）
         if self._check_seen_cache(repo, pushed_at):
@@ -1863,16 +1839,20 @@ class Collector:
                 except RuntimeError:
                     raise
 
-        # 标记已处理
-        self._mark_seen_cache(repo, pushed_at)
+        # 标记已处理（记录解析产出的节点数 + 主要语言）
+        self._mark_seen_cache(repo, pushed_at,
+                              nodes_extracted=repo_stats[0],
+                              nodes_added=repo_stats[1],
+                              language=language)
 
-        # 种子自动收录：任何渠道只要有节点产出即加入
+        # 种子自动收录：唯一标准 = 提取出节点（extracted 含重复）。
+        # 隐含 24h 内更新条件——超龄仓库在年龄分支已跳过解析（extracted=0）。
         if AUTO_SEED_ENABLED and has_nodes_flag[0]:
-            repo_nodes = repo_stats[1]  # 新增（server_port_protocol 去重后）
+            repo_nodes = repo_stats[0]  # 提取出的有效节点数（extracted）
             seeds = getattr(self, '_repo_seeds', {})
-            if repo_nodes is not None and repo_nodes >= AUTO_SEED_MIN_NODES_FOR_SEED:
+            if repo_nodes and repo_nodes >= AUTO_SEED_MIN_NODES_FOR_SEED:
                 self._update_seed_entry(seeds, repo, repo_nodes, pushed_at)
-                self._wlog(f"🌱 加入种子: {repo} (+{repo_nodes} 节点)")
+                self._wlog(f"🌱 加入种子: {repo} (提取 {repo_nodes} 节点)")
 
         # Fork 链追踪 + 用户仓库遍历（按标志位判定是否追踪）
         if self._should_trace(tag):
@@ -1938,7 +1918,7 @@ class Collector:
                 break
             for fork in forks:
                 fn = fork.get("full_name")
-                if not fn or not self._check_and_add_seen(fn): continue
+                if not fn: continue
                 if len(qualified) >= FORK_SIBLING_MAX: break
                 qualified.append(fork)
             if len(qualified) >= FORK_SIBLING_MAX:
@@ -1983,7 +1963,7 @@ class Collector:
                 break
             for fork in forks:
                 fn = fork.get("full_name")
-                if not fn or not self._check_and_add_seen(fn): continue
+                if not fn: continue
                 if len(qualified) >= FORK_CHILD_MAX: break
                 qualified.append(fork)
             if len(qualified) >= FORK_CHILD_MAX:
@@ -1999,19 +1979,30 @@ class Collector:
 
         tag 决定子仓库标志位（[userN]/[forkN]），
         Worker 按 _should_trace(tag) 判断是否继续追踪。
+        入队时统一做：本轮去重（_check_and_add_seen）+ 追踪记录过滤（_is_traced）。
         """
         if not getattr(self, '_disc_queue', None):  # 降级：无共用池时串行
             for fork in forks:
+                fn = fork.get("full_name")
+                if not fn or not self._check_and_add_seen(fn): continue
                 fn, nn = self._process_fork_repo(fork, branch)
                 if nn > 0: self._wlog(f"  {label}: {fn} +{nn}")
                 time.sleep(REPO_SLEEP_SECONDS)
             return
 
-        # 有共用池 → 全部提交到发现队列
-        # 注意：调用方已通过 _check_and_add_seen 过滤，这里直接 put
+        # 有共用池 → 提交到发现队列
+        # 去重标记（_check_and_add_seen）统一在这里做（防并发重复入队）——
+        # 注意顺序：被 _is_traced 挡下的仓库不标记，本轮内它更新后可被重新发现；
+        # 已追踪过（低层覆盖且未超期）的仓库不入扩展队列，避免 Worker 空转
+        # （已解析跳过 + 无需追踪 = 0 价值）。仓库更新（pushed_at 不同）→
+        # _is_traced False → 照常入队重新解析/追踪。
+        depth = self._tag_depth(tag)
+        enqueued = 0
         for fork in forks:
             fn = fork.get("full_name")
-            if not fn: continue
+            if not fn or not self._check_and_add_seen(fn): continue
+            if self._is_traced(fn, fork.get("pushed_at", ""), depth):
+                continue
             self._disc_put(("GitHub", fn,
                             {"branch": fork.get("default_branch", branch),
                              "size": fork.get("size", -1),
@@ -2020,7 +2011,8 @@ class Collector:
                              "language": fork.get("language", ""),
                              "tag": tag}),
                            label=label)
-        self._wlog(f"  {label}: {len(forks)} 个 → {self._qs()}")
+            enqueued += 1
+        self._wlog(f"  {label}: {enqueued}/{len(forks)} 个 → {self._qs()}")
 
     def _trace_user_repos(self, repo: str, branch: str,
                           tag: str = "[种子仓库]"):
@@ -2051,8 +2043,6 @@ class Collector:
                     continue
                 if fn in found: continue
                 found.add(fn)
-                if not self._check_and_add_seen(fn):
-                    continue
                 if USER_REPOS_MAX_PER_USER and len(qualified) >= USER_REPOS_MAX_PER_USER:
                     break
                 qualified.append(r)
@@ -2691,22 +2681,18 @@ class Collector:
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
                         self._mark_repo_not_found(full_name)
-                        # 仓库被删除 → 追踪该用户的其他仓库（[404userN] 标志）
-                        # user 类仓库不追踪 user（防 user→user 无底洞）
-                        if USER_REPOS_ENABLED and TRACE_USER_ON_404 \
-                                and self._tag_kind(tag) not in ("user", "404user"):
-                            owner = full_name.split("/")[0]
-                            self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户 {owner}")
-                            self._trace_user_repos(
-                                full_name, "main",
-                                self._child_tag(tag, "404user"))
                     continue
             finally:
                 self._repo_checking.discard(rl)
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
-            # 异步：放入发现队列，不阻塞当前 Worker
             raw_tag = self._child_tag(tag, "raw")
+            # 入队前追踪判断：已追踪（覆盖且未超期）→ 不入扩展队列；
+            # 仓库更新（pushed_at 不同）→ _is_traced False → 照常入队
+            if self._is_traced(full_name, repo_info.get("pushed_at", ""),
+                               self._tag_depth(raw_tag)):
+                continue
+            # 异步：放入发现队列，不阻塞当前 Worker
             if getattr(self, '_disc_queue', None):
                 self._disc_put(("GitHub", full_name,
                                 {"branch": branch,
@@ -2757,13 +2743,6 @@ class Collector:
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
                         self._mark_repo_not_found(full_name)
-                        if USER_REPOS_ENABLED and TRACE_USER_ON_404 \
-                                and self._tag_kind(tag) not in ("user", "404user"):
-                            owner = full_name.split("/")[0]
-                            self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户 {owner}")
-                            self._trace_user_repos(
-                                full_name, "main",
-                                self._child_tag(tag, "404user"))
                     continue
             finally:
                 self._repo_checking.discard(rl)
@@ -2772,13 +2751,21 @@ class Collector:
             # README/聚合文件中的来源仓库 → 直接追踪该用户的所有仓库
             # （来源仓库的 owner 大概率有多个节点仓库，tag=[userN+1]）
             # user 类仓库不追踪 user（防 user→user 无底洞）
+            # 已追踪（覆盖且未超期）→ 跳过，避免重复查用户列表 API
             if USER_REPOS_ENABLED \
                     and self._tag_kind(tag) not in ("user", "404user"):
-                self._wlog(f"👤 来源仓库 {full_name} → 追踪用户 {full_name.split('/')[0]}")
-                self._trace_user_repos(full_name, branch,
-                                       self._child_tag(tag, "user"))
-            # 异步：放入发现队列，不阻塞当前 Worker
+                user_tag = self._child_tag(tag, "user")
+                if not self._is_traced(full_name,
+                                       repo_info.get("pushed_at", ""),
+                                       self._tag_depth(user_tag)):
+                    self._wlog(f"👤 来源仓库 {full_name} → 追踪用户 {full_name.split('/')[0]}")
+                    self._trace_user_repos(full_name, branch, user_tag)
             link_tag = self._child_tag(tag, "raw")  # README 链接也算 raw
+            # 入队前追踪判断：已追踪（覆盖且未超期）→ 不入扩展队列
+            if self._is_traced(full_name, repo_info.get("pushed_at", ""),
+                               self._tag_depth(link_tag)):
+                continue
+            # 异步：放入发现队列，不阻塞当前 Worker
             if getattr(self, '_disc_queue', None):
                 self._disc_put(("GitHub", full_name,
                                 {"branch": branch,

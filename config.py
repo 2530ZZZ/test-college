@@ -101,6 +101,13 @@ PAGE_SLEEP_SECONDS = 2.0
 # 论证：极端 100MB 仓库的 Contents API 逐层遍历可能需要数分钟。
 REPO_TIMEOUT_SECONDS = 600
 
+# 仓库信息补查开关（info backfill）。
+# 作用：process_repo 解析处理前，若判断所需的字段（pushed_at/language 等）
+#       缺失，补查一次 GET /repos/{repo} 拿全信息再判断。
+# 设为 False：不补查，缺什么用什么（缺 pushed_at 则跳过年龄/已解析判断直接处理）。
+# 默认值：True。补查次数在 _finalize 统计输出，可据此评估 API 消耗。
+INFO_BACKFILL_ENABLED = True
+
 # 仓库入口跳过年龄阈值（小时）。
 # 作用：超过此值的仓库跳过文件解析（省 Tree API），但仍追踪 fork/用户仓库。
 # 原理：这是唯一年龄阈值。仓库太旧时文件基本没变（SHA 缓存会跳过），
@@ -194,17 +201,6 @@ USER_REPOS_ENABLED = True
 # 每个用户最多额外查询几个仓库（通过 repos API 分页获取）
 # 默认 30，取值范围 5-100。设为 0 表示不限制。
 USER_REPOS_MAX_PER_USER = 30
-
-# 仓库无法访问（404/隐藏/删除）时，是否追踪该用户名下仓库。
-# 作用：README 来源仓库被删、种子仓库被隐藏时，其 owner 可能还有
-#       其他节点仓库，追踪用户弥补损失。
-# 触发：任何仓库处理时 404（种子入队、process_repo 补查、递归发现），
-#       无论该仓库本身是否需追踪。
-# 产出：追踪出的用户仓库标志 [404userN]，处理时只追踪 fork/raw（不追踪 user）。
-# 成本：每个 404 仓库 1 次用户 repos API + N 个仓库入队。
-#       404 较多时配额消耗增加，可关闭。
-# 默认值：True。
-TRACE_USER_ON_404 = True
 
 # ==================== 日志配置 ====================
 
@@ -577,10 +573,18 @@ DISCOVERY_QUEUE_SIZE = 20000
 #   [userN]/[404userN] → 用户仓库，可追踪（只 fork/raw，不追踪 user）
 #   [forkN]/[rawN]     → N < 此值：处理 + 继续追踪（像源头仓库）
 #                        N ≥ 此值：直接处理不追踪
-#   [种子仓库]/[code搜索]/[关键词搜索] → 源头，层数视为 0，总是追踪
+#   [种子仓库]/[kwN]/[cdN] → 源头，层数由 KEYWORD_TRACE_DEPTH/CODE_TRACE_DEPTH 决定
 # 默认值：1（暂时只追踪一层，多层逻辑保留，后续可调大）。
 # 取值范围 1-5。设 1 = 只追踪一层（等价旧 TRACE_ONCE_ONLY）。
 MAX_TRACE_DEPTH = 1
+
+# 关键词/Code 入主队列时的源头层级（行为与层级解耦）。
+# 作用：决定这两类源头仓库入队后的行为——
+#   0              = 按种子逻辑追踪到最大层级（记录 traced 0，30 天超期重追踪）
+#   MAX_TRACE_DEPTH = 只解析这个仓库，不追踪（depth == MAX → 不再展开）
+# 默认值：0。合法取值：0 或 MAX_TRACE_DEPTH。
+KEYWORD_TRACE_DEPTH = 0
+CODE_TRACE_DEPTH = 0
 
 # 发现队列强制消费阈值。
 # 作用：当发现队列超过此值时，所有 Worker 强制消费发现队列（不取主队列）。
@@ -595,7 +599,7 @@ DISC_FORCE_CONSUME_AT = 19000
 #       disc ≥ 此值时全部消费 disc（队列非空，Worker 满负荷不空转）。
 #       源头数量自然受限：disc 增长后自动停止补充。
 # 默认值：200（disc 低于 200 就积极补源头，扩展队列空的时间更少）。
-DISC_MAIN_OK_AT = 500
+DISC_MAIN_OK_AT = 1000
 
 # 主队列取仓库冷却时间（秒）。
 # 作用：Worker 取完一个主队列仓库后，必须等此时间才能再取。
@@ -603,7 +607,7 @@ DISC_MAIN_OK_AT = 500
 #       disc 低于阈值（DISC_MAIN_OK_AT）且冷却结束才补充下一个源头。
 #       锁（_main_take_lock）保证同一瞬间只有一个 Worker 执行取动作（原子性）。
 # 默认值：60。建议 30-120。设 0 = 无冷却（不推荐，源头会过快补充）。
-MAIN_TAKE_COOLDOWN = 30
+MAIN_TAKE_COOLDOWN = 10
 
 # 同时允许几个源头仓库（从主队列取出正在处理）运行。
 # 作用：限制扩展仓库的"产生方"数量，防队列膨胀。
