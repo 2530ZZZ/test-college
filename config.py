@@ -264,6 +264,12 @@ CODE_STAGE_ENABLED = True
 # 阶段 3: 关键词搜索阶段
 KEYWORD_STAGE_ENABLED = True
 
+# 404 仓库持久化文件（跨运行跳过，避免每轮重复查询死链接）。
+# 作用：repo info 返回 404 的仓库记录到文件，下轮直接跳过（_is_repo_dead），
+#       不再重复消耗 API。文件在 _finalize 时重写（去重 + 上限 NOT_FOUND_REPOS_MAX）。
+NOT_FOUND_REPOS_FILE = "not_found_repos.txt"
+NOT_FOUND_REPOS_MAX = 5000
+
 # ==================== 已处理仓库持久化 ====================
 
 # 是否启用已处理仓库持久化（seen_cache）。

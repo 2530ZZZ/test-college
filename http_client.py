@@ -70,6 +70,10 @@ class HttpClient:
         self._raw_total = 0            # 累计字节
         self._raw_count = 0            # 累计文件数
 
+        # 最近 404 的 operation_name 集合（区分 404 与网络错误用，
+        # 调用方 get_json 返回 None 后查此集合决定 404 处理）
+        self.last_404 = set()
+
         # 构建带重试策略的 Session
         self.session = self._create_session(pool_connections, pool_maxsize)
 
@@ -272,6 +276,7 @@ class HttpClient:
                     log_sink.emit(f"[{_now()}] {operation_name} 202 (限流)，跳过")
                     return None
                 if resp.status_code == 404:
+                    self.last_404.add(operation_name)
                     log_sink.emit(f"[{_now()}] {operation_name} 404，跳过")
                     return None
                 if resp.status_code == 409:

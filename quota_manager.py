@@ -49,6 +49,7 @@ class QuotaManager:
         self._window_calls = 0        # 当前窗口已用次数（整点统计）
         self.throttle_count = 0       # 主动延迟次数（统计用）
         self.failed_calls = 0         # 失败调用次数（403/网络错误）
+        self._reset_wait_logged = False  # 配额等待日志去重（跨线程只打一条）
 
     @staticmethod
     def _bj_now() -> str:
@@ -174,8 +175,16 @@ class QuotaManager:
     def wait_for_reset(self, should_stop: callable = None) -> bool:
         """配额耗尽时暂停等待 GitHub 窗口恢复。
 
-        优先使用 GitHub 返回的 X-RateLimit-Reset 时间戳，
-        无数据时估算（window_start + 3600 + 10s 冗余）。
+        优先使用 GitHub 返回的 X-RateLimit-Reset 时间戳（真实恢复时间），
+        无数据时才用本地估算（window_start + 3600 + 10s 冗余）。
+
+        重要：重置时不更新 window_start——由 check() 在下一次 API 调用时
+        自然更新。若在此更新，第一个恢复的线程会重置它，其他等待线程的
+        估算条件（now - window_start >= 3600）将永久不满足 → 睡死
+        （08071 日志：17:01 耗尽后 23 个 work 睡到运行结束，只剩 W-13 独活）。
+
+        日志去重：首次进入打印一条"配额耗尽"，多线程并发只打一次
+        （_reset_wait_logged 实例标志），恢复时复位。
 
         Args:
             should_stop: 返回 True 表示应提前终止（如运行超时）。
@@ -184,43 +193,48 @@ class QuotaManager:
             True: 配额已恢复可以继续
             False: 提前终止
         """
-        _logged = False
         while True:
             with self._lock:
                 now = time.time()
-                # 有 GitHub 真实重置时间
-                if self._reset_time and now >= self._reset_time:
-                    self.calls = 0
-                    self.window_start = now
-                    self._reset_time = 0
-                    self.exceeded = False
-                    if _logged:
-                        log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
-                    return True
-                # 估算：window_start + 3600
-                if now - self.window_start >= 3600:
-                    self.calls = 0
-                    self.window_start = now
-                    self.exceeded = False
-                    return True
-            # 首次等待日志
-            if not _logged:
-                _logged = True
-                wait = 0
                 if self._reset_time:
-                    wait = max(0, self._reset_time - time.time())
+                    # 有 GitHub 真实重置时间 → 严格按它等（不提前恢复，避免 403 风暴）
+                    if now >= self._reset_time:
+                        self.calls = 0
+                        self._reset_time = 0
+                        self.exceeded = False
+                        if self._reset_wait_logged:
+                            self._reset_wait_logged = False
+                            log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
+                        return True
                 else:
-                    wait = 3600 - (time.time() - self.window_start) + 10
-                reset_bj = datetime.fromtimestamp(
-                    time.time() + wait, tz=timezone(timedelta(hours=8))
-                ).strftime('%H:%M')
+                    # 无真实时间 → 本地估算（window_start + 3600）
+                    if now - self.window_start >= 3600:
+                        self.calls = 0
+                        self.exceeded = False
+                        if self._reset_wait_logged:
+                            self._reset_wait_logged = False
+                            log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
+                        return True
+            # 首次等待日志（跨线程去重）
+            if not self._reset_wait_logged:
+                self._reset_wait_logged = True
+                with self._lock:
+                    wait = 0
+                    if self._reset_time:
+                        wait = max(0, self._reset_time - time.time())
+                    else:
+                        wait = 3600 - (time.time() - self.window_start) + 10
+                    reset_bj = datetime.fromtimestamp(
+                        time.time() + wait, tz=timezone(timedelta(hours=8))
+                    ).strftime('%H:%M')
                 log_sink.emit(f"[{self._bj_now()}] "
                       f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait/60:.0f}min 至 {reset_bj} 北京时间")
             # 计算等待时长
-            if self._reset_time:
-                wait = max(0, self._reset_time - time.time()) + 2
-            else:
-                wait = 3600 - (time.time() - self.window_start) + 10
+            with self._lock:
+                if self._reset_time:
+                    wait = max(0, self._reset_time - time.time()) + 2
+                else:
+                    wait = 3600 - (time.time() - self.window_start) + 10
             sleep_sec = min(30, wait)
             if sleep_sec > 0:
                 time.sleep(sleep_sec)

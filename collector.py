@@ -60,6 +60,7 @@ from config import (
     SEED_MAX_AGE_HOURS, SEED_MAX_ENTRIES, SEED_EVICTION_RATIO,
     SEEN_REPOS_PERSIST_ENABLED, SEEN_REPOS_DIR, SEEN_REPOS_MAX_BYTES,
     SEEN_CACHE_MAX_ENTRIES, SEEN_CACHE_EVICTION_RATIO,
+    NOT_FOUND_REPOS_FILE, NOT_FOUND_REPOS_MAX,
     SUB_URL_MAX_PER_FILE, SAFE_WRITE_ENABLED,
     SEED_STAGE_ENABLED, CODE_STAGE_ENABLED, KEYWORD_STAGE_ENABLED,
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
@@ -183,6 +184,19 @@ class Collector:
         # 加载持久化状态
         self.load_sha_cache()
         self.load_seen_cache()
+
+        # 加载 404 仓库持久化（跨运行跳过死链接，避免每轮重复查询）
+        try:
+            if os.path.exists(NOT_FOUND_REPOS_FILE):
+                with open(NOT_FOUND_REPOS_FILE, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip().lower()
+                        if line:
+                            self._repo_not_found.add(line)
+                if self._repo_not_found:
+                    self._wlog(f"已加载 404 仓库 {len(self._repo_not_found)} 条")
+        except Exception:
+            pass
 
     # ── 线程安全 HTTP 客户端 ──
 
@@ -555,8 +569,11 @@ class Collector:
                 ]
                 _ts = now_str()
                 log_sink.emit(f"[{_ts}] " + f"\n[{_ts}] ".join(lines))
-            except Exception:
-                pass  # 监控失败不影响主流程
+            except Exception as e:
+                # 首次异常打印一次（定位监控静默根因），之后静默不影响主流程
+                if not getattr(self, '_monitor_err_logged', False):
+                    self._monitor_err_logged = True
+                    self._wlog(f"⚠️ 监控输出异常（仅记录一次）: {e}")
 
     def _disc_put(self, item: tuple, label: str = ""):
         """放入发现队列（PriorityQueue）。
@@ -664,8 +681,17 @@ class Collector:
         return r in self._repo_not_found or r in self._repo_forbidden
 
     def _mark_repo_not_found(self, repo: str):
-        """标记仓库为 404（不存在/已删除），本次运行内不再重试。"""
-        self._repo_not_found.add(repo.lower())
+        """记录 404 仓库（本轮内存 + 持久化文件追加，跨运行跳过）。"""
+        r = repo.lower()
+        with self._state_lock:
+            if r in self._repo_not_found:
+                return
+            self._repo_not_found.add(r)
+        try:
+            with open(NOT_FOUND_REPOS_FILE, "a", encoding="utf-8") as f:
+                f.write(r + "\n")
+        except Exception:
+            pass
 
     def _mark_repo_forbidden(self, repo: str):
         """标记仓库为 403 访问拒绝（私有/被封），本次运行内不再重试。"""
@@ -1095,7 +1121,8 @@ class Collector:
                 "nodes_new": self._channel_new_nodes.get("GitHub", 0),
                 "api_calls": self.quota_mgr.total_calls,
                 "api_report": self.quota_mgr.get_stats_report()}
-            self._wait_queue_drain(main_queue, disc_queue)
+            # 最后收尾阶段：等两个队列全清空再停 work
+            self._wait_queue_drain(main_queue, disc_queue, wait_full=True)
 
         # ── 停止 Worker（优雅退出：sentinel 通知，处理完当前仓库即退出） ──
         for _ in workers: main_queue.put((float('inf'), -1, None))
@@ -1116,10 +1143,25 @@ class Collector:
             w.join(timeout=remaining)
         self._task_queue = None
 
-    def _wait_queue_drain(self, main_queue, disc_queue):
-        """等待主队列 + 发现队列全清空（配额耗尽则等待恢复）。"""
+    def _wait_queue_drain(self, main_queue, disc_queue, wait_full: bool = False):
+        """等待队列清空（阶段切换条件）。
+
+        默认（wait_full=False）：主队列空 AND 发现队列剩余 < work 数——
+        剩余量一个 work 就能快速消费完，直接进入下一阶段，work 继续处理
+        遗留 disc（不再死等 disc 清空，避免阶段 1 无限拖长）。
+        wait_full=True（最后收尾阶段 3）：等两个队列全清空再停 work。
+
+        配额耗尽则等待恢复。
+        """
         self._wlog(f"⏳ 等待队列清空 ({self._qs()})...")
-        while main_queue.qsize() > 0 or disc_queue.qsize() > 0:
+        while True:
+            if wait_full:
+                done = main_queue.qsize() == 0 and disc_queue.qsize() == 0
+            else:
+                done = (main_queue.qsize() == 0
+                        and disc_queue.qsize() < SHARED_POOL_WORKERS)
+            if done:
+                break
             if self.limiter.should_stop() or self._runtime_exceeded():
                 self._wlog(f"⚠️ 停止信号，放弃剩余任务")
                 break
@@ -1129,7 +1171,7 @@ class Collector:
                 self._wlog(f"🔄 配额恢复，继续处理 | {self._qs()}")
                 continue
             time.sleep(3)
-        self._wlog(f"队列处理完毕")
+        self._wlog(f"队列处理完毕 ({self._qs()})")
 
     # ── 搜集实现 ──
 
@@ -1149,18 +1191,19 @@ class Collector:
         for _idx, repo in enumerate(seed_list, 1):
             if self._should_stop(): break
             if not self._wait_queue_slot(task_queue): break
-            _prefix = f"🔵 [种子 {_idx}/{len(seed_list)}] {repo}"
+            _prefix = f"[种子 {_idx}/{len(seed_list)}]"
             if not self._main_put(("种子仓库", repo,
                                    {"seed_key": repo,
-                                    "tag": "[种子仓库]"})):
+                                    "tag": "[种子仓库]",
+                                    "pos": _prefix})):
                 self._wlog(f"🗑️ 主队列满，丢弃种子 {repo}")
                 continue
             self._add_seen(repo)  # 标记去重，防止 fork/用户追踪重复发现
             self.checked_count += 1
             self._main_queue_total += 1
-            self._wlog(f"{_prefix} | {self._qt()} | {self._qs()}")
+            self._wlog(f"🔵 {_prefix} {repo} | {self._qt()} | {self._qs()}")
             self._update_seed_entry(repo_seeds, repo, 0)
-            time.sleep(REPO_SLEEP_SECONDS)
+            # 种子纯入队（零 API），无需 sleep；背压由 _wait_queue_slot 控制
         self._worker_local.prefix = ""
 
     def _collect_keywords(self, task_queue: Queue):
@@ -1188,7 +1231,7 @@ class Collector:
             qs = time.time()
             if self._should_stop(): break
             try:
-                self._search_query_to_queue(query, task_queue)
+                self._search_query_to_queue(query, task_queue, idx)
             except RuntimeError:
                 break
             self._wlog(f"⏱️ [{idx}/{len(all_queries)}] "
@@ -1310,14 +1353,16 @@ class Collector:
                     continue
                 source, repo, kwargs = item
                 tag = kwargs.get("tag", "")
+                pos = kwargs.get("pos", "")      # 位置信息（种子序号/关键词页码）
+                pos_txt = f" {pos}" if pos else ""
                 self.http = HttpClient(token=self.token, rate_limiter=None,
                                        quota_manager=self.quota_mgr,
                                        api_gate=self.api_gate)
                 _t0 = time.time()
                 self._set_worker_state(f"处理 {tag} {repo}")
-                self._wlog(f"🔧 开始处理 {tag} {repo}")
+                self._wlog(f"🔧 开始处理 {tag} {repo}{pos_txt}")
                 extracted, added = self.process_repo(repo, **kwargs)
-                self._wlog(f"✅ 完成 {tag} {repo} | 提取 {extracted} | 新增 {added} "
+                self._wlog(f"✅ 完成 {tag} {repo}{pos_txt} | 提取 {extracted} | 新增 {added} "
                       f"| 耗时 {time.time()-_t0:.0f}s | {self._qt()} | {self._qs()}")
                 tn = threading.current_thread().name
                 self._worker_repo_count[tn] = self._worker_repo_count.get(tn, 0) + 1
@@ -1337,13 +1382,17 @@ class Collector:
                     except Exception:
                         pass
 
-    def _search_query_to_queue(self, query: str, task_queue: Queue):
+    def _search_query_to_queue(self, query: str, task_queue: Queue, q_idx: int = 0):
         """搜索单个关键词，结果直接放进线程池队列。"""
         has_cjk = bool(re.search(r'[一-鿿]', query))
         max_p = (MAX_PAGES * MAX_PAGES_ZH_MULTIPLIER) if has_cjk else MAX_PAGES
 
         for page in range(1, max_p + 1):
             if self._should_stop(): return
+            # 配额耗尽 → 暂停搜索（等恢复再继续，不发必失败的请求）
+            if self.quota_mgr.exceeded:
+                if not self._wait_reset():
+                    return
             if not self._wait_queue_slot(task_queue): return
             url = (f"https://api.github.com/search/repositories"
                    f"?q={query}&sort=updated&order=desc"
@@ -1372,7 +1421,8 @@ class Collector:
                                         "pushed_at": pushed,
                                         "is_source": True,
                                         "language": item.get("language", ""),
-                                        "tag": f"[kw{KEYWORD_TRACE_DEPTH}]"})):
+                                        "tag": f"[kw{KEYWORD_TRACE_DEPTH}]",
+                                        "pos": f"[关键词 {q_idx} 第{page}页]"})):
                     self._wlog(f"🗑️ 主队列满，丢弃 {repo}")
             time.sleep(PAGE_SLEEP_SECONDS)
 
@@ -1406,6 +1456,10 @@ class Collector:
 
             for page in range(1, CODE_MAX_PAGES + 1):
                 if self._should_stop(): break
+                # 配额耗尽 → 暂停搜索（等恢复再继续，不发必失败的请求）
+                if self.quota_mgr.exceeded:
+                    if not self._wait_reset():
+                        return
                 if not self._wait_queue_slot(task_queue): return
 
                 url = (f"https://api.github.com/search/code"
@@ -1454,7 +1508,8 @@ class Collector:
                                             "pushed_at": repo_data.get("pushed_at", ""),
                                             "is_source": True,
                                             "language": repo_data.get("language", ""),
-                                            "tag": cd_tag})):
+                                            "tag": cd_tag,
+                                            "pos": f"[Code {idx}/{len(CODE_QUERIES)} 第{page}页]"})):
                             self.checked_count += 1
                             self._main_queue_total += 1
                         else:
@@ -1557,6 +1612,16 @@ class Collector:
                   f"({', '.join(self._quota_exhausted_times)}) UTC", flush=True)
 
         # ── 跳过/失败统计 ──
+        # 404 仓库持久化（去重 + 上限，跨运行跳过死链接）
+        try:
+            nf = sorted(self._repo_not_found)
+            if len(nf) > NOT_FOUND_REPOS_MAX:
+                nf = nf[-NOT_FOUND_REPOS_MAX:]
+            with open(NOT_FOUND_REPOS_FILE, "w", encoding="utf-8") as f:
+                f.write("\n".join(nf) + "\n")
+        except Exception:
+            pass
+
         print(f"\n===== 仓库处理统计 =====", flush=True)
         print(f"  404 仓库: {len(self._repo_not_found)} 个 | 403 仓库: {len(self._repo_forbidden)} 个", flush=True)
         sk = self._skip_counts
@@ -1748,6 +1813,19 @@ class Collector:
                 size = ri.get("size", size)
                 disabled = ri.get("disabled", disabled)
                 language = ri.get("language", language)
+            elif f"repo info ({repo})" in self.http.last_404:
+                # 404（仓库不存在/被隐藏）→ 记录跳过（持久化，下轮不再查）
+                # + 追踪该用户的其他仓库（补偿损失，无条件触发）。
+                # 用户仓库层级 = 当前层 + 1（[404userN]），后续按层级规则处理。
+                # user/404user 类不追踪 user（防 user→user 递归）。
+                self._mark_repo_not_found(repo)
+                if USER_REPOS_ENABLED \
+                        and self._tag_kind(tag) not in ("user", "404user"):
+                    self._wlog(f"🔍 仓库 {repo} 不存在（404），追踪用户")
+                    self._trace_user_repos(repo, "main",
+                                           self._child_tag(tag, "404user"))
+                return (0, 0)
+            # 网络错误/其他 → 不跳过：用已有信息继续处理
 
         # ── 语言过滤（HTML 等无价值仓库跳过）── 统一在补查后判断 ──
         if language and language in SKIP_LANGUAGES:
@@ -2680,13 +2758,25 @@ class Collector:
                     operation_name=f"repo info ({full_name})")
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
-                        self._mark_repo_not_found(full_name)
+                        if f"repo info ({full_name})" in self.http.last_404:
+                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）
+                            self._mark_repo_not_found(full_name)
+                            if USER_REPOS_ENABLED \
+                                    and self._tag_kind(tag) not in ("user", "404user"):
+                                self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户")
+                                self._trace_user_repos(
+                                    full_name, "main",
+                                    self._child_tag(tag, "404user"))
                     continue
             finally:
                 self._repo_checking.discard(rl)
             branch = repo_info.get("default_branch", "main")
             self._branch_cache[full_name] = branch
-            raw_tag = self._child_tag(tag, "raw")
+            # raw 链层数封顶：子层 = min(父层+1, MAX_TRACE_DEPTH)。
+            # 防 [raw1]→[raw2]→[raw3]... 无限加深（raw 入队不受 _should_trace
+            # 门控——达上限的 raw 仓库照常入队解析，但不产生更深层）。
+            # 封顶后同层链接被 _check_and_add_seen 去重拦截。
+            raw_tag = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
             # 入队前追踪判断：已追踪（覆盖且未超期）→ 不入扩展队列；
             # 仓库更新（pushed_at 不同）→ _is_traced False → 照常入队
             if self._is_traced(full_name, repo_info.get("pushed_at", ""),
@@ -2742,7 +2832,15 @@ class Collector:
                     operation_name=f"repo info ({full_name})")
                 if not repo_info or repo_info.get('disabled', False):
                     if not repo_info:
-                        self._mark_repo_not_found(full_name)
+                        if f"repo info ({full_name})" in self.http.last_404:
+                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）
+                            self._mark_repo_not_found(full_name)
+                            if USER_REPOS_ENABLED \
+                                    and self._tag_kind(tag) not in ("user", "404user"):
+                                self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户")
+                                self._trace_user_repos(
+                                    full_name, "main",
+                                    self._child_tag(tag, "404user"))
                     continue
             finally:
                 self._repo_checking.discard(rl)
@@ -2750,9 +2848,12 @@ class Collector:
             self._branch_cache[full_name] = branch
             # README/聚合文件中的来源仓库 → 直接追踪该用户的所有仓库
             # （来源仓库的 owner 大概率有多个节点仓库，tag=[userN+1]）
-            # user 类仓库不追踪 user（防 user→user 无底洞）
-            # 已追踪（覆盖且未超期）→ 跳过，避免重复查用户列表 API
+            # 门控：父 tag 层级 < MAX_TRACE_DEPTH 才追踪（源头 0 层允许产生
+            #       [user1]；[raw1]/[fork1] 等已达上限层不再追踪 → 修 [user2] 绕过）
+            #       user 类仓库不追踪 user（防 user→user 无底洞）
+            #       已追踪（覆盖且未超期）→ 跳过，避免重复查用户列表 API
             if USER_REPOS_ENABLED \
+                    and self._should_trace(tag) \
                     and self._tag_kind(tag) not in ("user", "404user"):
                 user_tag = self._child_tag(tag, "user")
                 if not self._is_traced(full_name,
@@ -2760,7 +2861,7 @@ class Collector:
                                        self._tag_depth(user_tag)):
                     self._wlog(f"👤 来源仓库 {full_name} → 追踪用户 {full_name.split('/')[0]}")
                     self._trace_user_repos(full_name, branch, user_tag)
-            link_tag = self._child_tag(tag, "raw")  # README 链接也算 raw
+            link_tag = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"  # README 链接也算 raw（层数封顶）
             # 入队前追踪判断：已追踪（覆盖且未超期）→ 不入扩展队列
             if self._is_traced(full_name, repo_info.get("pushed_at", ""),
                                self._tag_depth(link_tag)):
