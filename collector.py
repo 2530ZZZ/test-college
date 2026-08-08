@@ -156,6 +156,14 @@ class Collector:
         self._cd_progress = ""                          # 如 "2/5 第3/5页"
         self._clone_repos = 0                           # Partial Clone 成功仓库数
         self._clone_files = 0                           # Partial Clone 列出文件数
+        # ── Clone 统计（CLONE_FIRST 实验数据，_finalize 写 clone_stats.json）──
+        self._clone_stats = []                          # 每次 clone: (repo, size_kb, time_s, files, ok)
+        self._clone_fail_details = []                   # 失败明细: (repo, size_kb, reason)
+        self._clone_fail_breakdown = {}                 # 失败分类计数: {"timeout": n, ...}
+        self._clone_active = 0                          # 当前进行中 clone 数（监控采样）
+        self._clone_active_peak = 0                     # clone 并发峰值（监控采样）
+        self._cpu_load_peak = 0.0                       # CPU 负载峰值（监控采样，clone_stats）
+        self._disk_free_min = 999.0                     # 磁盘可用最低（GB，监控采样）
         self._last_activity = 0.0                       # 最近一次 _wlog 时间（监控降频信号）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
@@ -583,6 +591,9 @@ class Collector:
                 used_gb, total_gb = self._read_mem_gb()
                 mem_pct = used_gb / total_gb * 100 if total_gb else 0
                 disk_free_gb, disk_total_gb = self._read_disk_gb()
+                # 资源峰值采样（clone_stats.json 用）
+                self._cpu_load_peak = max(self._cpu_load_peak, load)
+                self._disk_free_min = min(self._disk_free_min, disk_free_gb)
                 net = self._net_status()
                 _hw = getattr(getattr(self, 'http', None), '_raw_window', [])
                 _raw60_mb = sum(b for _, b in _hw) / 1024 / 1024
@@ -603,7 +614,9 @@ class Collector:
                     f"   API: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
                     f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB | "
-                    f"clone {self._clone_repos}仓库/{self._clone_files}文件",
+                    f"clone {self._clone_repos}仓库/{self._clone_files}文件"
+                    f" | 并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
+                    f"(峰值{self._clone_active_peak})",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
                     f"关键词 {self._kw_progress or '-'} | "
                     f"Code {self._cd_progress or '-'}",
@@ -1640,6 +1653,10 @@ class Collector:
             self.save_sha_cache()
         except Exception as e:
             self._wlog(f"⚠️ SHA 缓存保存异常: {e}")
+        try:
+            self._save_clone_stats(elapsed_seconds)
+        except Exception as e:
+            self._wlog(f"⚠️ clone_stats 保存异常: {e}")
 
         # ── 分渠道统计 ──
         print(f"\n{'='*60}", flush=True)
@@ -1993,7 +2010,8 @@ class Collector:
         # 主要路径：递归树 API
         if USE_RECURSIVE_TREE:
             success = self._process_with_recursive_tree(
-                repo, branch, has_nodes_flag, raw_depth, repo_stats, tag)
+                repo, branch, has_nodes_flag, raw_depth, repo_stats, tag,
+                size_kb=size)
             if not success:
                 # 树 API 404 可能是因为分支名不对（种子仓库进来默认是 main），
                 # 懒查真实分支名，只消耗 1 次 API 调用，然后重试
@@ -2001,7 +2019,8 @@ class Collector:
                 if actual_branch and actual_branch != branch:
                     self._wlog(f"  分支名修正: {branch} → {actual_branch}")
                     success = self._process_with_recursive_tree(
-                        repo, actual_branch, has_nodes_flag, raw_depth, repo_stats, tag)
+                        repo, actual_branch, has_nodes_flag, raw_depth, repo_stats, tag,
+                        size_kb=size)
 
             if not success:
                 if CONTENTS_API_FALLBACK_ENABLED:
@@ -2249,7 +2268,8 @@ class Collector:
                                      has_nodes: List[bool],
                                      raw_depth: int = 0,
                                      stats: List[int] = None,
-                                     tag: str = "[种子仓库]") -> bool:
+                                     tag: str = "[种子仓库]",
+                                     size_kb: int = -1) -> bool:
         """使用 git/trees API 获取递归文件树。
 
         一次 API 调用获取全仓库文件列表，然后过滤、下载、提取。
@@ -2257,6 +2277,7 @@ class Collector:
         Args:
             stats: [extracted, added] 本仓库级统计累加。
             tag: 仓库标志位（透传给 _handle_one_file 用于递归发现）。
+            size_kb: 仓库大小（KB，clone 统计用；-1 = 未知）。
 
         Returns:
             True 表示处理成功，False 表示需要回退到 Contents API
@@ -2266,7 +2287,7 @@ class Collector:
 
         # ── Clone-First 模式：跳过树 API，直接 git clone 拿文件树（零核心 API）──
         if CLONE_FIRST_MODE:
-            entries = self._partial_clone_file_list(repo, branch)
+            entries = self._partial_clone_file_list(repo, branch, size_kb=size_kb)
             if entries is not None:
                 return self._process_file_list(repo, branch, entries,
                                                has_nodes, raw_depth, stats, tag)
@@ -2289,7 +2310,7 @@ class Collector:
         if data.get('truncated', False):
             if PARTIAL_CLONE_ENABLED:
                 self._wlog(f"树数据被截断，尝试 Partial Clone 获取完整文件树")
-                entries = self._partial_clone_file_list(repo, branch)
+                entries = self._partial_clone_file_list(repo, branch, size_kb=size_kb)
                 if entries is not None:
                     # entries 与 tree API 格式相同，走共用过滤逻辑
                     return self._process_file_list(repo, branch, entries,
@@ -2431,7 +2452,43 @@ class Collector:
 
         return True
 
-    def _partial_clone_file_list(self, repo: str, branch: str):
+    def _record_clone(self, repo: str, size_kb: int, time_s: float,
+                      files: int, ok: bool, reason: str, detail: str):
+        """记录一次 clone 结果（CLONE_FIRST 实验统计，_finalize 聚合写 JSON）。"""
+        try:
+            self._clone_stats.append((repo, size_kb, time_s, files, ok))
+            if not ok:
+                self._clone_fail_breakdown[reason] = \
+                    self._clone_fail_breakdown.get(reason, 0) + 1
+                self._clone_fail_details.append(
+                    {"repo": repo, "size_kb": size_kb, "time_s": round(time_s),
+                     "reason": reason, "detail": detail})
+                self._repos_by_result["clone_fail"].append(
+                    f"https://github.com/{repo}")  # 汇总展示
+                self._wlog(f"⚠️ Partial Clone 失败 [{reason}]: {repo} "
+                      f"({time_s:.0f}s) {detail[:200]}")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _classify_clone_error(err_text: str) -> str:
+        """按 stderr 关键词分类 clone 失败原因（统计用）。"""
+        e = (err_text or "").lower()
+        if "repository not found" in e:
+            return "repo_not_found"
+        if "rate limit" in e or "too many" in e or "429" in e:
+            return "rate_limit"
+        if "authentication" in e or "invalid username" in e \
+                or "access denied" in e or "403" in e:
+            return "auth"
+        if "repository has been disabled" in e or "disabled" in e:
+            return "disabled"
+        if "ls-tree" in e:
+            return "ls_tree"
+        return "other"
+
+    def _partial_clone_file_list(self, repo: str, branch: str,
+                                 size_kb: int = -1):
         """用 git partial clone 获取完整文件列表（零 API 配额）。
 
         git clone --filter=blob:none 只下载 commit + tree 对象（路径名），
@@ -2448,6 +2505,8 @@ class Collector:
         import signal
         tmp = tempfile.mkdtemp(prefix="pclone_")
         acquired = False
+        _t0 = time.time()
+        _size_kb = size_kb if size_kb is not None else -1
         try:
             token = self.token or GITHUB_TOKEN
             if not token:
@@ -2456,7 +2515,14 @@ class Collector:
             # 并发限制（最多 PARTIAL_CLONE_CONCURRENCY 个 clone）
             self._clone_sem.acquire()
             acquired = True
+            self._clone_active += 1  # 监控采样
+            if self._clone_active > self._clone_active_peak:
+                self._clone_active_peak = self._clone_active
             self._set_worker_state(f"PartialClone {repo}")
+            # 大仓库标记日志（size > 1GB = 1024*1024 KB），实时观察大仓库影响
+            if _size_kb > 1024 * 1024:
+                self._wlog(f"📦 大仓库 [{_size_kb/1024/1024:.1f}GB] clone 开始: {repo} "
+                      f"(并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY})")
             clone_url = f"https://x-access-token:{token}@github.com/{repo}.git"
             # 不带 --branch：用远端 HEAD（默认分支），避免分支名错误导致 clone 失败
             # （种子仓库默认传 main，实际分支可能是 master，--branch 错则直接失败）。
@@ -2471,22 +2537,20 @@ class Collector:
             except subprocess.TimeoutExpired:
                 os.killpg(p.pid, signal.SIGKILL)  # 只杀自己的 git 进程组
                 p.communicate()
-                self._repos_by_result["clone_fail"].append(
-                    f"https://github.com/{repo}")  # 汇总展示
-                self._wlog(f"⚠️ Partial Clone 超时（{PARTIAL_CLONE_TIMEOUT}s），放弃")
+                self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
+                                   "timeout", f"超时 {PARTIAL_CLONE_TIMEOUT}s")
                 return None
             if p.returncode != 0:
-                self._repos_by_result["clone_fail"].append(
-                    f"https://github.com/{repo}")
-                self._wlog(f"⚠️ Partial Clone 失败: {(err_text or '')[:200]}")
+                reason = self._classify_clone_error(err_text or "")
+                self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
+                                   reason, (err_text or "")[-800:])
                 return None
             r2 = subprocess.run(
                 ["git", "-C", tmp, "ls-tree", "-r", "-l", "HEAD"],
                 capture_output=True, text=True, timeout=300)
             if r2.returncode != 0:
-                self._repos_by_result["clone_fail"].append(
-                    f"https://github.com/{repo}")
-                self._wlog(f"⚠️ ls-tree 失败")
+                self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
+                                   "ls_tree", (r2.stderr or "")[-800:])
                 return None
             entries = []
             for line in r2.stdout.splitlines():
@@ -2511,14 +2575,21 @@ class Collector:
             with self._state_lock:
                 self._clone_repos += 1
                 self._clone_files += len(entries)
-            self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）")
+            self._record_clone(repo, _size_kb, time.time() - _t0,
+                               len(entries), True, "", "")
+            self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）"
+                  f" | 耗时 {time.time()-_t0:.0f}s"
+                  f"{f' | 大仓库 {_size_kb/1024/1024:.1f}GB' if _size_kb > 1024*1024 else ''}")
             return entries
         except Exception as e:
+            self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
+                               "exception", str(e)[-800:])
             self._wlog(f"⚠️ Partial Clone 异常: {e}")
             return None
         finally:
             if acquired:
                 self._clone_sem.release()
+                self._clone_active -= 1  # 监控采样
             self._set_worker_state("空闲")
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -3161,3 +3232,82 @@ class Collector:
         with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(self.all_links))
         self._wlog(f"保存 no_li.txt ({len(self.all_links)} 条)")
+
+    def _save_clone_stats(self, elapsed_seconds: float = 0):
+        """写 clone_stats.json（CLONE_FIRST 实验数据，随结果提交）。
+
+        内容：分桶聚合（仓库大小 × clone 耗时/成败）+ 失败明细 + 资源峰值。
+        供跨轮对比（08083/08084...）确定 clone 并发/大仓库策略。
+        """
+        try:
+            import json
+            stats = self._clone_stats
+            if not stats:
+                return
+            ok_stats = [s for s in stats if s[4]]
+            times = sorted(s[2] for s in ok_stats)
+
+            def _pct(p):
+                if not times:
+                    return 0
+                return round(times[min(len(times) - 1, int(len(times) * p))], 1)
+
+            # 仓库大小分桶（size_kb 单位是 KB：1GB = 1024*1024 KB）
+            _G = 1024 * 1024
+            _buckets = [
+                ("0-100MB", lambda kb: kb <= 100 * 1024),
+                ("100M-1GB", lambda kb: 100 * 1024 < kb <= _G),
+                ("1-5GB", lambda kb: _G < kb <= 5 * _G),
+                ("5-10GB", lambda kb: 5 * _G < kb <= 10 * _G),
+                (">10GB", lambda kb: kb > 10 * _G),
+            ]
+            by_bucket = {}
+            for name, cond in _buckets:
+                bs = [s for s in stats if cond(s[1])]
+                if not bs:
+                    continue
+                bs_ok = [s for s in bs if s[4]]
+                bt = sorted(s[2] for s in bs_ok)
+                by_bucket[name] = {
+                    "count": len(bs), "ok": len(bs_ok),
+                    "fail": len(bs) - len(bs_ok),
+                    "avg_s": round(sum(bt) / len(bt), 1) if bt else 0,
+                    "max_s": round(bt[-1], 1) if bt else 0,
+                    "files_total": sum(s[3] for s in bs_ok),
+                }
+
+            data = {
+                "run_id": datetime.now(timezone.utc).strftime("%Y%m%d-%H%M"),
+                "mode": "clone_first" if CLONE_FIRST_MODE else "tree+commits",
+                "clone_concurrency": PARTIAL_CLONE_CONCURRENCY,
+                "duration_s": int(elapsed_seconds),
+                "api_used": self.quota_mgr.total_calls,
+                "api_remaining": self.quota_mgr.remaining(),
+                "nodes_added": sum(s.get("nodes_new", 0)
+                                   for s in self._channel_stats.values()),
+                "resources": {
+                    "cpu_load_max": round(self._cpu_load_peak, 2),
+                    "disk_free_min_gb": round(self._disk_free_min, 1),
+                    "clone_concurrency_peak": self._clone_active_peak,
+                },
+                "clone": {
+                    "total": len(stats), "ok": len(ok_stats),
+                    "fail": len(stats) - len(ok_stats),
+                    "files_total": sum(s[3] for s in ok_stats),
+                    "time_s": {"avg": round(sum(times) / len(times), 1)
+                               if times else 0,
+                               "max": round(times[-1], 1) if times else 0,
+                               "p90": _pct(0.9)},
+                    "fail_breakdown": dict(self._clone_fail_breakdown),
+                },
+                "by_size_bucket": by_bucket,
+                "failures": self._clone_fail_details,
+            }
+            with open("clone_stats.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=1)
+            self._wlog(f"📊 clone_stats.json 已保存 "
+                  f"(clone {len(stats)}: ok {len(ok_stats)}/"
+                  f"fail {len(stats)-len(ok_stats)} | "
+                  f"fail_breakdown {self._clone_fail_breakdown})")
+        except Exception as e:
+            self._wlog(f"⚠️ clone_stats 保存异常: {e}")
