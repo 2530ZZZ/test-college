@@ -22,6 +22,7 @@ import pickle
 import subprocess
 import threading
 from queue import Queue, PriorityQueue, Empty
+from collections import deque
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
@@ -164,6 +165,10 @@ class Collector:
         self._clone_active_peak = 0                     # clone 并发峰值（监控采样）
         self._cpu_load_peak = 0.0                       # CPU 负载峰值（监控采样，clone_stats）
         self._disk_free_min = 999.0                     # 磁盘可用最低（GB，监控采样）
+        # ── clone 滑动窗口（监控近 60 秒统计）──
+        self._clone_ok_window = deque()                 # [(完成时间, 仓库数, 文件数)] 成功窗口
+        self._clone_traffic_window = deque()            # [(完成时间, 字节数)] 流量窗口（成功+失败）
+        self._clone_fail_count = 0                      # 累计 clone 失败仓库数
         self._last_activity = 0.0                       # 最近一次 _wlog 时间（监控降频信号）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
@@ -597,6 +602,12 @@ class Collector:
                 net = self._net_status()
                 _hw = getattr(getattr(self, 'http', None), '_raw_window', [])
                 _raw60_mb = sum(b for _, b in _hw) / 1024 / 1024
+                # clone 近 60 秒窗口统计（成功仓库/文件 + 流量含失败）
+                _t60 = now - 60
+                _ok60_repos = sum(r for _t, r, _f in self._clone_ok_window if _t > _t60)
+                _ok60_files = sum(f for _t, _r, f in self._clone_ok_window if _t > _t60)
+                _tr60_mb = sum(b for _t, b in self._clone_traffic_window
+                               if _t > _t60) / 1024 / 1024
                 # Worker 状态（全部按编号排序）
                 wc = []
                 for i in range(SHARED_POOL_WORKERS):
@@ -614,7 +625,9 @@ class Collector:
                     f"   API: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
                     f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB | "
-                    f"clone {self._clone_repos}仓库/{self._clone_files}文件"
+                    f"clone近60s: {_ok60_repos}仓库/{_ok60_files}文件/{_tr60_mb:.0f}MB"
+                    f"(进行中{self._clone_active}) | "
+                    f"累计 成功{self._clone_repos}/失败{self._clone_fail_count}"
                     f" | 并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
                     f"(峰值{self._clone_active_peak})",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
@@ -2453,11 +2466,20 @@ class Collector:
         return True
 
     def _record_clone(self, repo: str, size_kb: int, time_s: float,
-                      files: int, ok: bool, reason: str, detail: str):
-        """记录一次 clone 结果（CLONE_FIRST 实验统计，_finalize 聚合写 JSON）。"""
+                      files: int, ok: bool, reason: str, detail: str,
+                      traffic_bytes: int = 0):
+        """记录一次 clone 结果（CLONE_FIRST 实验统计，_finalize 聚合写 JSON）。
+
+        traffic_bytes: 本次 clone 的下载流量近似（tmp 目录大小）。
+        """
         try:
             self._clone_stats.append((repo, size_kb, time_s, files, ok))
-            if not ok:
+            now = time.time()
+            # 监控近 60 秒窗口：成功入 ok_window；流量（成功+失败）入 traffic_window
+            if ok:
+                self._clone_ok_window.append((now, 1, files))
+            else:
+                self._clone_fail_count += 1
                 self._clone_fail_breakdown[reason] = \
                     self._clone_fail_breakdown.get(reason, 0) + 1
                 self._clone_fail_details.append(
@@ -2467,6 +2489,15 @@ class Collector:
                     f"https://github.com/{repo}")  # 汇总展示
                 self._wlog(f"⚠️ Partial Clone 失败 [{reason}]: {repo} "
                       f"({time_s:.0f}s) {detail[:200]}")
+            if traffic_bytes > 0:
+                self._clone_traffic_window.append((now, traffic_bytes))
+                # 滑窗裁剪（保留 60 秒）
+                while self._clone_traffic_window \
+                        and self._clone_traffic_window[0][0] < now - 60:
+                    self._clone_traffic_window.popleft()
+            while self._clone_ok_window \
+                    and self._clone_ok_window[0][0] < now - 60:
+                self._clone_ok_window.popleft()
         except Exception:
             pass
 
@@ -2503,7 +2534,11 @@ class Collector:
         """
         import tempfile
         import signal
-        tmp = tempfile.mkdtemp(prefix="pclone_")
+        try:
+            tmp = tempfile.mkdtemp(prefix="pclone_")
+        except Exception:
+            self._wlog("⚠️ mkdtemp 失败（磁盘空间不足？）")
+            return None
         acquired = False
         _t0 = time.time()
         _size_kb = size_kb if size_kb is not None else -1
@@ -2538,19 +2573,27 @@ class Collector:
                 os.killpg(p.pid, signal.SIGKILL)  # 只杀自己的 git 进程组
                 p.communicate()
                 self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
-                                   "timeout", f"超时 {PARTIAL_CLONE_TIMEOUT}s")
+                                   "timeout", f"超时 {PARTIAL_CLONE_TIMEOUT}s",
+                                   shutil.disk_usage(tmp).used)
                 return None
             if p.returncode != 0:
                 reason = self._classify_clone_error(err_text or "")
                 self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
-                                   reason, (err_text or "")[-800:])
+                                   reason, (err_text or "")[-800:],
+                                   shutil.disk_usage(tmp).used)
                 return None
+            # 注意：ls-tree 不带 -l！partial clone（blob:none）下 blob 不在本地，
+            # -l 要显示文件大小会触发"逐 blob 延迟获取"（每个文件一次网络请求）——
+            # 大仓库几万文件 = 几万请求 → 300s 超时（08083 日志 135 次
+            # "ls-tree timed out"、大仓库 175 个全部失败）。size 只用于下载排序
+            # 启发式，放弃它不影响正确性（下载后以实际大小为准）。
             r2 = subprocess.run(
-                ["git", "-C", tmp, "ls-tree", "-r", "-l", "HEAD"],
+                ["git", "-C", tmp, "ls-tree", "-r", "HEAD"],
                 capture_output=True, text=True, timeout=300)
             if r2.returncode != 0:
                 self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
-                                   "ls_tree", (r2.stderr or "")[-800:])
+                                   "ls_tree", (r2.stderr or "")[-800:],
+                                   shutil.disk_usage(tmp).used)
                 return None
             entries = []
             for line in r2.stdout.splitlines():
@@ -2559,16 +2602,12 @@ class Collector:
                     continue
                 meta, path = parts
                 meta_parts = meta.split()
-                if len(meta_parts) < 4:
+                if len(meta_parts) < 3:
                     continue
-                _mode, etype, sha, size = meta_parts[:4]
+                _mode, etype, sha = meta_parts[:3]
                 if etype != "blob":
                     continue
-                try:
-                    sz = int(size)
-                except ValueError:
-                    sz = 0
-                entries.append({"path": path, "sha": sha, "size": sz,
+                entries.append({"path": path, "sha": sha, "size": 0,
                                 "type": "blob"})
             self._repos_by_result["clone_ok"].append(
                 f"https://github.com/{repo}")  # 汇总展示
@@ -2576,14 +2615,16 @@ class Collector:
                 self._clone_repos += 1
                 self._clone_files += len(entries)
             self._record_clone(repo, _size_kb, time.time() - _t0,
-                               len(entries), True, "", "")
+                               len(entries), True, "", "",
+                               shutil.disk_usage(tmp).used)
             self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）"
                   f" | 耗时 {time.time()-_t0:.0f}s"
                   f"{f' | 大仓库 {_size_kb/1024/1024:.1f}GB' if _size_kb > 1024*1024 else ''}")
             return entries
         except Exception as e:
             self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
-                               "exception", str(e)[-800:])
+                               "exception", str(e)[-800:],
+                               shutil.disk_usage(tmp).used)
             self._wlog(f"⚠️ Partial Clone 异常: {e}")
             return None
         finally:
