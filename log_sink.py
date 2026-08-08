@@ -32,6 +32,17 @@ class LogSink:
         """同步等待队列清空（收尾时用，确保日志完整输出）。"""
         self._q.join()
 
+    def qsize(self) -> int:
+        """当前队列待打印日志数（监控健康检查）。"""
+        return self._q.qsize()
+
+    def consumer_alive(self) -> bool:
+        """LogSink 消费者线程是否存活（监控健康检查）。"""
+        for t in threading.enumerate():
+            if t.name == "LogSink" and t.is_alive():
+                return True
+        return False
+
     def _run(self):
         while True:
             msg = self._q.get()

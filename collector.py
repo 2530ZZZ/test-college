@@ -18,6 +18,7 @@ import json
 import random
 import shutil
 import re
+import faulthandler
 import pickle
 import subprocess
 import threading
@@ -84,6 +85,50 @@ from quota_manager import QuotaManager
 from log_sink import log_sink
 
 
+class MonitoredLock:
+    """带持有者监控的 RLock（OOM 排查：显示谁持锁多久）。
+
+    API 与 RLock 兼容（acquire/release/__enter__/__exit__），
+    监控循环通过 holder_info() 查看当前持锁线程与时长——
+    若 worker 全部卡在锁等待，监控直接显示"谁持锁 X 秒"。
+    """
+
+    def __init__(self):
+        self._lock = threading.RLock()
+        self._holder = None
+        self._since = 0.0
+        self._depth = 0
+
+    def acquire(self, *args, **kwargs):
+        ok = self._lock.acquire(*args, **kwargs)
+        if ok:
+            self._depth += 1
+            if self._depth == 1:
+                self._holder = threading.current_thread().name
+                self._since = time.time()
+        return ok
+
+    def release(self):
+        self._lock.release()
+        self._depth -= 1
+        if self._depth == 0:
+            self._holder = None
+
+    def holder_info(self):
+        """返回 (持有线程名, 已持有秒数) 或 None（无持有）。"""
+        if self._holder:
+            return self._holder, time.time() - self._since
+        return None
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+        return False
+
+
 class Collector:
     """多源并行节点收集器。
 
@@ -123,7 +168,7 @@ class Collector:
         self._http_local = threading.local()
 
         # ── 共享状态（线程安全保护） ──
-        self._state_lock = threading.RLock()          # 保护下方所有 set/dict/list
+        self._state_lock = MonitoredLock()            # 保护下方所有 set/dict/list（带持锁监控）
         self.all_links: List[str] = []
         self.unique_nodes: Set[str] = set()            # 全局已收集节点 URI
         self.global_dedup_keys: Set[tuple] = set()     # (server, port, protocol) 去重
@@ -169,6 +214,10 @@ class Collector:
         self._clone_ok_window = deque()                 # [(完成时间, 仓库数, 文件数)] 成功窗口
         self._clone_traffic_window = deque()            # [(完成时间, 字节数)] 流量窗口（成功+失败）
         self._clone_fail_count = 0                      # 累计 clone 失败仓库数
+        # ── OOM 定位诊断（08084：内存 100% OOM 终止，线程静默卡死）──
+        self._dump_done = False                         # faulthandler 转储已触发（去重）
+        self._parsing_active = 0                        # 当前正在解析的文件数
+        self._parsing_max_mb = 0.0                      # 正在解析文件的最大大小(MB)
         self._last_activity = 0.0                       # 最近一次 _wlog 时间（监控降频信号）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
@@ -509,6 +558,22 @@ class Collector:
         except Exception:
             pass
 
+    @staticmethod
+    def _read_python_rss_gb() -> float:
+        """读本进程 RSS（GB）——/proc/self/status 的 VmRSS。
+
+        区分"程序自身内存"vs"系统内存"（GA runner 其他进程干扰），
+        08084 OOM 时程序 RSS 是否确实接近 15.6GB 由它确认。
+        """
+        try:
+            with open("/proc/self/status") as f:
+                for line in f:
+                    if line.startswith("VmRSS:"):
+                        return int(line.split()[1]) / 1024 / 1024  # kB → GB
+        except Exception:
+            pass
+        return 0.0
+
     def _worker_stats(self) -> tuple:
         """Worker 统计：(工作中数, 空闲数, 工作率%)。
 
@@ -596,9 +661,18 @@ class Collector:
                 used_gb, total_gb = self._read_mem_gb()
                 mem_pct = used_gb / total_gb * 100 if total_gb else 0
                 disk_free_gb, disk_total_gb = self._read_disk_gb()
+                py_rss_gb = self._read_python_rss_gb()
                 # 资源峰值采样（clone_stats.json 用）
                 self._cpu_load_peak = max(self._cpu_load_peak, load)
                 self._disk_free_min = min(self._disk_free_min, disk_free_gb)
+                # ── OOM 定位：内存 > 80% 且未转储过 → 打印所有线程调用栈 ──
+                # faulthandler.dump_traceback() 直接显示每个 worker/extract
+                # 线程卡在哪一行（08084 OOM 前 30 分钟线程静默卡死的定位工具）。
+                if mem_pct > 80 and not self._dump_done:
+                    self._dump_done = True
+                    self._wlog(f"🚨 内存 {mem_pct:.0f}% 超过 80%，"
+                          f"触发线程转储（仅一次，定位静默卡死）")
+                    faulthandler.dump_traceback()
                 net = self._net_status()
                 _hw = getattr(getattr(self, 'http', None), '_raw_window', [])
                 _raw60_mb = sum(b for _, b in _hw) / 1024 / 1024
@@ -614,11 +688,17 @@ class Collector:
                     st = self._worker_state.get(f"W-{i}",
                                                 {"what": "无记录", "since": now})
                     wc.append(f"W-{i} {st['what']}({now-st['since']:.0f}s)")
+                # ── OOM 诊断采样：log_sink 健康 / 解析中文件 / 锁持有 ──
+                _log_q = log_sink.qsize()
+                _log_ok = "OK" if log_sink.consumer_alive() else "DEAD"
+                _lk = self._state_lock.holder_info()
+                _lk_txt = f"锁: {_lk[0]} {_lk[1]:.0f}s" if _lk else "锁: 空闲"
                 _now_dt = datetime.fromtimestamp(now, tz=timezone.utc)
                 lines = [
                     f"📊 [{_now_dt.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
                     f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
                     f"内存: {mem_pct:.0f}% ({used_gb:.1f}/{total_gb:.1f}GB) | "
+                    f"RSS: {py_rss_gb:.1f}GB | "
                     f"磁盘: {disk_free_gb:.1f}/{disk_total_gb:.0f}GB 可用",
                     f"   网络近60s: 总下载 {net['total_mb']/1024:.2f}GB | "
                     f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s",
@@ -630,6 +710,9 @@ class Collector:
                     f"累计 成功{self._clone_repos}/失败{self._clone_fail_count}"
                     f" | 并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
                     f"(峰值{self._clone_active_peak})",
+                    f"   诊断: log队列 {_log_q}/{_log_ok} | "
+                    f"解析中 {self._parsing_active}文件"
+                    f"(最大{self._parsing_max_mb:.0f}MB) | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
                     f"关键词 {self._kw_progress or '-'} | "
                     f"Code {self._cd_progress or '-'}",
@@ -2502,18 +2585,43 @@ class Collector:
             pass
 
     @staticmethod
+    def _dir_size_bytes(path: str) -> int:
+        """递归统计目录真实占用字节数。
+
+        不用 shutil.disk_usage(path).used——它返回整个文件系统的已用
+        空间（08084 监控显示 clone 流量 58616MB 假数值的根因）。
+        """
+        total = 0
+        try:
+            for root, _dirs, files in os.walk(path):
+                for f in files:
+                    try:
+                        total += os.path.getsize(os.path.join(root, f))
+                    except OSError:
+                        pass
+        except Exception:
+            pass
+        return total
+
+    @staticmethod
     def _classify_clone_error(err_text: str) -> str:
-        """按 stderr 关键词分类 clone 失败原因（统计用）。"""
+        """按 stderr 关键词分类 clone 失败原因（统计用）。
+
+        顺序注意：disabled 检查在 auth 前——GitHub 封禁仓库的 git 输出
+        含 "Access to this repository has been disabled" + "error: 403"，
+        若 auth 的 "403" 裸匹配在前会误判（08084 alanbobs999 案例）。
+        故去掉裸 "403" 匹配（403 语义太泛，auth/disabled 均可能）。
+        """
         e = (err_text or "").lower()
         if "repository not found" in e:
             return "repo_not_found"
         if "rate limit" in e or "too many" in e or "429" in e:
             return "rate_limit"
-        if "authentication" in e or "invalid username" in e \
-                or "access denied" in e or "403" in e:
-            return "auth"
-        if "repository has been disabled" in e or "disabled" in e:
+        if "disabled" in e:
             return "disabled"
+        if "authentication" in e or "invalid username" in e \
+                or "access denied" in e:
+            return "auth"
         if "ls-tree" in e:
             return "ls_tree"
         return "other"
@@ -2542,6 +2650,12 @@ class Collector:
         acquired = False
         _t0 = time.time()
         _size_kb = size_kb if size_kb is not None else -1
+        # 记录调用前状态：clone 只是仓库处理的一个环节，完成后恢复
+        # （08084 监控 bug：finally 无条件设"空闲"，把仍在处理中的
+        # worker 状态覆盖，导致假"0忙/36闲"误导排查）。
+        # 必须在 try 前定义（无 token 提前 return 时 finally 也要引用）。
+        _prev_state = self._worker_state.get(
+            threading.current_thread().name, {}).get("what", "")
         try:
             token = self.token or GITHUB_TOKEN
             if not token:
@@ -2574,13 +2688,13 @@ class Collector:
                 p.communicate()
                 self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
                                    "timeout", f"超时 {PARTIAL_CLONE_TIMEOUT}s",
-                                   shutil.disk_usage(tmp).used)
+                                   self._dir_size_bytes(tmp))
                 return None
             if p.returncode != 0:
                 reason = self._classify_clone_error(err_text or "")
                 self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
                                    reason, (err_text or "")[-800:],
-                                   shutil.disk_usage(tmp).used)
+                                   self._dir_size_bytes(tmp))
                 return None
             # 注意：ls-tree 不带 -l！partial clone（blob:none）下 blob 不在本地，
             # -l 要显示文件大小会触发"逐 blob 延迟获取"（每个文件一次网络请求）——
@@ -2593,7 +2707,7 @@ class Collector:
             if r2.returncode != 0:
                 self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
                                    "ls_tree", (r2.stderr or "")[-800:],
-                                   shutil.disk_usage(tmp).used)
+                                   self._dir_size_bytes(tmp))
                 return None
             entries = []
             for line in r2.stdout.splitlines():
@@ -2616,7 +2730,7 @@ class Collector:
                 self._clone_files += len(entries)
             self._record_clone(repo, _size_kb, time.time() - _t0,
                                len(entries), True, "", "",
-                               shutil.disk_usage(tmp).used)
+                               self._dir_size_bytes(tmp))
             self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）"
                   f" | 耗时 {time.time()-_t0:.0f}s"
                   f"{f' | 大仓库 {_size_kb/1024/1024:.1f}GB' if _size_kb > 1024*1024 else ''}")
@@ -2624,14 +2738,15 @@ class Collector:
         except Exception as e:
             self._record_clone(repo, _size_kb, time.time() - _t0, 0, False,
                                "exception", str(e)[-800:],
-                               shutil.disk_usage(tmp).used)
+                               self._dir_size_bytes(tmp))
             self._wlog(f"⚠️ Partial Clone 异常: {e}")
             return None
         finally:
             if acquired:
                 self._clone_sem.release()
                 self._clone_active -= 1  # 监控采样
-            self._set_worker_state("空闲")
+            # 恢复调用前状态（"处理 xxx"），而非无条件"空闲"
+            self._set_worker_state(_prev_state or "空闲")
             shutil.rmtree(tmp, ignore_errors=True)
 
     # ==================== 懒分支名解析 ====================
@@ -2805,14 +2920,27 @@ class Collector:
             return  # 跳过但可能是间歇性问题 → 不标记
 
         # 提取节点（使用新的协议解析层）
+        # OOM 诊断：记录正在解析的文件数与最大大小（监控显示，
+        # 08084 内存 100% 时需确认是否解析线程持有大文件）。
+        self._parsing_active += 1
+        if content_size_mb > self._parsing_max_mb:
+            self._parsing_max_mb = content_size_mb
+
         def extract():
             return extract_all_strategies(content)
 
         try:
             if FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
-                with ThreadPoolExecutor(max_workers=1) as executor:
+                # 不用 with（with 退出时 shutdown(wait=True) 会等卡死的
+                # extract 线程结束 → worker 被阻塞 + 线程持有 content 不释放，
+                # 08084 OOM 前 30 分钟 worker 全停的嫌疑点之一）。
+                # 手动管理：超时即放弃，worker 立即继续，不阻塞不累积。
+                executor = ThreadPoolExecutor(max_workers=1)
+                try:
                     future = executor.submit(extract)
                     proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
+                finally:
+                    executor.shutdown(wait=False, cancel_futures=True)
             else:
                 proxies = extract()
         except FutureTimeoutError:
@@ -2820,6 +2948,8 @@ class Collector:
             return
         except Exception:
             return
+        finally:
+            self._parsing_active -= 1
 
         # ---- 过滤 + 去重 + 入 buffer（线程安全） ----
         raw_count = len(proxies)
