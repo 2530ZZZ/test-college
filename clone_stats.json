@@ -1,0 +1,87 @@
+{
+ "run_id": "20260808-2031",
+ "mode": "clone_first",
+ "clone_concurrency": 15,
+ "duration_s": 19801,
+ "api_used": 14707,
+ "api_remaining": 4610,
+ "nodes_added": 326510,
+ "resources": {
+  "cpu_load_max": 3.52,
+  "disk_free_min_gb": 86.8,
+  "clone_concurrency_peak": 10
+ },
+ "clone": {
+  "total": 893,
+  "ok": 891,
+  "fail": 2,
+  "files_total": 1242232,
+  "time_s": {
+   "avg": 1.7,
+   "max": 54.2,
+   "p90": 3.0
+  },
+  "fail_breakdown": {
+   "ls_tree": 1,
+   "disabled": 1
+  }
+ },
+ "by_size_bucket": {
+  "0-100MB": {
+   "count": 534,
+   "ok": 532,
+   "fail": 2,
+   "avg_s": 1.8,
+   "max_s": 54.2,
+   "files_total": 285136
+  },
+  "100M-1GB": {
+   "count": 197,
+   "ok": 197,
+   "fail": 0,
+   "avg_s": 1.7,
+   "max_s": 15.7,
+   "files_total": 650071
+  },
+  "1-5GB": {
+   "count": 108,
+   "ok": 108,
+   "fail": 0,
+   "avg_s": 1.7,
+   "max_s": 10.8,
+   "files_total": 229331
+  },
+  "5-10GB": {
+   "count": 24,
+   "ok": 24,
+   "fail": 0,
+   "avg_s": 1.7,
+   "max_s": 4.6,
+   "files_total": 4740
+  },
+  ">10GB": {
+   "count": 30,
+   "ok": 30,
+   "fail": 0,
+   "avg_s": 2.2,
+   "max_s": 7.9,
+   "files_total": 72954
+  }
+ },
+ "failures": [
+  {
+   "repo": "example/test",
+   "size_kb": 48,
+   "time_s": 1,
+   "reason": "ls_tree",
+   "detail": "fatal: Not a valid object name HEAD\n"
+  },
+  {
+   "repo": "alanbobs999/TopFreeProxies",
+   "size_kb": -1,
+   "time_s": 0,
+   "reason": "disabled",
+   "detail": "Cloning into '/tmp/pclone_rvetpywv'...\nremote: Access to this repository has been disabled by GitHub staff.\nremote: If you are the repository owner, you can contact support via https://support.github.com/contact for more information.\nfatal: unable to access 'https://github.com/alanbobs999/TopFreeProxies.git/': The requested URL returned error: 403\n"
+  }
+ ]
+}
