@@ -53,6 +53,7 @@ from config import (
     SECONDARY_RATE_LIMIT_DEGRADE, DEGRADE_WORKERS,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS,
     PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT, PARTIAL_CLONE_CONCURRENCY,
+    CLONE_FIRST_MODE,
     CONTENTS_API_FALLBACK_ENABLED, MONITOR_INTERVAL,
     MAIN_SOURCE_LIMIT, TRACE_RETRY_DAYS,
     KEYWORD_TRACE_DEPTH, CODE_TRACE_DEPTH, INFO_BACKFILL_ENABLED,
@@ -473,6 +474,20 @@ class Collector:
         except Exception:
             return 0.0, 0.0
 
+    @staticmethod
+    def _read_disk_gb() -> tuple:
+        """读当前目录所在磁盘可用/总量（GB）。
+
+        Clone-First 模式下 30 并发 git clone 瞬时占用可达 5-15GB，
+        监控显示验证磁盘压力（GA runner 磁盘 70GB+）。
+        """
+        try:
+            import shutil
+            usage = shutil.disk_usage(os.getcwd())
+            return usage.free / 1024 ** 3, usage.total / 1024 ** 3
+        except Exception:
+            return 0.0, 0.0
+
     def _set_worker_state(self, what: str):
         """记录当前 Worker 状态（监控显示用）。"""
         try:
@@ -567,6 +582,7 @@ class Collector:
                     load, cpu_pct = -1, 0
                 used_gb, total_gb = self._read_mem_gb()
                 mem_pct = used_gb / total_gb * 100 if total_gb else 0
+                disk_free_gb, disk_total_gb = self._read_disk_gb()
                 net = self._net_status()
                 _hw = getattr(getattr(self, 'http', None), '_raw_window', [])
                 _raw60_mb = sum(b for _, b in _hw) / 1024 / 1024
@@ -580,7 +596,8 @@ class Collector:
                 lines = [
                     f"📊 [{_now_dt.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
                     f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
-                    f"内存: {mem_pct:.0f}% ({used_gb:.1f}/{total_gb:.1f}GB)",
+                    f"内存: {mem_pct:.0f}% ({used_gb:.1f}/{total_gb:.1f}GB) | "
+                    f"磁盘: {disk_free_gb:.1f}/{disk_total_gb:.0f}GB 可用",
                     f"   网络近60s: 总下载 {net['total_mb']/1024:.2f}GB | "
                     f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s",
                     f"   API: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
@@ -660,6 +677,27 @@ class Collector:
         finally:
             with self._state_lock:
                 self._reset_waiting = False
+
+    def _requeue_for_quota(self, item: tuple, from_queue):
+        """配额耗尽时，缺信息任务降级优先级放回原队列（排到队尾）。
+
+        原理：PriorityQueue 队头阻塞——缺信息任务（需 API 补查 repo info）
+        放回队头附近会堵住后面的有信息任务；降级 priority/ts 排到队尾后，
+        worker 自然先处理有信息任务（零 API clone 路径），配额恢复后
+        缺信息任务再被正常取出补查处理。任务不丢弃。
+        """
+        try:
+            if from_queue is getattr(self, '_disc_queue', None):
+                # 扩展队列元素: (priority, ts, seq, item) → priority 降级
+                from_queue.put((1000, time.time(), next(self._disc_seq), item))
+            elif from_queue is getattr(self, '_task_queue', None):
+                # 主队列元素: (ts, seq, item) → ts 推后到队尾
+                from_queue.put((time.time() + 1e9, next(self._disc_seq), item))
+            else:
+                return  # 未知队列，任务随 finally task_done 丢弃（极少发生）
+            from_queue.task_done()  # 抵消本次取出计数（新元素已入队）
+        except Exception:
+            pass
 
     def _add_seen(self, repo: str):
         """标记仓库为已处理（大小写不敏感），线程安全。"""
@@ -1318,6 +1356,7 @@ class Collector:
           3. 发现队列 ≤ DISC_MAIN_OK_AT → 原子取主队列（互斥+冷却）
           4. 次级限流时自动降级等待
         """
+        quota_skip_count = 0  # 连续遇到缺信息任务计数（配额耗尽零 API 模式，跨循环保持）
         while True:
             item = None
             from_queue = None
@@ -1381,9 +1420,30 @@ class Collector:
                 if self.limiter.should_stop() or self._runtime_exceeded():
                     break
                 if self.quota_mgr.exceeded:
-                    if not self._wait_reset():
-                        break
-                    continue
+                    # 配额耗尽 → 零 API 模式：只处理有完整信息的仓库
+                    # （clone/下载/解析不调 API）；缺信息任务（需补查 repo
+                    # info）降级优先级放回队列排队尾，配额恢复后正常补查。
+                    # 连续遇到缺信息任务 → 队列已无可零 API 处理的任务，
+                    # _wait_reset 等待配额恢复（兜底）。
+                    if INFO_BACKFILL_ENABLED:
+                        try:
+                            _s, _r, _kw = item
+                            if not _kw.get("pushed_at") \
+                                    or not _kw.get("language"):
+                                self._requeue_for_quota(item, from_queue)
+                                quota_skip_count += 1
+                                if quota_skip_count >= 3:
+                                    quota_skip_count = 0
+                                    if not self._wait_reset():
+                                        break
+                                else:
+                                    time.sleep(0.3)  # 让其他 worker 先取有信息任务
+                                continue
+                        except (ValueError, TypeError):
+                            pass
+                    # 有信息任务 → 零 API 处理路径（process_repo 内部 API
+                    # 调用在配额耗尽时均有保护，见 _trace_repo/_discover_recursive）
+                    quota_skip_count = 0
                 source, repo, kwargs = item
                 tag = kwargs.get("tag", "")
                 pos = kwargs.get("pos", "")      # 位置信息（种子序号/关键词页码）
@@ -1799,6 +1859,8 @@ class Collector:
 
         同层（或低层覆盖）已追踪过 → 跳过（省 fork/用户 API）。
         """
+        if self.quota_mgr.exceeded:
+            return  # 配额耗尽：追踪需 forks/users API，零 API 模式跳过
         depth = self._tag_depth(tag)
         if self._is_traced(repo, pushed_at, depth):
             return  # 该层数已追踪过（低层覆盖高层）
@@ -1976,7 +2038,9 @@ class Collector:
                 self._wlog(f"🌱 加入种子: {repo} (提取 {repo_nodes} 节点)")
 
         # Fork 链追踪 + 用户仓库遍历（按标志位判定是否追踪）
-        if self._should_trace(tag):
+        # 配额耗尽时跳过（追踪需 forks/users API）——零 API 模式下只做
+        # clone/下载/解析；追踪等配额恢复后的任务自然触发。
+        if self._should_trace(tag) and not self.quota_mgr.exceeded:
             self._trace_repo(repo, branch, pushed_at, tag)
 
         return (repo_stats[0], repo_stats[1])
@@ -2200,6 +2264,21 @@ class Collector:
         if self.limiter.should_stop():
             raise RuntimeError("限流超限")
 
+        # ── Clone-First 模式：跳过树 API，直接 git clone 拿文件树（零核心 API）──
+        if CLONE_FIRST_MODE:
+            entries = self._partial_clone_file_list(repo, branch)
+            if entries is not None:
+                return self._process_file_list(repo, branch, entries,
+                                               has_nodes, raw_depth, stats, tag)
+            # clone 失败 → 看 Contents 开关（默认关闭：放弃）
+            if CONTENTS_API_FALLBACK_ENABLED:
+                self._wlog(f"Clone-First clone 失败，回退到 Contents API")
+                return False
+            self._wlog(f"Clone-First clone 失败，放弃（Contents 已关闭）")
+            self._repos_by_result["clone_fail"].append(
+                f"https://github.com/{repo}")
+            return True  # 视为处理完成（无节点）
+
         tree_url = f"https://api.github.com/repos/{repo}/git/trees/{branch}?recursive=1"
         resp = self.http.get(tree_url, timeout=TREE_API_TIMEOUT,
                              operation_name="递归树")
@@ -2286,7 +2365,9 @@ class Collector:
         # 关键洞察：raw 下载免费不计 API 配额，但大量下载耗时巨大。
         # 少量候选文件 → 直接下载（零 API 成本）。
         # 大量候选文件 → 先通过 commits API 确定 24h 内变更的文件，再下载。
-        if len(files_to_check) > MAX_RAW_DOWNLOADS_PER_REPO:
+        # Clone-First 模式：跳过 commits（零核心 API），符合后缀的全量下载解析，
+        # SHA 缓存过滤在上方已生效，已处理过的文件不会重复下载。
+        if not CLONE_FIRST_MODE and len(files_to_check) > MAX_RAW_DOWNLOADS_PER_REPO:
             self._wlog(f"仓库 https://github.com/{repo} "
                   f"候选文件较多 ({len(files_to_check)} 个)，"
                   f"先通过 commits API 过滤")
@@ -2377,9 +2458,11 @@ class Collector:
             acquired = True
             self._set_worker_state(f"PartialClone {repo}")
             clone_url = f"https://x-access-token:{token}@github.com/{repo}.git"
+            # 不带 --branch：用远端 HEAD（默认分支），避免分支名错误导致 clone 失败
+            # （种子仓库默认传 main，实际分支可能是 master，--branch 错则直接失败）。
             p = subprocess.Popen(
                 ["git", "clone", "--depth", "1", "--filter=blob:none",
-                 "--no-checkout", "--single-branch", f"--branch={branch}",
+                 "--no-checkout", "--single-branch",
                  clone_url, tmp],
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                 start_new_session=True)  # 独立进程组，killpg 只杀自己
@@ -2803,6 +2886,19 @@ class Collector:
                 if self._is_repo_dead(full_name):
                     continue
             self._repo_checking.add(rl)
+            if self.quota_mgr.exceeded:
+                # 配额耗尽：跳过 repo info（需 API），按未知信息直接入队，
+                # worker 配额恢复后补查（缺信息任务由零 API 循环排队尾）。
+                link_tag_q = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
+                if getattr(self, '_disc_queue', None):
+                    self._disc_put(("GitHub", full_name,
+                                    {"branch": "main", "size": -1,
+                                     "disabled": False, "pushed_at": "",
+                                     "raw_depth": raw_depth + 1,
+                                     "language": "", "tag": link_tag_q}),
+                                   label="链接")
+                self._repo_checking.discard(rl)
+                continue
             try:
                 repo_info = self.http.get_json(
                     f"https://api.github.com/repos/{full_name}",
@@ -2878,6 +2974,19 @@ class Collector:
                 if self._is_repo_dead(full_name):
                     continue
             self._repo_checking.add(rl)
+            if self.quota_mgr.exceeded:
+                # 配额耗尽：跳过 repo info（需 API），按未知信息直接入队，
+                # worker 配额恢复后补查（缺信息任务由零 API 循环排队尾）。
+                link_tag_q = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
+                if getattr(self, '_disc_queue', None):
+                    self._disc_put(("GitHub", full_name,
+                                    {"branch": "main", "size": -1,
+                                     "disabled": False, "pushed_at": "",
+                                     "raw_depth": raw_depth + 1,
+                                     "language": "", "tag": link_tag_q}),
+                                   label="链接")
+                self._repo_checking.discard(rl)
+                continue
             try:
                 repo_info = self.http.get_json(
                     f"https://api.github.com/repos/{full_name}",

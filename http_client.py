@@ -241,11 +241,10 @@ class HttpClient:
                 if remaining_hdr and is_api_call:
                     remaining = int(remaining_hdr)
                 reset_hdr = resp.headers.get("X-RateLimit-Reset")
-                if reset_hdr and is_api_call:
-                    try:
-                        self.quota.set_reset_time(int(reset_hdr))
-                    except Exception:
-                        pass
+                # 注意：不在此处 set_reset_time——200 响应的 X-RateLimit-Reset
+                # 总是"下一 UTC 整点"，会污染 wait_for_reset 的等待条件
+                # （08081 事故：35 个 worker 被拨闹钟无限推迟）。
+                # 只在 403 核心配额耗尽分支设置（下方 403 处理）。
                 self._record_call(url, resp.status_code, remaining)
                 if is_api_call:
                     self.quota.record()
@@ -306,6 +305,14 @@ class HttpClient:
                         log_sink.emit(f"[{_now()}] {operation_name} 403（访问被拒，"
                               f"配额剩余 {int(remaining_hdr)}），跳过")
                         return None
+
+                    # 核心配额耗尽（remaining=0）→ 记录真实重置时间
+                    # （403-only：200 响应带同一 reset 头但语义不同，见上方注释）
+                    if reset_hdr and is_api_call:
+                        try:
+                            self.quota.set_reset_time(int(reset_hdr))
+                        except Exception:
+                            pass
 
                     # 计算是否会导致超限
                     if self.limiter.total_wait + wait_seconds > self.limiter.max_wait:

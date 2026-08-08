@@ -39,7 +39,10 @@ class QuotaManager:
         """
         self.max_per_hour = max_per_hour
         self.calls = 0                # 当前窗口已用次数
-        self.window_start = time.time()
+        # 对齐 UTC 整点（GitHub 配额窗口边界）。之前用启动时刻导致程序窗口
+        # 与 GitHub 窗口错位 30 分钟：程序计数先归零误判"配额耗尽"，
+        # 实际 GitHub 窗口还剩大量配额（08081 日志 17:21 误判 0/4800）。
+        self.window_start = time.time() // 3600 * 3600
         self._reset_time = 0          # GitHub 返回的真实重置时间戳
         self._lock = threading.Lock()
         self.exceeded = False         # 配额耗尽标志（本窗口内不恢复）

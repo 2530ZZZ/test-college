@@ -906,6 +906,12 @@ MAX_RECURSIVE_REPOS = 500
 # 默认值：True。建议保持开启。
 PARTIAL_CLONE_ENABLED = True
 
+# Clone-First 模式（试验开关）：所有需要解析的仓库直接 git clone 拿文件树，
+# 跳过树 API 与 commits 过滤（零核心 API 消耗），符合后缀的文件全量下载解析。
+# tree/commits 逻辑保留（False 时恢复原路径），便于对照效果。
+# 默认值：False（原路径）。试验期开启。
+CLONE_FIRST_MODE = True
+
 # Partial Clone clone 超时（秒）。
 # 默认 900（15 分钟）。大仓库 tree 对象 ~100MB 需 30-60s。
 PARTIAL_CLONE_TIMEOUT = 900
@@ -915,8 +921,9 @@ PARTIAL_CLONE_TIMEOUT = 900
 # 原理：git clone --filter=blob:none 下载 tree 对象 + 本地索引，
 #       并发过多会互相拖慢导致超时（曾 17 次 900s 超时）。
 #       超时 kill 用进程组隔离（start_new_session），只杀自己的 git。
-# 默认值：2。建议 1-4。设 1 = 完全串行。
-PARTIAL_CLONE_CONCURRENCY = 2
+# 默认值：2。CLONE_FIRST_MODE 试验期改为 30（GitHub Actions 2 核 / 70GB 磁盘，
+#       clone 是网络 I/O 密集 CPU 占用低；磁盘瞬时占用 5-15GB 由监控验证）。
+PARTIAL_CLONE_CONCURRENCY = 30
 
 # 是否回退到 Contents API 逐目录遍历。
 # 作用：tree 失败 + Partial Clone 失败时的最后手段。
