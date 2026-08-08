@@ -852,3 +852,5 @@ arashnsrtz/v2ray-tester-pro
 arespv/v2ray-tester-pro
 arespv/vpn-builderv2
 xmedd/clash-aggregator
+epodonios/v2ray-configs.git
+epodonios/bulk-xray-v2ray-vless-vmess-...-config

@@ -1,0 +1,407 @@
+[2026-08-08 20:32:53] 🚀 程序启动
+[2026-08-08 20:32:53] 关键词: 105 个
+[2026-08-08 20:32:53] [MainThread] 加载 SHA 缓存 338939 条 (1 分片)
+[2026-08-08 20:32:53] [MainThread] 加载已处理仓库缓存 41374 条
+[2026-08-08 20:32:53] [MainThread] 已加载 404 仓库 854 条
+[2026-08-08 20:32:53] [MainThread] 🚀 程序启动 | 配额上限 4800/小时
+[2026-08-08 20:32:53] [MainThread] 🔵 阶段 1: 种子仓库 (744 个)
+[2026-08-08 20:32:53] [种子] 🔵 种子仓库: 744 个 → 队列
+[2026-08-08 20:32:53] [种子] 🔵 [种子 1/744] Raad63/v2ray-configs-sub-5 | 配额 4800/4800 12:32UTC | 主队列 1/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 2/744] wang1680/proxypool | 配额 4800/4800 12:32UTC | 主队列 2/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 3/744] Pawdroid/Free-servers | 配额 4800/4800 12:32UTC | 主队列 3/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 4/744] LoneKingCode/free-proxy-db | 配额 4800/4800 12:32UTC | 主队列 4/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 5/744] gfpcom/free-proxy-list | 配额 4800/4800 12:32UTC | 主队列 5/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 6/744] mahdibland/get_v2 | 配额 4800/4800 12:32UTC | 主队列 6/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 7/744] MhdiTaheri/V2rayCollector | 配额 4800/4800 12:32UTC | 主队列 7/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 8/744] Raad63/nirevil | 配额 4800/4800 12:32UTC | 主队列 8/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 9/744] cysk003/yebekhe-TVC | 配额 4800/4800 12:32UTC | 主队列 9/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 10/744] chaoduzj/V2RayAutoConfig | 配额 4800/4800 12:32UTC | 主队列 10/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 11/744] sclyxcn/airport-free | 配额 4800/4800 12:32UTC | 主队列 11/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 12/744] MhdiTaheri/V2rayCollector_Py | 配额 4800/4800 12:32UTC | 主队列 12/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 13/744] mr-mohamad-mr/multi-proxy-config-fetcher | 配额 4800/4800 12:32UTC | 主队列 13/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 14/744] miladkantoori/multi-proxy-config-fetcher | 配额 4800/4800 12:32UTC | 主队列 14/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 15/744] Rayan-Config/C-Sub | 配额 4800/4800 12:32UTC | 主队列 15/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 16/744] mfuu/v2ray | 配额 4800/4800 12:32UTC | 主队列 16/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 17/744] mahdibland/SSAggregator | 配额 4800/4800 12:32UTC | 主队列 17/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 18/744] mahdibland/ShadowsocksAggregator | 配额 4800/4800 12:32UTC | 主队列 18/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 19/744] free-nodes/clashfree | 配额 4800/4800 12:32UTC | 主队列 19/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 20/744] ninjastrikers/nexus-nodes | 配额 4800/4800 12:32UTC | 主队列 20/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 21/744] chaoduzj/aggregator | 配额 4800/4800 12:32UTC | 主队列 21/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 22/744] Airuop/cross | 配额 4800/4800 12:32UTC | 主队列 22/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 23/744] SkillfulElectro/V2RayCollector | 配额 4800/4800 12:32UTC | 主队列 23/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 24/744] aiboboxx/v2rayfree | 配额 4800/4800 12:32UTC | 主队列 24/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 25/744] iswhat/Chat2DB | 配额 4800/4800 12:32UTC | 主队列 25/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 26/744] pooriaredorg/pooriaredorg | 配额 4800/4800 12:32UTC | 主队列 26/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 27/744] ssrsub/ssr | 配额 4800/4800 12:32UTC | 主队列 27/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 28/744] peasoft/NoMoreWalls | 配额 4800/4800 12:32UTC | 主队列 28/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 29/744] 4n0nymou3/multi-proxy-config-fetcher | 配额 4800/4800 12:32UTC | 主队列 29/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 30/744] wenxig/free-nodes-sub | 配额 4800/4800 12:32UTC | 主队列 30/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 31/744] 10ium/multi-proxy-config-fetcher | 配额 4800/4800 12:32UTC | 主队列 31/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 32/744] sclyxcn/v2ray-reaper | 配额 4800/4800 12:32UTC | 主队列 32/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 33/744] cysk003/Epodonios-v2ray-configs | 配额 4800/4800 12:32UTC | 主队列 33/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 34/744] cysk003/NoMoreWalls | 配额 4800/4800 12:32UTC | 主队列 34/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 35/744] Misaka-blog/chromego_merge | 配额 4800/4800 12:32UTC | 主队列 35/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 36/744] Aethersailor/SubConverter-Extended | 配额 4800/4800 12:32UTC | 主队列 36/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 37/744] kafeixiang/mihomo | 配额 4800/4800 12:32UTC | 主队列 37/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 38/744] anaer/Sub | 配额 4800/4800 12:32UTC | 主队列 38/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 39/744] Leon406/SubCrawler | 配额 4800/4800 12:32UTC | 主队列 39/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 40/744] Baobei321/-AutoMergePublicNodes | 配额 4800/4800 12:32UTC | 主队列 40/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 41/744] ts-sf/fly | 配额 4800/4800 12:32UTC | 主队列 41/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 42/744] chaoduzj/subs-check | 配额 4800/4800 12:32UTC | 主队列 42/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 43/744] chaoduzj/pac2 | 配额 4800/4800 12:32UTC | 主队列 43/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 44/744] ws94666ws/awesome-vpn | 配额 4800/4800 12:32UTC | 主队列 44/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 45/744] ab13643832129/awesome-vpn | 配额 4800/4800 12:32UTC | 主队列 45/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 46/744] xwcyg6/airport-free | 配额 4800/4800 12:32UTC | 主队列 46/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 47/744] BiHuDeH/multi-proxy-config-fetcher | 配额 4800/4800 12:32UTC | 主队列 47/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 48/744] sami4030/multi-proxy-config-fetcher | 配额 4800/4800 12:32UTC | 主队列 48/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 49/744] ermaozi/get_subscribe | 配额 4800/4800 12:32UTC | 主队列 49/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 50/744] Airuop/archive | 配额 4800/4800 12:32UTC | 主队列 50/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 51/744] AtenaPV/PL4 | 配额 4800/4800 12:32UTC | 主队列 51/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 52/744] AtenaPV/Main-DB | 配额 4800/4800 12:32UTC | 主队列 52/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 53/744] AtenaPV/Sub-Sync | 配额 4800/4800 12:32UTC | 主队列 53/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 54/744] sevcator/5ubscrpt10n | 配额 4800/4800 12:32UTC | 主队列 54/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 55/744] V2RayRoot/V2RayConfig | 配额 4800/4800 12:32UTC | 主队列 55/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 56/744] ehsanghaffar/config-sub-platform | 配额 4800/4800 12:32UTC | 主队列 56/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 57/744] Airuop/config-fetcher | 配额 4800/4800 12:32UTC | 主队列 57/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 58/744] free-nodes/v2rayfree | 配额 4800/4800 12:32UTC | 主队列 58/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 59/744] crashgfw/free-airport-nodes | 配额 4800/4800 12:32UTC | 主队列 59/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 60/744] lza6/free-VPN | 配额 4800/4800 12:32UTC | 主队列 60/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 61/744] guying23/AutoMergePublicNodes | 配额 4800/4800 12:32UTC | 主队列 61/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 62/744] wzdnzd/aggregator | 配额 4800/4800 12:32UTC | 主队列 62/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 63/744] bruceblink/free-v2ray | 配额 4800/4800 12:32UTC | 主队列 63/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 64/744] alanbobs999/TopFreeProxies | 配额 4800/4800 12:32UTC | 主队列 64/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 65/744] wrfree/free | 配额 4800/4800 12:32UTC | 主队列 65/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 66/744] learnhard-cn/free_proxy_ss | 配额 4800/4800 12:32UTC | 主队列 66/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 67/744] mahsanet/MahsaFreeConfig | 配额 4800/4800 12:32UTC | 主队列 67/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 68/744] Ashkan-m/v2ray | 配额 4800/4800 12:32UTC | 主队列 68/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 69/744] Kamyar19/configMs | 配额 4800/4800 12:32UTC | 主队列 69/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 70/744] junjun266/FreeProxyGo | 配额 4800/4800 12:32UTC | 主队列 70/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 71/744] imalyzer/mihomo-node-checker | 配额 4800/4800 12:32UTC | 主队列 71/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 72/744] lerjtl/Testfree | 配额 4800/4800 12:32UTC | 主队列 72/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 73/744] superokde/free-nodes | 配额 4800/4800 12:32UTC | 主队列 73/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 74/744] XHegit/FreeNodes | 配额 4800/4800 12:32UTC | 主队列 74/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 75/744] Yannik666/nodes | 配额 4800/4800 12:32UTC | 主队列 75/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 76/744] wanvfx/FreeNodes | 配额 4800/4800 12:32UTC | 主队列 76/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 77/744] luochen1975/FreeNodes | 配额 4800/4800 12:32UTC | 主队列 77/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 78/744] yangfh158/FreeNodes | 配额 4800/4800 12:32UTC | 主队列 78/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 79/744] chengege666/FreeNodes | 配额 4800/4800 12:32UTC | 主队列 79/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] 🔵 [种子 80/744] gwcctv/FreeNodes | 配额 4800/4800 12:32UTC | 主队列 80/200 发现队列 0/20000 [空] | Worker 0忙/36闲(0%)
+[2026-08-08 20:32:53] [种子] ⏸️  主队列 ≥ 80（80/200），搜索暂停
+[2026-08-08 20:32:53] [W-0] 🔧 开始处理 [种子仓库] Raad63/v2ray-configs-sub-5 [种子 1/744]
+[2026-08-08 20:32:53] [W-0] [种子仓库] 仓库 https://github.com/Raad63/v2ray-configs-sub-5 (分支: main, size: 25403824KB, pushed: 2026-08-08T10:29:12Z)
+[2026-08-08 20:32:53] [W-0] 📦 大仓库 [24.2GB] clone 开始: Raad63/v2ray-configs-sub-5 (并发 1/15)
+[2026-08-08 20:32:53] [W-0] 📦 Partial Clone: 998 个文件（零 API 配额） | 耗时 0s | 大仓库 24.2GB
+[2026-08-08 20:32:54] [W-0] 仓库 https://github.com/Raad63/v2ray-configs-sub-5 候选文件 991 个
+[2026-08-08 20:32:54] [ThreadPoolExecutor-0_0] 🔗 [种子仓库] 发现仓库链接 Epodonios/v2ray-configs.git (来源 https://raw.githubusercontent.com/Raad63/v2ray-configs-sub-5/main/.github/workflows/main.yml)
+[2026-08-08 20:32:55] repo info (Epodonios/v2ray-configs.git) 404，跳过
+[2026-08-08 20:32:55] [ThreadPoolExecutor-0_0] 🔍 仓库 Epodonios/v2ray-configs.git 不存在，追踪用户
+[2026-08-08 20:32:55] [ThreadPoolExecutor-0_0] 👤 [种子仓库] 遍历用户仓库: Epodonios
+[2026-08-08 20:32:55] [ThreadPoolExecutor-0_0]   👤 用户仓库: 12/12 个 → 主队列 79/200 发现队列 12/20000 [[user0]:12] | Worker 1忙/35闲(2%)
+[2026-08-08 20:32:55] [ThreadPoolExecutor-0_0]   用户 Epodonios 共查 12 个仓库
+[2026-08-08 20:32:55] [W-2] 🔧 开始处理 [user0] Epodonios/bulk-xray-v2ray-vless-vmess-...-configs
+[2026-08-08 20:32:55] [W-2] [user0] 仓库 https://github.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs (分支: main, size: 23866KB, pushed: 2026-08-08T12:29:57Z)
+[2026-08-08 20:32:55] [W-4] 🔧 开始处理 [user0] Epodonios/v2ray-configs
+[2026-08-08 20:32:55] [W-4] [user0] 仓库 https://github.com/Epodonios/v2ray-configs (分支: main, size: 25406635KB, pushed: 2026-08-08T12:03:31Z)
+[2026-08-08 20:32:55] [W-5] 🔧 开始处理 [user0] Epodonios/MEMENTO
+[2026-08-08 20:32:55] [W-5] ⏭️ [user0] 仓库 https://github.com/Epodonios/MEMENTO 505h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:55] [W-5] 🔗 [user0] 查子仓库: Epodonios/MEMENTO
+[2026-08-08 20:32:55] [W-8] 🔧 开始处理 [user0] Epodonios/epodonios.github.io
+[2026-08-08 20:32:55] [W-8] ⏭️ [user0] 仓库 https://github.com/Epodonios/epodonios.github.io 212h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:55] [W-8] 🔗 [user0] 查子仓库: Epodonios/epodonios.github.io
+[2026-08-08 20:32:55] [W-3] 🔧 开始处理 [user0] Epodonios/NOBODY-player
+[2026-08-08 20:32:55] [W-3] ⏭️ [user0] 仓库 https://github.com/Epodonios/NOBODY-player 257h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:55] [W-3] 🔗 [user0] 查子仓库: Epodonios/NOBODY-player
+[2026-08-08 20:32:55] [W-6] 🔧 开始处理 [user0] Epodonios/APNEL
+[2026-08-08 20:32:55] [W-6] ⏭️ [user0] 仓库 https://github.com/Epodonios/APNEL 355h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:55] [W-6] 🔗 [user0] 查子仓库: Epodonios/APNEL
+[2026-08-08 20:32:55] [W-12] 🔧 开始处理 [user0] Epodonios/Epodonios
+[2026-08-08 20:32:55] [W-1] 🔧 开始处理 [user0] Epodonios/Active_v2rays
+[2026-08-08 20:32:55] [W-1] ⏭️ [user0] 仓库 https://github.com/Epodonios/Active_v2rays 9458h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:55] [W-1] 🔗 [user0] 查子仓库: Epodonios/Active_v2rays
+[2026-08-08 20:32:55] [W-4] 📦 大仓库 [24.2GB] clone 开始: Epodonios/v2ray-configs (并发 1/15)
+[2026-08-08 20:32:55] [W-9] 🔧 开始处理 [user0] Epodonios/hash-unhash-file
+[2026-08-08 20:32:55] [W-7] 🔧 开始处理 [user0] Epodonios/cyber-books
+[2026-08-08 20:32:55] [W-11] 🔧 开始处理 [user0] Epodonios/-
+[2026-08-08 20:32:56] [W-10] 🔧 开始处理 [user0] Epodonios/test
+[2026-08-08 20:32:56] [W-10] ⏭️ [user0] 仓库 https://github.com/Epodonios/test 9505h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:56] [W-10] 🔗 [user0] 查子仓库: Epodonios/test
+[2026-08-08 20:32:56] [W-6] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/APNEL)
+[2026-08-08 20:32:56] [W-3] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/NOBODY-player)
+[2026-08-08 20:32:56] [W-10] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/test)
+[2026-08-08 20:32:56] [W-5] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/MEMENTO)
+[2026-08-08 20:32:56] [W-8] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/epodonios.github.io)
+[2026-08-08 20:32:56] [W-9] ⏭️ [user0] 仓库 https://github.com/Epodonios/hash-unhash-file 21532h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:56] [W-9] 🔗 [user0] 查子仓库: Epodonios/hash-unhash-file
+[2026-08-08 20:32:56] [W-6] ✅ 完成 [user0] Epodonios/APNEL | 提取 0 | 新增 0 | 耗时 1s | 配额 4789/4800 12:32UTC | 主队列 79/200 发现队列 0/20000 [空] | Worker 13忙/23闲(36%)
+[2026-08-08 20:32:56] [W-1]   🍴 子仓库: 1/1 个 → 主队列 78/200 发现队列 1/20000 [[fork1]:1] | Worker 12忙/24闲(33%)
+[2026-08-08 20:32:56] [W-1] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/Active_v2rays)
+[2026-08-08 20:32:56] [W-6] 🔧 开始处理 [种子仓库] wang1680/proxypool [种子 2/744]
+[2026-08-08 20:32:56] [W-3] ✅ 完成 [user0] Epodonios/NOBODY-player | 提取 0 | 新增 0 | 耗时 1s | 配额 4787/4800 12:32UTC | 主队列 78/200 发现队列 1/20000 [[fork1]:1] | Worker 13忙/23闲(36%)
+[2026-08-08 20:32:56] [W-13] 🔧 开始处理 [fork1] vsevolobo/Active_v2rays
+[2026-08-08 20:32:56] [W-3] 🔧 开始处理 [种子仓库] Pawdroid/Free-servers [种子 3/744]
+[2026-08-08 20:32:56] repo info (Epodonios/-) 返回 403 (尝试 1/2)
+[2026-08-08 20:32:56] repo info (Epodonios/-) 403（访问被拒，配额剩余 4958），跳过
+[2026-08-08 20:32:56] [W-11] ⚠️ [user0] 仓库 https://github.com/Epodonios/- 已禁用，跳过
+[2026-08-08 20:32:56] [W-11] ✅ 完成 [user0] Epodonios/- | 提取 0 | 新增 0 | 耗时 1s | 配额 4786/4800 12:32UTC | 主队列 77/200 发现队列 0/20000 [空] | Worker 14忙/22闲(38%)
+[2026-08-08 20:32:56] [W-8] ✅ 完成 [user0] Epodonios/epodonios.github.io | 提取 0 | 新增 0 | 耗时 1s | 配额 4785/4800 12:32UTC | 主队列 76/200 发现队列 0/20000 [空] | Worker 13忙/23闲(36%)
+[2026-08-08 20:32:56] [W-8] 🔧 开始处理 [种子仓库] gfpcom/free-proxy-list [种子 5/744]
+[2026-08-08 20:32:56] [W-11] 🔧 开始处理 [种子仓库] LoneKingCode/free-proxy-db [种子 4/744]
+[2026-08-08 20:32:56] [W-7] ⏭️ [user0] 仓库 https://github.com/Epodonios/cyber-books 21795h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:56] [W-7] 🔗 [user0] 查子仓库: Epodonios/cyber-books
+[2026-08-08 20:32:56] [W-10] ✅ 完成 [user0] Epodonios/test | 提取 0 | 新增 0 | 耗时 1s | 配额 4783/4800 12:32UTC | 主队列 75/200 发现队列 0/20000 [空] | Worker 14忙/22闲(38%)
+[2026-08-08 20:32:56] [W-10] 🔧 开始处理 [种子仓库] mahdibland/get_v2 [种子 6/744]
+[2026-08-08 20:32:56] [W-9]   🍴 子仓库: 2/2 个 → 主队列 74/200 发现队列 2/20000 [[fork1]:2] | Worker 14忙/22闲(38%)
+[2026-08-08 20:32:56] [W-9] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/hash-unhash-file)
+[2026-08-08 20:32:56] [W-5] ✅ 完成 [user0] Epodonios/MEMENTO | 提取 0 | 新增 0 | 耗时 1s | 配额 4781/4800 12:32UTC | 主队列 74/200 发现队列 2/20000 [[fork1]:2] | Worker 14忙/22闲(38%)
+[2026-08-08 20:32:56] [W-12] ⏭️ [user0] 仓库 https://github.com/Epodonios/Epodonios 21863h 未更新，跳过解析（需追踪）
+[2026-08-08 20:32:56] [W-12] 🔗 [user0] 查子仓库: Epodonios/Epodonios
+[2026-08-08 20:32:56] [W-5] 🔧 开始处理 [种子仓库] MhdiTaheri/V2rayCollector [种子 7/744]
+[2026-08-08 20:32:56] [W-14] 🔧 开始处理 [fork1] weiyuan-sty/hash-unhash-file
+[2026-08-08 20:32:56] [W-1] ✅ 完成 [user0] Epodonios/Active_v2rays | 提取 0 | 新增 0 | 耗时 1s | 配额 4779/4800 12:32UTC | 主队列 73/200 发现队列 1/20000 [[fork1]:1] | Worker 15忙/21闲(41%)
+[2026-08-08 20:32:56] [W-1] 🔧 开始处理 [种子仓库] Raad63/nirevil [种子 8/744]
+[2026-08-08 20:32:56] [W-15] 🔧 开始处理 [fork1] WikiPikiMiki/hash-unhash-file
+[2026-08-08 20:32:57] [W-7]   🍴 子仓库: 2/2 个 → 主队列 72/200 发现队列 2/20000 [[fork1]:2] | Worker 16忙/20闲(44%)
+[2026-08-08 20:32:57] [W-7] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/cyber-books)
+[2026-08-08 20:32:57] [W-17] 🔧 开始处理 [fork1] weiyuan-sty/cyber-books
+[2026-08-08 20:32:57] [W-16] 🔧 开始处理 [fork1] zealousoperator007/cyber-books
+[2026-08-08 20:32:57] [W-3] [种子仓库] 仓库 https://github.com/Pawdroid/Free-servers (分支: main, size: 94KB, pushed: 2026-08-08T12:00:43Z)
+[2026-08-08 20:32:57] [ThreadPoolExecutor-0_7] 📦 批次 0001 已持久化: /home/runner/work/test-college/test-college/batches/no_batch_0001.txt (5009 个节点, 累计 5009 个) | 主队列 72/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-7] ✅ 完成 [user0] Epodonios/cyber-books | 提取 0 | 新增 0 | 耗时 1s | 配额 4776/4800 12:32UTC | 主队列 72/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-7] 🔧 开始处理 [种子仓库] cysk003/yebekhe-TVC [种子 9/744]
+[2026-08-08 20:32:57] [W-9] ✅ 完成 [user0] Epodonios/hash-unhash-file | 提取 0 | 新增 0 | 耗时 1s | 配额 4774/4800 12:32UTC | 主队列 71/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-8] [种子仓库] 仓库 https://github.com/gfpcom/free-proxy-list (分支: main, size: 37144KB, pushed: 2026-08-08T11:54:39Z)
+[2026-08-08 20:32:57] [W-11] ⏭️ [种子仓库] 仓库 https://github.com/LoneKingCode/free-proxy-db 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:57] [W-11] ✅ 完成 [种子仓库] LoneKingCode/free-proxy-db [种子 4/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4772/4800 12:32UTC | 主队列 70/200 发现队列 0/20000 [空] | Worker 17忙/19闲(47%)
+[2026-08-08 20:32:57] [W-9] 🔧 开始处理 [种子仓库] chaoduzj/V2RayAutoConfig [种子 10/744]
+[2026-08-08 20:32:57] [W-6] [种子仓库] 仓库 https://github.com/wang1680/proxypool (分支: main, size: 50878KB, pushed: 2026-08-08T10:19:05Z)
+[2026-08-08 20:32:57] [W-11] 🔧 开始处理 [种子仓库] sclyxcn/airport-free [种子 11/744]
+[2026-08-08 20:32:57] [W-13] 📝 已处理缓存: vsevolobo/Active_v2rays
+[2026-08-08 20:32:57] [W-13] ⏭️ [fork1] 仓库 https://github.com/vsevolobo/Active_v2rays 9458h 未更新，跳过解析（无需追踪）
+[2026-08-08 20:32:57] [W-13] ✅ 完成 [fork1] vsevolobo/Active_v2rays | 提取 0 | 新增 0 | 耗时 1s | 配额 4770/4800 12:32UTC | 主队列 69/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-13] 🔧 开始处理 [种子仓库] MhdiTaheri/V2rayCollector_Py [种子 12/744]
+[2026-08-08 20:32:57] [W-10] ⏭️ [种子仓库] 仓库 https://github.com/mahdibland/get_v2 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:57] [W-10] ✅ 完成 [种子仓库] mahdibland/get_v2 [种子 6/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4769/4800 12:32UTC | 主队列 68/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-14] 📝 已处理缓存: weiyuan-sty/hash-unhash-file
+[2026-08-08 20:32:57] [W-14] ⏭️ [fork1] 仓库 https://github.com/weiyuan-sty/hash-unhash-file 21532h 未更新，跳过解析（无需追踪）
+[2026-08-08 20:32:57] [W-14] ✅ 完成 [fork1] weiyuan-sty/hash-unhash-file | 提取 0 | 新增 0 | 耗时 1s | 配额 4768/4800 12:32UTC | 主队列 67/200 发现队列 0/20000 [空] | Worker 17忙/19闲(47%)
+[2026-08-08 20:32:57] [W-14] 🔧 开始处理 [种子仓库] miladkantoori/multi-proxy-config-fetcher [种子 14/744]
+[2026-08-08 20:32:57] [W-10] 🔧 开始处理 [种子仓库] mr-mohamad-mr/multi-proxy-config-fetcher [种子 13/744]
+[2026-08-08 20:32:57] [W-5] [种子仓库] 仓库 https://github.com/MhdiTaheri/V2rayCollector (分支: main, size: 951604KB, pushed: 2026-08-08T11:25:22Z)
+[2026-08-08 20:32:57] [W-1] [种子仓库] 仓库 https://github.com/Raad63/nirevil (分支: main, size: 74372KB, pushed: 2026-08-08T09:44:31Z)
+[2026-08-08 20:32:57] [W-16] 📝 已处理缓存: zealousoperator007/cyber-books
+[2026-08-08 20:32:57] [W-16] ⏭️ [fork1] 仓库 https://github.com/zealousoperator007/cyber-books 21795h 未更新，跳过解析（无需追踪）
+[2026-08-08 20:32:57] [W-16] ✅ 完成 [fork1] zealousoperator007/cyber-books | 提取 0 | 新增 0 | 耗时 1s | 配额 4765/4800 12:32UTC | 主队列 66/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-16] 🔧 开始处理 [种子仓库] Rayan-Config/C-Sub [种子 15/744]
+[2026-08-08 20:32:57] [W-15] 📝 已处理缓存: WikiPikiMiki/hash-unhash-file
+[2026-08-08 20:32:57] [W-15] ⏭️ [fork1] 仓库 https://github.com/WikiPikiMiki/hash-unhash-file 21532h 未更新，跳过解析（无需追踪）
+[2026-08-08 20:32:57] [W-15] ✅ 完成 [fork1] WikiPikiMiki/hash-unhash-file | 提取 0 | 新增 0 | 耗时 1s | 配额 4764/4800 12:32UTC | 主队列 65/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-15] 🔧 开始处理 [种子仓库] mfuu/v2ray [种子 16/744]
+[2026-08-08 20:32:57] [W-17] 📝 已处理缓存: weiyuan-sty/cyber-books
+[2026-08-08 20:32:57] [W-17] ⏭️ [fork1] 仓库 https://github.com/weiyuan-sty/cyber-books 21795h 未更新，跳过解析（无需追踪）
+[2026-08-08 20:32:57] [W-17] ✅ 完成 [fork1] weiyuan-sty/cyber-books | 提取 0 | 新增 0 | 耗时 1s | 配额 4763/4800 12:32UTC | 主队列 64/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:57] [W-17] 🔧 开始处理 [种子仓库] mahdibland/SSAggregator [种子 17/744]
+[2026-08-08 20:32:58] [W-11] ⏭️ [种子仓库] 仓库 https://github.com/sclyxcn/airport-free 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:58] [W-11] ✅ 完成 [种子仓库] sclyxcn/airport-free [种子 11/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4762/4800 12:32UTC | 主队列 63/200 发现队列 0/20000 [空] | Worker 18忙/18闲(50%)
+[2026-08-08 20:32:58] [W-10] [种子仓库] 仓库 https://github.com/mr-mohamad-mr/multi-proxy-config-fetcher (分支: main, size: 62189KB, pushed: 2026-08-08T11:28:40Z)
+[2026-08-08 20:32:58] [W-11] 🔧 开始处理 [种子仓库] mahdibland/ShadowsocksAggregator [种子 18/744]
+[2026-08-08 20:32:58] [W-9] [种子仓库] 仓库 https://github.com/chaoduzj/V2RayAutoConfig (分支: main, size: 12978079KB, pushed: 2026-08-08T12:15:17Z)
+[2026-08-08 20:32:58] [W-7] [种子仓库] 仓库 https://github.com/cysk003/yebekhe-TVC (分支: main, size: 2068337KB, pushed: 2026-08-08T09:29:28Z)
+[2026-08-08 20:32:58] [W-9] 📦 大仓库 [12.4GB] clone 开始: chaoduzj/V2RayAutoConfig (并发 9/15)
+[2026-08-08 20:32:58] [W-7] 📦 大仓库 [2.0GB] clone 开始: cysk003/yebekhe-TVC (并发 10/15)
+[2026-08-08 20:32:58] [W-14] [种子仓库] 仓库 https://github.com/miladkantoori/multi-proxy-config-fetcher (分支: main, size: 66552KB, pushed: 2026-08-08T12:32:56Z)
+[2026-08-08 20:32:58] [W-4] 📦 Partial Clone: 998 个文件（零 API 配额） | 耗时 2s | 大仓库 24.2GB
+[2026-08-08 20:32:58] [W-13] [种子仓库] 仓库 https://github.com/MhdiTaheri/V2rayCollector_Py (分支: main, size: 32002KB, pushed: 2026-08-08T11:32:05Z)
+[2026-08-08 20:32:58] [W-15] [种子仓库] 仓库 https://github.com/mfuu/v2ray (分支: master, size: 24KB, pushed: 2026-08-08T05:34:57Z)
+[2026-08-08 20:32:58] [W-19] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-19] 🔧 开始处理 [种子仓库] free-nodes/clashfree [种子 19/744]
+[2026-08-08 20:32:58] [W-22] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-22] 🔧 开始处理 [种子仓库] ninjastrikers/nexus-nodes [种子 20/744]
+[2026-08-08 20:32:58] [W-28] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-28] 🔧 开始处理 [种子仓库] chaoduzj/aggregator [种子 21/744]
+[2026-08-08 20:32:58] [W-31] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-31] 🔧 开始处理 [种子仓库] Airuop/cross [种子 22/744]
+[2026-08-08 20:32:58] [W-29] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-29] 🔧 开始处理 [种子仓库] SkillfulElectro/V2RayCollector [种子 23/744]
+[2026-08-08 20:32:58] [W-33] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-33] 🔧 开始处理 [种子仓库] aiboboxx/v2rayfree [种子 24/744]
+[2026-08-08 20:32:58] [W-20] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-20] 🔧 开始处理 [种子仓库] iswhat/Chat2DB [种子 25/744]
+[2026-08-08 20:32:58] [W-26] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-26] 🔧 开始处理 [种子仓库] pooriaredorg/pooriaredorg [种子 26/744]
+[2026-08-08 20:32:58] [W-32] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-32] 🔧 开始处理 [种子仓库] ssrsub/ssr [种子 27/744]
+[2026-08-08 20:32:58] [W-16] [种子仓库] 仓库 https://github.com/Rayan-Config/C-Sub (分支: main, size: 26528KB, pushed: 2026-08-08T12:28:38Z)
+[2026-08-08 20:32:58] [W-18] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-18] 🔧 开始处理 [种子仓库] peasoft/NoMoreWalls [种子 28/744]
+[2026-08-08 20:32:58] [W-27] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-27] 🔧 开始处理 [种子仓库] 4n0nymou3/multi-proxy-config-fetcher [种子 29/744]
+[2026-08-08 20:32:58] [W-35] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-35] 🔧 开始处理 [种子仓库] wenxig/free-nodes-sub [种子 30/744]
+[2026-08-08 20:32:58] [W-23] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-23] 🔧 开始处理 [种子仓库] 10ium/multi-proxy-config-fetcher [种子 31/744]
+[2026-08-08 20:32:58] [W-34] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-34] 🔧 开始处理 [种子仓库] sclyxcn/v2ray-reaper [种子 32/744]
+[2026-08-08 20:32:58] [W-24] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-24] 🔧 开始处理 [种子仓库] cysk003/Epodonios-v2ray-configs [种子 33/744]
+[2026-08-08 20:32:58] [W-25] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-25] 🔧 开始处理 [种子仓库] cysk003/NoMoreWalls [种子 34/744]
+[2026-08-08 20:32:58] [W-30] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-30] 🔧 开始处理 [种子仓库] Misaka-blog/chromego_merge [种子 35/744]
+[2026-08-08 20:32:58] [W-21] ⏳ 等待任务中...
+[2026-08-08 20:32:58] [W-21] 🔧 开始处理 [种子仓库] Aethersailor/SubConverter-Extended [种子 36/744]
+[2026-08-08 20:32:58] [W-2] 📦 Partial Clone: 4 个文件（零 API 配额） | 耗时 3s
+[2026-08-08 20:32:58] [W-17] ⏭️ [种子仓库] 仓库 https://github.com/mahdibland/SSAggregator 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:58] [W-17] ✅ 完成 [种子仓库] mahdibland/SSAggregator [种子 17/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4754/4800 12:32UTC | 主队列 44/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:32:58] [W-17] 🔧 开始处理 [种子仓库] kafeixiang/mihomo [种子 37/744]
+[2026-08-08 20:32:58] [W-11] ⏭️ [种子仓库] 仓库 https://github.com/mahdibland/ShadowsocksAggregator 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:58] [W-11] ✅ 完成 [种子仓库] mahdibland/ShadowsocksAggregator [种子 18/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4753/4800 12:32UTC | 主队列 43/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:32:58] [W-11] 🔧 开始处理 [种子仓库] anaer/Sub [种子 38/744]
+[2026-08-08 20:32:59] [W-33] [种子仓库] 仓库 https://github.com/aiboboxx/v2rayfree (分支: main, size: 26034KB, pushed: 2026-08-08T08:46:53Z)
+[2026-08-08 20:32:59] [W-24] [种子仓库] 仓库 https://github.com/cysk003/Epodonios-v2ray-configs (分支: main, size: 25399428KB, pushed: 2026-08-08T07:56:24Z)
+[2026-08-08 20:32:59] [W-31] ⏭️ [种子仓库] 仓库 https://github.com/Airuop/cross 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:59] [W-31] ✅ 完成 [种子仓库] Airuop/cross [种子 22/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4750/4800 12:32UTC | 主队列 42/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:32:59] [W-23] [种子仓库] 仓库 https://github.com/10ium/multi-proxy-config-fetcher (分支: main, size: 44455KB, pushed: 2026-08-08T06:47:05Z)
+[2026-08-08 20:32:59] [W-24] 📦 大仓库 [24.2GB] clone 开始: cysk003/Epodonios-v2ray-configs (并发 14/15)
+[2026-08-08 20:32:59] [W-31] 🔧 开始处理 [种子仓库] Leon406/SubCrawler [种子 39/744]
+[2026-08-08 20:32:59] [W-34] [种子仓库] 仓库 https://github.com/sclyxcn/v2ray-reaper (分支: main, size: 5492357KB, pushed: 2026-08-08T09:33:09Z)
+[2026-08-08 20:32:59] [W-26] [种子仓库] 仓库 https://github.com/pooriaredorg/pooriaredorg (分支: main, size: 18297KB, pushed: 2026-08-08T09:39:25Z)
+[2026-08-08 20:32:59] [W-19] [种子仓库] 仓库 https://github.com/free-nodes/clashfree (分支: main, size: 29044KB, pushed: 2026-08-08T09:20:44Z)
+[2026-08-08 20:32:59] [W-32] ⏭️ [种子仓库] 仓库 https://github.com/ssrsub/ssr 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:59] [W-32] ✅ 完成 [种子仓库] ssrsub/ssr [种子 27/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4745/4800 12:32UTC | 主队列 41/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:32:59] [W-32] 🔧 开始处理 [种子仓库] Baobei321/-AutoMergePublicNodes [种子 40/744]
+[2026-08-08 20:32:59] [W-18] [种子仓库] 仓库 https://github.com/peasoft/NoMoreWalls (分支: master, size: 5055122KB, pushed: 2026-08-08T09:36:40Z)
+[2026-08-08 20:32:59] [W-29] ⏭️ [种子仓库] 仓库 https://github.com/SkillfulElectro/V2RayCollector 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:59] [W-29] ✅ 完成 [种子仓库] SkillfulElectro/V2RayCollector [种子 23/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4743/4800 12:32UTC | 主队列 40/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:32:59] [W-29] 🔧 开始处理 [种子仓库] ts-sf/fly [种子 41/744]
+[2026-08-08 20:32:59] [W-35] [种子仓库] 仓库 https://github.com/wenxig/free-nodes-sub (分支: main, size: 15984KB, pushed: 2026-08-08T11:23:31Z)
+[2026-08-08 20:32:59] [W-22] [种子仓库] 仓库 https://github.com/ninjastrikers/nexus-nodes (分支: main, size: 1134567KB, pushed: 2026-08-08T08:57:44Z)
+[2026-08-08 20:32:59] [W-27] [种子仓库] 仓库 https://github.com/4n0nymou3/multi-proxy-config-fetcher (分支: main, size: 89375KB, pushed: 2026-08-08T09:52:55Z)
+[2026-08-08 20:32:59] [W-11] [种子仓库] 仓库 https://github.com/anaer/Sub (分支: main, size: 116KB, pushed: 2026-08-08T10:32:55Z)
+[2026-08-08 20:32:59] [W-20] ⏭️ [种子仓库] 仓库 https://github.com/iswhat/Chat2DB 已解析，跳过解析（无需追踪）
+[2026-08-08 20:32:59] [W-20] ✅ 完成 [种子仓库] iswhat/Chat2DB [种子 25/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4738/4800 12:32UTC | 主队列 39/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:32:59] [W-20] 🔧 开始处理 [种子仓库] chaoduzj/subs-check [种子 42/744]
+[2026-08-08 20:32:59] [W-30] [种子仓库] 仓库 https://github.com/Misaka-blog/chromego_merge (分支: main, size: 121075KB, pushed: 2026-08-08T12:26:47Z)
+[2026-08-08 20:32:59] [W-28] [种子仓库] 仓库 https://github.com/chaoduzj/aggregator (分支: main, size: 489225KB, pushed: 2026-08-08T09:50:19Z)
+[2026-08-08 20:32:59] [W-21] [种子仓库] 仓库 https://github.com/Aethersailor/SubConverter-Extended (分支: master, size: 10757KB, pushed: 2026-08-08T12:13:18Z)
+[2026-08-08 20:32:59] [W-25] [种子仓库] 仓库 https://github.com/cysk003/NoMoreWalls (分支: master, size: 5053054KB, pushed: 2026-08-08T12:30:20Z)
+[2026-08-08 20:32:59] [W-17] [种子仓库] 仓库 https://github.com/kafeixiang/mihomo (分支: Alpha, size: 12987KB, pushed: 2026-08-08T09:28:07Z)
+[2026-08-08 20:32:59] [W-31] [种子仓库] 仓库 https://github.com/Leon406/SubCrawler (分支: main, size: 2190584KB, pushed: 2026-08-08T10:26:53Z)
+[2026-08-08 20:32:59] [W-29] [种子仓库] 仓库 https://github.com/ts-sf/fly (分支: main, size: 13509158KB, pushed: 2026-08-08T09:05:20Z)
+[2026-08-08 20:32:59] [W-32] [种子仓库] 仓库 https://github.com/Baobei321/-AutoMergePublicNodes (分支: master, size: 8113560KB, pushed: 2026-08-08T11:53:11Z)
+[2026-08-08 20:32:59] [W-20] [种子仓库] 仓库 https://github.com/chaoduzj/subs-check (分支: master, size: 285262KB, pushed: 2026-08-08T08:55:11Z)
+[2026-08-08 20:33:01] [ThreadPoolExecutor-0_7] SHA 缓存已保存: 338952 条, 1 分片
+[2026-08-08 20:33:01] [W-12]   🍴 子仓库: 1/1 个 → 主队列 38/200 发现队列 1/20000 [[fork1]:1] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:01] [W-12] 🔗 [user0] 开始 Fork 链追踪 (Epodonios/Epodonios)
+[2026-08-08 20:33:01] [W-2] 仓库 https://github.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs 候选文件 1 个
+[2026-08-08 20:33:01] [W-12] ✅ 完成 [user0] Epodonios/Epodonios | 提取 0 | 新增 0 | 耗时 6s | 配额 4728/4800 12:33UTC | 主队列 38/200 发现队列 1/20000 [[fork1]:1] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:01] [W-12] 🔧 开始处理 [种子仓库] chaoduzj/pac2 [种子 43/744]
+[2026-08-08 20:33:10] [W-13] 📦 Partial Clone: 5 个文件（零 API 配额） | 耗时 12s
+[2026-08-08 20:33:10] [W-34] 📦 大仓库 [5.2GB] clone 开始: sclyxcn/v2ray-reaper (并发 15/15)
+[2026-08-08 20:33:10] [W-12] ⏭️ [种子仓库] 仓库 https://github.com/chaoduzj/pac2 已解析，跳过解析（无需追踪）
+[2026-08-08 20:33:10] [W-12] ✅ 完成 [种子仓库] chaoduzj/pac2 [种子 43/744] | 提取 0 | 新增 0 | 耗时 9s | 配额 4727/4800 12:33UTC | 主队列 37/200 发现队列 1/20000 [[fork1]:1] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:10] [W-12] 🔧 开始处理 [fork1] vasgun/Epodonios
+[2026-08-08 20:33:10] [W-8] 📦 Partial Clone: 35 个文件（零 API 配额） | 耗时 13s
+[2026-08-08 20:33:10] [W-7] 📦 Partial Clone: 257 个文件（零 API 配额） | 耗时 12s | 大仓库 2.0GB
+[2026-08-08 20:33:10] [W-5] 📦 Partial Clone: 21 个文件（零 API 配额） | 耗时 13s
+[2026-08-08 20:33:10] [W-15] 📦 Partial Clone: 12 个文件（零 API 配额） | 耗时 12s
+[2026-08-08 20:33:10] [W-24] 📦 Partial Clone: 998 个文件（零 API 配额） | 耗时 11s | 大仓库 24.2GB
+[2026-08-08 20:33:10] [W-22] 📦 大仓库 [1.1GB] clone 开始: ninjastrikers/nexus-nodes (并发 13/15)
+[2026-08-08 20:33:10] [W-14] 📦 Partial Clone: 19 个文件（零 API 配额） | 耗时 12s
+[2026-08-08 20:33:10] [W-10] 📦 Partial Clone: 19 个文件（零 API 配额） | 耗时 13s
+[2026-08-08 20:33:10] [W-1] 📦 Partial Clone: 295 个文件（零 API 配额） | 耗时 13s
+[2026-08-08 20:33:10] [W-18] 📦 大仓库 [4.8GB] clone 开始: peasoft/NoMoreWalls (并发 14/15)
+[2026-08-08 20:33:10] [W-9] 📦 Partial Clone: 104 个文件（零 API 配额） | 耗时 12s | 大仓库 12.4GB
+[2026-08-08 20:33:10] [W-23] 📦 Partial Clone: 19 个文件（零 API 配额） | 耗时 11s
+[2026-08-08 20:33:10] [W-6] 📦 Partial Clone: 6 个文件（零 API 配额） | 耗时 13s
+[2026-08-08 20:33:10] [W-25] 📦 大仓库 [4.8GB] clone 开始: cysk003/NoMoreWalls (并发 15/15)
+[2026-08-08 20:33:10] [W-16] 📦 Partial Clone: 20 个文件（零 API 配额） | 耗时 12s
+[2026-08-08 20:33:10] [W-33] 📦 Partial Clone: 11 个文件（零 API 配额） | 耗时 12s
+[2026-08-08 20:33:10] [W-3] 📦 Partial Clone: 49 个文件（零 API 配额） | 耗时 13s
+[2026-08-08 20:33:10] [W-31] 📦 大仓库 [2.1GB] clone 开始: Leon406/SubCrawler (并发 14/15)
+[2026-08-08 20:33:10] [W-29] 📦 大仓库 [12.9GB] clone 开始: ts-sf/fly (并发 15/15)
+[2026-08-08 20:33:10] [W-16] 仓库 https://github.com/Rayan-Config/C-Sub 候选文件 2 个
+[2026-08-08 20:33:10] [W-15] 仓库 https://github.com/mfuu/v2ray 候选文件 2 个
+[2026-08-08 20:33:10] [W-8] 仓库 https://github.com/gfpcom/free-proxy-list 候选文件 1 个
+[2026-08-08 20:33:10] [W-2] 🔗 [user0] 发现仓库链接 Epodonios/bulk-xray-v2ray-vless-vmess-...-config (来源 https://raw.githubusercontent.com/Epodonios/bulk-xray-v2ray-vless-vmess-...-configs/main/README.md)
+[2026-08-08 20:33:10] [W-5] 仓库 https://github.com/MhdiTaheri/V2rayCollector 候选文件 14 个
+[2026-08-08 20:33:10] [W-13] 仓库 https://github.com/MhdiTaheri/V2rayCollector_Py 候选文件 2 个
+[2026-08-08 20:33:11] [W-12] 📝 已处理缓存: vasgun/Epodonios
+[2026-08-08 20:33:11] [W-12] ⏭️ [fork1] 仓库 https://github.com/vasgun/Epodonios 21863h 未更新，跳过解析（无需追踪）
+[2026-08-08 20:33:11] [W-12] ✅ 完成 [fork1] vasgun/Epodonios | 提取 0 | 新增 0 | 耗时 1s | 配额 4726/4800 12:33UTC | 主队列 37/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:11] [W-12] 🔧 开始处理 [种子仓库] ws94666ws/awesome-vpn [种子 44/744]
+[2026-08-08 20:33:16] [W-33] 仓库 https://github.com/aiboboxx/v2rayfree 候选文件 3 个
+[2026-08-08 20:33:16] [W-16] 🔗 [种子仓库] 递归发现仓库 gransa/Temp-Sub (来源 https://raw.githubusercontent.com/Rayan-Config/C-Sub/main/configs/channel_stats.json)
+[2026-08-08 20:33:16] repo info (Epodonios/bulk-xray-v2ray-vless-vmess-...-config) 404，跳过
+[2026-08-08 20:33:16] [W-12] ⏭️ [种子仓库] 仓库 https://github.com/ws94666ws/awesome-vpn 已解析，跳过解析（无需追踪）
+[2026-08-08 20:33:16] [W-12] ✅ 完成 [种子仓库] ws94666ws/awesome-vpn [种子 44/744] | 提取 0 | 新增 0 | 耗时 5s | 配额 4724/4800 12:33UTC | 主队列 36/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:16] [W-12] 🔧 开始处理 [种子仓库] ab13643832129/awesome-vpn [种子 45/744]
+[2026-08-08 20:33:16] [W-6] 仓库 https://github.com/wang1680/proxypool 候选文件 4 个
+[2026-08-08 20:33:16] [W-25] 📦 Partial Clone: 63 个文件（零 API 配额） | 耗时 17s | 大仓库 4.8GB
+[2026-08-08 20:33:16] [W-32] 📦 大仓库 [7.7GB] clone 开始: Baobei321/-AutoMergePublicNodes (并发 15/15)
+[2026-08-08 20:33:16] [W-12] ⏭️ [种子仓库] 仓库 https://github.com/ab13643832129/awesome-vpn 已解析，跳过解析（无需追踪）
+[2026-08-08 20:33:16] [W-12] ✅ 完成 [种子仓库] ab13643832129/awesome-vpn [种子 45/744] | 提取 0 | 新增 0 | 耗时 0s | 配额 4723/4800 12:33UTC | 主队列 35/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:16] [W-12] 🔧 开始处理 [种子仓库] xwcyg6/airport-free [种子 46/744]
+[2026-08-08 20:33:16] [W-34] 📦 Partial Clone: 33 个文件（零 API 配额） | 耗时 18s | 大仓库 5.2GB
+[2026-08-08 20:33:16] [W-17] 📦 Partial Clone: 1022 个文件（零 API 配额） | 耗时 17s
+[2026-08-08 20:33:17] [W-23] 仓库 https://github.com/10ium/multi-proxy-config-fetcher 候选文件 3 个
+[2026-08-08 20:33:17] [W-31] 📦 Partial Clone: 75 个文件（零 API 配额） | 耗时 18s | 大仓库 2.1GB
+[2026-08-08 20:33:17] [W-18] 📦 Partial Clone: 63 个文件（零 API 配额） | 耗时 18s | 大仓库 4.8GB
+[2026-08-08 20:33:17] [W-14] 仓库 https://github.com/miladkantoori/multi-proxy-config-fetcher 候选文件 3 个
+[2026-08-08 20:33:17] [W-26] 📦 Partial Clone: 19 个文件（零 API 配额） | 耗时 18s
+[2026-08-08 20:33:17] [W-2] 🔗 [user0] 查子仓库: Epodonios/bulk-xray-v2ray-vless-vmess-...-configs
+[2026-08-08 20:33:17] [W-28] 📦 Partial Clone: 518 个文件（零 API 配额） | 耗时 18s
+[2026-08-08 20:33:17] [W-11] 📦 Partial Clone: 3 个文件（零 API 配额） | 耗时 18s
+[2026-08-08 20:33:17] [W-27] 📦 Partial Clone: 44 个文件（零 API 配额） | 耗时 18s
+[2026-08-08 20:33:17] [W-21] 📦 Partial Clone: 352 个文件（零 API 配额） | 耗时 18s
+[2026-08-08 20:33:17] [W-12] ⏭️ [种子仓库] 仓库 https://github.com/xwcyg6/airport-free 已解析，跳过解析（无需追踪）
+[2026-08-08 20:33:17] [W-12] ✅ 完成 [种子仓库] xwcyg6/airport-free [种子 46/744] | 提取 0 | 新增 0 | 耗时 1s | 配额 4721/4800 12:33UTC | 主队列 34/200 发现队列 1/20000 [[raw1]:1] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:17] [W-29] 📦 Partial Clone: 9 个文件（零 API 配额） | 耗时 18s | 大仓库 12.9GB
+[2026-08-08 20:33:17] [W-12] 🔧 开始处理 [raw1] gransa/Temp-Sub
+[2026-08-08 20:33:17] [W-12] ⏭️ [raw1] 仓库 https://github.com/gransa/Temp-Sub 6813h 未更新，跳过解析（无需追踪）
+[2026-08-08 20:33:17] [W-12] ✅ 完成 [raw1] gransa/Temp-Sub | 提取 0 | 新增 0 | 耗时 0s | 配额 4721/4800 12:33UTC | 主队列 34/200 发现队列 0/20000 [空] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:17] [W-12] 🔧 开始处理 [种子仓库] BiHuDeH/multi-proxy-config-fetcher [种子 47/744]
+[2026-08-08 20:33:17] [W-22] 📦 Partial Clone: 589 个文件（零 API 配额） | 耗时 18s | 大仓库 1.1GB
+[2026-08-08 20:33:17] [W-35] 📦 Partial Clone: 18 个文件（零 API 配额） | 耗时 19s
+[2026-08-08 20:33:17] [W-16] 🔗 [种子仓库] 递归发现仓库 Rayan-Config/HUB (来源 https://raw.githubusercontent.com/Rayan-Config/C-Sub/main/configs/channel_stats.json)
+[2026-08-08 20:33:18] [W-12] [种子仓库] 仓库 https://github.com/BiHuDeH/multi-proxy-config-fetcher (分支: main, size: 26081KB, pushed: 2026-08-08T12:23:56Z)
+[2026-08-08 20:33:18] [W-3] 仓库 https://github.com/Pawdroid/Free-servers 候选文件 32 个
+[2026-08-08 20:33:18] [W-30] 📦 Partial Clone: 20 个文件（零 API 配额） | 耗时 19s
+[2026-08-08 20:33:19] [W-20] 📦 Partial Clone: 106 个文件（零 API 配额） | 耗时 19s
+[2026-08-08 20:33:19] [W-32] 📦 Partial Clone: 56 个文件（零 API 配额） | 耗时 20s | 大仓库 7.7GB
+[2026-08-08 20:33:19] [W-19] 📦 Partial Clone: 11 个文件（零 API 配额） | 耗时 20s
+[2026-08-08 20:33:19] [W-10] 仓库 https://github.com/mr-mohamad-mr/multi-proxy-config-fetcher 候选文件 3 个
+[2026-08-08 20:33:19] [W-11] 仓库 https://github.com/anaer/Sub 候选文件 1 个
+[2026-08-08 20:33:19] [W-12] 📦 Partial Clone: 19 个文件（零 API 配额） | 耗时 1s
+[2026-08-08 20:33:19] [W-8] 🌱 加入种子: gfpcom/free-proxy-list (提取 2 节点)
+[2026-08-08 20:33:19] [W-8] ✅ 完成 [种子仓库] gfpcom/free-proxy-list [种子 5/744] | 提取 2 | 新增 2 | 耗时 23s | 配额 4718/4800 12:33UTC | 主队列 33/200 发现队列 2/20000 [[fork1]:1 [raw1]:1] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:19] [W-8] 🔧 开始处理 [种子仓库] sami4030/multi-proxy-config-fetcher [种子 48/744]
+[2026-08-08 20:33:19] [ThreadPoolExecutor-47_0] 🔗 [种子仓库] 发现仓库链接 Pawdroid/shadowrocket_for_android (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/README.md)
+[2026-08-08 20:33:19] [W-26] 仓库 https://github.com/pooriaredorg/pooriaredorg 候选文件 2 个
+[2026-08-08 20:33:19] [W-15] 🌱 加入种子: mfuu/v2ray (提取 64 节点)
+[2026-08-08 20:33:19] [W-15] ✅ 完成 [种子仓库] mfuu/v2ray [种子 16/744] | 提取 64 | 新增 31 | 耗时 22s | 配额 4718/4800 12:33UTC | 主队列 32/200 发现队列 5/20000 [[fork1]:4 [raw1]:1] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:19] [W-15] 🔧 开始处理 [种子仓库] ermaozi/get_subscribe [种子 49/744]
+[2026-08-08 20:33:19] [ThreadPoolExecutor-47_6] 🔗 [种子仓库] 发现仓库链接 Qv2ray/Qv2ray (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-fr.md)
+[2026-08-08 20:33:19] [W-16] 🌱 加入种子: Rayan-Config/C-Sub (提取 55 节点)
+[2026-08-08 20:33:19] [W-16] ✅ 完成 [种子仓库] Rayan-Config/C-Sub [种子 15/744] | 提取 55 | 新增 54 | 耗时 22s | 配额 4718/4800 12:33UTC | 主队列 31/200 发现队列 5/20000 [[fork1]:4 [raw1]:1] | Worker 36忙/0闲(100%)
+[2026-08-08 20:33:19] [W-16] 🔧 开始处理 [种子仓库] Airuop/archive [种子 50/744]
+[2026-08-08 20:33:19] [W-12] 仓库 https://github.com/BiHuDeH/multi-proxy-config-fetcher 候选文件 1 个
+[2026-08-08 20:33:19] [W-19] 仓库 https://github.com/free-nodes/clashfree 候选文件 2 个
+[2026-08-08 20:33:19] [ThreadPoolExecutor-47_4] 🔗 [种子仓库] 发现仓库链接 2dust/v2rayN (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-en.md)
+[2026-08-08 20:33:19] [W-29] 仓库 https://github.com/ts-sf/fly 候选文件 5 个
+[2026-08-08 20:33:19] [ThreadPoolExecutor-47_1] 🔗 [种子仓库] 发现仓库链接 jiangxufeng/v2rayL (来源 https://raw.githubusercontent.com/Pawdroid/Free-servers/main/static/README-ar.md)
+[2026-08-08 20:33:19] [W-30] 仓库 https://github.com/Misaka-blog/chromego_merge 候选文件 1 个
+[2026-08-08 20:33:19] [W-27] 仓库 https://github.com/4n0nymou3/multi-proxy-config-fetcher 候选文件 12 个
+[2026-08-08 20:33:19] [W-35] 仓库 https://github.com/wenxig/free-nodes-sub 候选文件 3 个
+[2026-08-08 20:33:19] [W-34] 仓库 https://github.com/sclyxcn/v2ray-reaper 候选文件 14 个
+[2026-08-08 20:33:19] [W-32] 仓库 https://github.com/Baobei321/-AutoMergePublicNodes 候选文件 11 个
+[2026-08-08 20:33:19] [W-8] [种子仓库] 仓库 https://github.com/sami4030/multi-proxy-config-fetcher (分支: main, size: 19731KB, pushed: 2026-08-08T11:24:01Z)
+[2026-08-08 20:33:19] [W-15] [种子仓库] 仓库 https://github.com/ermaozi/get_subscribe (分支: main, size: 212KB, pushed: 2026-08-08T12:11:51Z)
+[2026-08-08 20:33:20] [W-16] [种子仓库] 仓库 https://github.com/Airuop/archive (分支: master, size: 679827KB, pushed: 2026-08-08T08:49:06Z)
+[2026-08-08 20:33:20] [ThreadPoolExecutor-47_0] 👤 来源仓库 Pawdroid/shadowrocket_for_android → 追踪用户 Pawdroid
+[2026-08-08 20:33:20] [ThreadPoolExecutor-47_0] 👤 [种子仓库] 遍历用户仓库: Pawdroid
+[2026-08-08 20:33:20] [ThreadPoolExecutor-47_4] 👤 来源仓库 2dust/v2rayN → 追踪用户 2dust
+[2026-08-08 20:33:20] [ThreadPoolExecutor-47_4] 👤 [种子仓库] 遍历用户仓库: 2dust
+[2026-08-08 20:33:20] [ThreadPoolExecutor-47_6] 👤 来源仓库 Qv2ray/Qv2ray → 追踪用户 Qv2ray
+[2026-08-08 20:33:20] [ThreadPoolExecutor-47_6] 👤 [种子仓库] 遍历用户仓库: Qv2ray
+[2026-08-08 20:33:21] [ThreadPoolExecutor-47_1] 👤 来源仓库 jiangxufeng/v2rayL → 追踪用户 jiangxufeng
+[2026-08-08 20:33:21] [ThreadPoolExecutor-47_1] 👤 [种子仓库] 遍历用户仓库: jiangxufeng
