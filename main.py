@@ -12,6 +12,8 @@ import os
 import sys
 import time
 import glob
+import signal
+import threading
 from datetime import datetime, timezone, timedelta
 
 from collector import Collector
@@ -81,6 +83,43 @@ def build_queries():
     return queries
 
 
+# ==================== 停止信号处理 ====================
+
+def install_signal_handler(collector):
+    """安装停止信号处理（SIGINT/SIGTERM）——取消/终止时优雅退出。
+
+    背景：GA 取消 job 时发送 SIGINT/SIGTERM。默认 KeyboardInterrupt 的
+    抛出时机不稳定（主线程可能在 communicate/网络等待中），且退出前
+    flush stdout 可能卡在 GA 日志管道上（08085 取消后"运行搜集"转圈 1 小时）。
+
+    处理逻辑：
+      1. 重定向 stdout/stderr 到 devnull——退出前 flush 不再碰可能阻塞的管道
+      2. 置 limiter.exceeded=True → 所有 _should_stop() 检查点（worker/
+         搜索/队列等待循环）优雅退出 → collector.run() 正常收尾保存数据
+      3. 120 秒后强制 os._exit(0) 兜底——主线程若卡在不可中断等待
+         （communicate 900s / 网络超时）也能保证进程退出，GA 不再干等
+
+    正常运行（无信号）时此处理完全不参与，零影响。
+    """
+    def _handler(signum, frame):
+        try:
+            # 防退出 flush 阻塞：stdout/stderr 指向 devnull（后续日志进黑洞）
+            sys.stdout = open(os.devnull, 'w')
+            sys.stderr = open(os.devnull, 'w')
+            # 置停止标志：worker/搜索/队列循环检测到后优雅收尾
+            try:
+                collector.limiter.exceeded = True
+            except Exception:
+                pass
+            # 兜底：120 秒后强制退出（_finalize 收尾通常 <60s）
+            threading.Timer(120, lambda: os._exit(0)).start()
+        except Exception:
+            os._exit(0)
+
+    signal.signal(signal.SIGINT, _handler)
+    signal.signal(signal.SIGTERM, _handler)
+
+
 # ==================== 主流程 ====================
 
 def main():
@@ -90,6 +129,8 @@ def main():
     print(f"[{now_str()}] 关键词: {len(queries)} 个", flush=True)
 
     collector = Collector(token=GITHUB_TOKEN, queries=queries)
+    # 安装停止信号处理（GA 取消/终止时优雅退出，防"运行搜集"转圈卡死）
+    install_signal_handler(collector)
     collector.run()
 
     # 节点已由 collector 内部自动保存到 no.txt
