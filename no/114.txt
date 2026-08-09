@@ -1,4 +1,0 @@
-vless://@198.41.208.120:8880
-vless://e6fe1cbf-144b-40e1-b98c-a18736703631@178.21.161.126:443?type=ws&path=/XvonVpn&host=&security=none#🇮🇷IR_38499_@Surfboardv2ray
-vless://4885ab97-33e7-4cfa-ad95-6c7f876177a5@mklppoi.serendpiti.ir:2069?security=reality&type=xhttp&headerType=&path=/path&host=hostname&mode=auto&extra={
-vless://4885ab97-33e7-4cfa-ad95-6c7f876177a5@mmytr.serendpiti.ir:2056?security=reality&type=xhttp&headerType=&path=/path&host=hostname&mode=auto&extra={

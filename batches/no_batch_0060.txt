@@ -1,3 +1,0 @@
-vless://ef27e62d-91bd-4676-b9ce-8743a73eda07@172.233.175.13:80?security=reality&encryption=none&pbk=BVimgXtKkQ2Q6EpG8uKYTpySrNxEeIqVhdsxi5U5qRU&headerType=none&fp=chrome&type=tcp&sni=zula.ir&sid=94aa1bdc
-ss://YWVzLTI1Ni1jZmI6ZUlXMERuazY5NDU0ZTZuU3d1c3B2OURtUzIwMXRRMERAMTcyLjEwNC4xMDEuMjAxOjgwOTk=
-vless://70f5d3b8-7d31-4d7d-9467-e43752d66fca@[2606:4700:3030::6815:1001]:2096?security=tls&sni=sub.shadowsokstes.WoRkErs.DeV&type=ws&host=sub.shadowsokstes.WoRkE

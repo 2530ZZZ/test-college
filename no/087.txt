@@ -1,7 +1,0 @@
-trojan://BxceQaOe@13.230.254.47:41973?allowInsecure=1&sni=t.me%252Fripaojiedian#%F0%9F%87%B8%F0%9F%87%AC%20%E6%96%B0%E5%8A%A0%E5%9D%A13
-ss://0ac0d730-53f9-4818-9744-68720d80aa2a@fan8884.flaptop.sbs:8884?security=none&type=tcp&headerType=http&path=/&host=onedrive.live.com,cdnjs.cloudflare.com,raw.githubusercontent.com,drive.google.com,dropbox.com,box.com,archive.org#
-ss://0a85a67d-a849-cf52-cfa9-da208d43e6a9@cdn-ru1.iranwebfa.com:443?security=tls&type=ws&path=/stream&sni=cdn-ru1.iranwebfa.com&alpn=http/1.1#
-ss://08ea9f28-6911-4a80-b92b-85d81c8111a4@lp3.partyy.com.tr:3446?security=none&encryption=none&headerType=none&type=tcp#
-vless://6372b213-c892-42b4-b3cf-cba68a048bf4@104.21.2.134:443/?type=grpc&encryption=none&security=tls&sni=fru.injatech.eu&alpn=h2%2Chttp%2F1.1&fp=chrome#%40Hope_Net-join-us-on-Telegram
-ss://1da142b0-668b-4a60-ac74-e6c3f1b4e98c@217.60.236.171:443?type=tcp&encryption=none&path=/&host=Ponisha.ir&headerType=http&security=none#Config
-ss://1d14ea39-4f80-49bd-abee-a8a9bc9515b9@104.19.222.79:2087?path=/&security=tls&encryption=none&insecure=1&type=httpupgrade&allowInsecure=1&sni=deg.balende.ir#@Magsin_Vpn

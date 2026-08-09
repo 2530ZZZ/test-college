@@ -1,9 +1,0 @@
-ss://c0d3ba02-7d95-464e-90ca-8a89e46ab9b6@134.122.34.159:18172?type=tcp&amp;path=%2F&amp;host=fast.com&amp;headerType=http&amp;security=none#telegram
-ss://b87e99c3-4977-4f85-9858-9687ed8f5cbc@medium.com:2096?mode=gun&amp;security=tls&amp;encryption=none&amp;type=grpc&amp;serviceName=&amp;sni=s6.digitalcity5.sbs#XHEYKH+free
-ss://b87f7327-8b37-4bc4-c0a9-e3b58f9322af@ah4.arsalantau.com:2052?path=%2FArsalanTauBot&amp;security=none&amp;encryption=none&amp;host=ah4.arsalantau.com&amp;type=ws#%F0%9D%97%9D%F0%9D%97%BC%F0%9D%97%B6%F0%9D%97%BB+%E2%9E%AA+%40V2range
-ss://YWVzLTI1Ni1nY206ZDM2YjViYjEtZmFlNy00ZGRjLWIwMjMtMTkzNWY2NGUzNTBi@193.233.204.112:28595#Join+186+%28%40Outline_Vpn%29
-ss://c554b6bc-fb9d-4f2d-902b-b3809759a4df@h35.tiptop-1.top:42082?security=none&amp;encryption=none&amp;host=speedtest.net&amp;headerType=http&amp;type=tcp#%DA%A9%D8%A7%D9%86%D8%A7%D9%84+%D9%85%D8%A7+%D8%AF%D8%B1+%D8%AA%D9%84%DA%AF%D8%B1%D8%A7%D9%85%3A+%40V2rayng_Fast
-ss://c0d3ba02-7d95-464e-90ca-8a89e46ab9b6@138.197.165.89:18172?type=tcp&amp;path=%2F&amp;host=fast.com&amp;headerType=http&amp;security=none#telegram
-ss://c0d3ba02-7d95-464e-90ca-8a89e46ab9b6@143.110.212.234:18172?type=tcp&amp;path=%2F&amp;host=fast.com&amp;headerType=http&amp;security=none#telegram
-ss://b881e493-574b-4b50-e944-640ede7418e7@new-join-too.outline-vpn.cloud:2053?path=%2F&amp;security=tls&amp;encryption=none&amp;host=dl1.gamestationpro.world&amp;type=ws&amp;sni=dl1.gamestationpro.world#Fares4+ID%28%40Outline_Vpn%29+%F0%9F%92%9A
-ss://acd867f1-a71b-4a17-a473-2b57930d8678@webhook-receiver.4b3a.com:8443?security=reality&amp;encryption=none&amp;pbk=CZWbmrDdvesNCBlbMBuvHsJiR8Hsxmsd8DWDR_2JrjM&amp;host=%2FBIA_TELEGRAM%40MARAMBASHI_MARAMBASHI_MARAMBASHI&amp;headerType=none&amp;fp=chrome&amp;type=tcp&amp;sni=cDn.cloUdfLare.com.&amp;sid=6ba85179e30d4fc2#%40MARAMBASHI%20%F0%9F%8C%80%D9%88%D8%B5%D9%84%20%D9%85%DB%8C%D8%B4%DB%8C%20%D8%AC%D9%88%DB%8C%D9%86%20%D8%A8%D8%AF%D9%87%F0%9F%92%9B
