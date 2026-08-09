@@ -542,9 +542,11 @@ MAX_PAGES_ZH_MULTIPLIER = 2
 PARALLEL_DOWNLOAD_THRESHOLD = 10
 
 # 并行下载最大线程数（raw CDN 不限流，设大加速）
-# 注意：总下载线程 = Worker 数 × 此值。24 Worker × 8 = 192 线程，
-#       GA runner 7GB 内存安全（大仓库有 MB_HIGH/MED 动态降级）。
-PARALLEL_DOWNLOAD_WORKERS = 8
+# 注意：总下载线程 = Worker 数 × 此值。36 Worker × 16 = 576 线程（极端值），
+#       网络 I/O 密集线程实际栈占用小（MB 级）；大仓库文件有 MB_HIGH/MED
+#       动态降级保护。08091 网络仅 7MB/s（GA 带宽余量巨大），下载是排队
+#       瓶颈 → 8→16 翻倍吞吐（下载线程 daemon，见 _daemon_thread_init）。
+PARALLEL_DOWNLOAD_WORKERS = 16
 
 # ==================== 共用线程池 ====================
 
@@ -922,9 +924,10 @@ PARTIAL_CLONE_TIMEOUT = 900
 #       并发过多会互相拖慢导致超时（曾 17 次 900s 超时）。
 #       超时 kill 用进程组隔离（start_new_session），只杀自己的 git。
 # 默认值：2。CLONE_FIRST_MODE 试验期曾设 30（08082 日志：2 核机器负载飙到
-#       23.56 持续 100%，clone 失败 13 次）→ 降到 15 观察负载与吞吐平衡，
-#       clone_stats.json 分桶统计为最终定值提供依据。
-PARTIAL_CLONE_CONCURRENCY = 15
+#       23.56 持续 100%，clone 失败 13 次）→ 降到 15 观察负载与吞吐平衡。
+#       08091 分析：71 个任务耗时 >900s（clone 信号量排队），资源余量大
+#       （CPU 1核/网络 7MB/s），ls-tree 请求风暴已修复 → 15→25 减排队。
+PARTIAL_CLONE_CONCURRENCY = 25
 
 # 是否回退到 Contents API 逐目录遍历。
 # 作用：tree 失败 + Partial Clone 失败时的最后手段。

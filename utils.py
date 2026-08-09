@@ -116,6 +116,7 @@ def timeout_decorator(seconds: int):
 # ==================== TCP 预筛选 ====================
 
 import socket
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Tuple, Optional
 
@@ -197,7 +198,13 @@ def tcp_prescreen(node_list: List[str], timeout: float = 2.0,
     alive = []
     tasks = {}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    # 线程池线程设为 daemon：tcp_check 网络卡住时程序退出不被阻塞
+    # （与 collector 的 _daemon_thread_init 同理，见 08091 收尾挂 30 分钟）
+    def _daemon_init():
+        threading.current_thread().daemon = True
+
+    with ThreadPoolExecutor(max_workers=max_workers,
+                            initializer=_daemon_init) as executor:
         for node in node_list:
             host, port = parse_host_port(node)
             if host and port:

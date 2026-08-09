@@ -85,6 +85,17 @@ from quota_manager import QuotaManager
 from log_sink import log_sink
 
 
+def _daemon_thread_init():
+    """ThreadPoolExecutor 线程设为 daemon。
+
+    Python 退出规则：主线程结束后必须等所有非 daemon 线程结束才退出。
+    卡住的解析/下载线程（网络等待、大文件解析）会让程序收尾后挂 30 分钟
+    （08091：程序 20:31 收尾完成，python 挂到 21:01 被 GA 超时杀）。
+    daemon 线程在解释器退出时被强制终止——程序可靠退出，正常运行零影响。
+    """
+    threading.current_thread().daemon = True
+
+
 class MonitoredLock:
     """带持有者监控的 RLock（OOM 排查：显示谁持锁多久）。
 
@@ -2531,7 +2542,8 @@ class Collector:
                 workers = 8
             else:
                 workers = PARALLEL_DOWNLOAD_WORKERS
-            with ThreadPoolExecutor(max_workers=workers) as executor:
+            with ThreadPoolExecutor(max_workers=workers,
+                                    initializer=_daemon_thread_init) as executor:
                 futures = {executor.submit(
                     self._handle_one_file, repo, branch, fp, s, has_nodes,
                     raw_depth, stats, tag
@@ -2935,7 +2947,8 @@ class Collector:
                 # extract 线程结束 → worker 被阻塞 + 线程持有 content 不释放，
                 # 08084 OOM 前 30 分钟 worker 全停的嫌疑点之一）。
                 # 手动管理：超时即放弃，worker 立即继续，不阻塞不累积。
-                executor = ThreadPoolExecutor(max_workers=1)
+                executor = ThreadPoolExecutor(max_workers=1,
+                                              initializer=_daemon_thread_init)
                 try:
                     future = executor.submit(extract)
                     proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
