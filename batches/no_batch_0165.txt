@@ -1,4 +1,0 @@
-trojan://36d9d131-6319-4758-b4ce-3011f0afc72a@20.239.141.137:443
-trojan://36d9d131-6319-4758-b4ce-3011f0afc72a@hkt.iamnotagoodman.com:443
-vless://1851fa23-279c-406e-ab0a-6c6e16bb9c25@104.27.49.251:2087?encryption=none&security=tls&sni=dailyconfigs.dodfun.ir&fp=chrome&alpn=h2%2Chttp%2F1.1&insecure=0&allowInsecure=0&type=xhttp&host=dailyconfigs.dodfun.ir&path=%2FDailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs%3Fed%3D2048&mode=auto&extra=%7B%22mode%22%3A%22auto%22%7D#@vpnclashfa
-vless://1851fa23-279c-406e-ab0a-6c6e16bb9c25@104.17.239.252:2087?encryption=none&security=tls&sni=dailyconfigs.dodfun.ir&fp=chrome&alpn=h2%2Chttp%2F1.1&insecure=0&allowInsecure=0&type=xhttp&host=dailyconfigs.dodfun.ir&path=%2FDailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs--DailyConfigs%3Fed%3D2048&mode=auto&extra=%7B%22mode%22%3A%22auto%22%7D#@vpnclashfa
