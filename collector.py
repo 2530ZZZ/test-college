@@ -992,16 +992,23 @@ class Collector:
 
     # ==================== 批次持久化（线程安全） ====================
 
-    def _flush_batch(self):
+    def _flush_batch(self, force: bool = False):
         """将当前 buffer 刷盘为批次文件。
 
         线程安全：_state_lock 保护 buffer/id/paths。
         刷盘后调用 on_batch_flush 回调（如果设置），用于投喂测速编排器。
         多个线程可并发调用，同一时刻只有一个线程执行写盘。
+
+        force=False（运行中）：锁内二次确认 buffer >= BATCH_FLUSH_SIZE 才写
+        ——防竞态：多线程锁外检查到阈值后同时调 flush，第一个写盘期间
+        其他线程积累的小批次（48/98 节点）被误 flush（08105 的 35 个小分片）。
+        force=True（收尾）：无条件写（残留数据不丢）。
         """
         with self._state_lock:
             if not self.batch_buffer:
                 return
+            if not force and len(self.batch_buffer) < BATCH_FLUSH_SIZE:
+                return  # 竞态保护：运行中不足阈值不写（留在 buffer 等下次）
             self.batch_id += 1
             seq = self.batch_id
             nodes_to_write = list(self.batch_buffer)
@@ -1808,7 +1815,7 @@ class Collector:
             self._wlog(f"⚠️ 运行时间 {elapsed_seconds:.0f}s 超出上限 "
                   f"{self._max_runtime}s（已提前停止搜集）")
         try:
-            self._flush_batch()
+            self._flush_batch(force=True)  # 收尾：无条件写残留（数据不丢）
         except Exception as e:
             self._wlog(f"⚠️ buffer 刷盘异常: {e}")
         # 内存优化（两阶段持久化）：读全部 batches → 全量去重 → 写 no/ 分片。
