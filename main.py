@@ -142,6 +142,13 @@ def main():
     sys.stderr = sys.__stderr__
     log_file.close()
 
+    # 强制退出：不等待任何残留线程（卡住的解析/下载线程会让 Python 在
+    # 收尾后挂 30 分钟，08091 的 pid 2302 被 GA 超时杀的教训）。
+    # _finalize 已保存全部分片/SHA 缓存/种子/clone_stats，os._exit 跳过
+    # 解释器退出清理，数据安全。不能用线程池 initializer 设 daemon——
+    # Python 3.10+ 禁止在线程启动后改 daemon（08101 线程池全废事故）。
+    os._exit(0)
+
 
 if __name__ == "__main__":
     main()
