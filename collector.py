@@ -26,7 +26,8 @@ from queue import Queue, PriorityQueue, Empty
 from collections import deque
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
+from concurrent.futures import (ThreadPoolExecutor, ProcessPoolExecutor,
+                                as_completed, TimeoutError as FutureTimeoutError)
 from typing import List, Set, Optional, Tuple, Dict
 
 from config import (
@@ -34,6 +35,7 @@ from config import (
     REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, FILE_PROCESS_TIMEOUT,
     ALLOWED_EXTENSIONS, SKIP_LANGUAGES,
     SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
+    EXTRACT_PROCESSES, DOWNLOAD_MEMORY_BUDGET_MB, EXTRACT_PROCESS_MIN_MB,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
@@ -175,6 +177,11 @@ class Collector:
         self._batch_dedup: Set[str] = set()            # 当前批次内去重（≤5000 条小 set，内存优化）
         self._total_batch_nodes = 0                    # 批次累计节点数（含重复，统计展示）
         self._final_node_count = 0                     # 收尾去重后唯一节点数（统计展示）
+        # ── 多进程解析池 + 内存预算（08104：GIL 1 核 + content 占满 11GB）──
+        self._extract_pool = (ProcessPoolExecutor(max_workers=EXTRACT_PROCESSES)
+                              if EXTRACT_PROCESSES > 0 else None)
+        self._parsing_bytes = 0                        # 解析中+等待解析的 content 总字节（预算控制）
+        self._budget_wait_count = 0                    # 预算等待次数（统计）
         self.seen_repos: Set[str] = set()  # 存储小写，大小写不敏感
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
@@ -1810,6 +1817,12 @@ class Collector:
             self._save_clone_stats(elapsed_seconds)
         except Exception as e:
             self._wlog(f"⚠️ clone_stats 保存异常: {e}")
+        # 多进程解析池收尾：不等待卡住的任务（wait=False），进程退出释放内存
+        try:
+            if self._extract_pool is not None:
+                self._extract_pool.shutdown(wait=False, cancel_futures=True)
+        except Exception:
+            pass
 
         # ── 分渠道统计 ──
         print(f"\n{'='*60}", flush=True)
@@ -3001,12 +3014,35 @@ class Collector:
         if content_size_mb > self._parsing_max_mb:
             self._parsing_max_mb = content_size_mb
 
+        # 内存预算控制（08104：64-120 文件并发解析，content 占满 11GB）：
+        # 解析前检查"解析中"的 content 总大小，超预算则等待
+        # （不发起新解析，下载线程被占住 → 自然不再下载新文件，
+        # 排队的是 URL 而非 content，不占内存）。
+        if self._budget_wait_count == 0:
+            self._wlog(f"⏳ 内存预算 {DOWNLOAD_MEMORY_BUDGET_MB}MB 满，"
+                  f"解析名额排队（首次提示）")
+        while True:
+            with self._state_lock:
+                if (self._parsing_bytes + len(content)
+                        <= DOWNLOAD_MEMORY_BUDGET_MB * 1024 * 1024):
+                    self._parsing_bytes += len(content)
+                    break
+            self._budget_wait_count += 1
+            time.sleep(0.5)
+
         def extract():
             return extract_all_strategies(content)
 
         _ex_t0 = time.time()
         try:
-            if FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
+            if self._extract_pool is not None \
+                    and content_size_mb > EXTRACT_PROCESS_MIN_MB:
+                # 大文件 → 多进程解析池（绕 GIL 用满多核；content pickle
+                # 传递内存×2，由预算封顶；卡住的进程占池子不累积）
+                future = self._extract_pool.submit(extract)
+                proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
+            elif FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
+                # 小文件 → 线程解析（pickle 开销占比大，进程池反而慢）
                 # 不用 with（with 退出时 shutdown(wait=True) 会等卡死的
                 # extract 线程结束 → worker 被阻塞 + 线程持有 content 不释放，
                 # 08084 OOM 前 30 分钟 worker 全停的嫌疑点之一）。
@@ -3026,6 +3062,8 @@ class Collector:
             return
         finally:
             self._parsing_active -= 1
+            with self._state_lock:
+                self._parsing_bytes -= len(content)  # 释放预算
             # 08103 监测：记录每文件耗时（下载/解析/大小），定位慢在哪一步
             self._file_times.append((round(_dl_s, 1), round(time.time() - _ex_t0, 1),
                                      round(content_size_mb, 1)))

@@ -708,6 +708,24 @@ FILE_DOWNLOAD_TIMEOUT = (15, 180)
 # 超过此上限放弃该文件（下次重试），避免 worker 卡死在慢速下载。
 MAX_DOWNLOAD_SECONDS = 240
 
+# 多进程解析池进程数。
+# 解析(extract_all_strategies)是纯 Python CPU 密集——GIL 限制下多线程
+# 解析永远只用 1 核（08104 实测 64 线程并发也仅 50% CPU）。多进程每个
+# 进程独立 GIL，真正用满多核。2 核机器建议 2；content 经 pickle 传递
+# （内存×2，~186MB/93MB 文件），配合 DOWNLOAD_MEMORY_BUDGET_MB 封顶。
+# 影响：只影响解析速度与内存峰值，不影响正确性。可随时调整。
+EXTRACT_PROCESSES = 2
+
+# 下载/解析内存预算（MB）：正在解析 + 等待解析的文件 content 总大小上限。
+# 08104：64-120 个文件并发解析，content(93MB×N) 占满 11GB → 内存爆。
+# 超预算时下载线程等待（不发起新下载，URL 排队，不占内存）。
+# 影响：只限制内存峰值，不影响正确性。可随时调整。
+DOWNLOAD_MEMORY_BUDGET_MB = 2048
+
+# 走进程池解析的最小文件大小（MB）。小于此值直接线程解析（pickle 开销
+# 占比大，小文件进程池反而慢）；大于此值提交进程池（绕 GIL 用多核）。
+EXTRACT_PROCESS_MIN_MB = 1
+
 # Contents API（/repos/{repo}/contents/{path}）
 # 回退路径，仅树 API 失败时使用。逐目录遍历，速度慢。
 CONTENTS_API_TIMEOUT = (10, 20)
