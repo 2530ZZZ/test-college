@@ -33,7 +33,7 @@ from config import (
     GITHUB_TOKEN, MAX_PAGES, PER_PAGE, REPO_SLEEP_SECONDS, PAGE_SLEEP_SECONDS, SEARCH_FORK,
     REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, FILE_PROCESS_TIMEOUT,
     ALLOWED_EXTENSIONS, SKIP_LANGUAGES,
-    SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT,
+    SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
@@ -2890,19 +2890,22 @@ class Collector:
 
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
 
-        # 下载文件
-        file_resp = self.http.get(raw_url, timeout=FILE_DOWNLOAD_TIMEOUT,
-                                  operation_name=f"下载 {file_path}")
-        if not file_resp:
-            return  # 下载失败 → 不标记（下次重试）
+        # 下载文件（总时长限制：CDN 慢速限速 0.1MB/s 持续送数据不触发
+        # read timeout，100MB 文件能慢速下载 1000s+（08102 W-3 卡 2600s），
+        # MAX_DOWNLOAD_SECONDS 超时即放弃，下次重试）
+        content_bytes = self.http.download_with_timeout(
+            raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
+            f"下载 {file_path}")
+        if content_bytes is None:
+            return  # 下载失败/超总时长 → 不标记（下次重试）
 
         # 读取内容（surrogate 字符兼容）
         content = None
         try:
-            content = file_resp.content.decode('utf-8', errors='replace')
+            content = content_bytes.decode('utf-8', errors='replace')
         except Exception:
             try:
-                content = file_resp.content.decode('latin-1', errors='replace')
+                content = content_bytes.decode('latin-1', errors='replace')
             except Exception:
                 pass
 

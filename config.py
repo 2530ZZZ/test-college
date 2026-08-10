@@ -542,11 +542,11 @@ MAX_PAGES_ZH_MULTIPLIER = 2
 PARALLEL_DOWNLOAD_THRESHOLD = 10
 
 # 并行下载最大线程数（raw CDN 不限流，设大加速）
-# 注意：总下载线程 = Worker 数 × 此值。36 Worker × 16 = 576 线程（极端值），
-#       网络 I/O 密集线程实际栈占用小（MB 级）；大仓库文件有 MB_HIGH/MED
-#       动态降级保护。08091 网络仅 7MB/s（GA 带宽余量巨大），下载是排队
-#       瓶颈 → 8→16 翻倍吞吐（下载线程 daemon，见 _daemon_thread_init）。
-PARALLEL_DOWNLOAD_WORKERS = 16
+# 注意：总下载线程 = Worker 数 × 此值。24 Worker × 8 = 192 线程，
+#       GA runner 7GB 内存安全（大仓库有 MB_HIGH/MED 动态降级）。
+# 08102 试验 16 并发：触发 raw CDN 单连接限速（0.1MB/s，网络 7.65→0.31MB/s，
+#       大文件 1000s+ 慢速下载不触发 read timeout）→ 回滚 8。
+PARALLEL_DOWNLOAD_WORKERS = 8
 
 # ==================== 共用线程池 ====================
 
@@ -699,6 +699,12 @@ REPO_INFO_TIMEOUT = (8, 15)
 # read=180s：极端 100MB 节点文件在慢网络（1MB/s）下需 100s+。
 # 注意：下载超时 ≠ 解析超时（后者见 FILE_PROCESS_TIMEOUT）。
 FILE_DOWNLOAD_TIMEOUT = (15, 180)
+
+# 单个文件下载总时长上限（秒）。
+# read timeout 只防"无数据"，CDN 慢速限速（0.1MB/s 持续送数据）不会触发——
+# 100MB 文件能慢速下载 1000s+（08102 的 W-3 卡 2600s 根因）。
+# 超过此上限放弃该文件（下次重试），避免 worker 卡死在慢速下载。
+MAX_DOWNLOAD_SECONDS = 240
 
 # Contents API（/repos/{repo}/contents/{path}）
 # 回退路径，仅树 API 失败时使用。逐目录遍历，速度慢。
