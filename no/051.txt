@@ -1,1 +1,0 @@
-vless://fcdea945-f87c-4b34-9241-a33adc22af97@netflow.yoooka.lol:10750?security=tls&alpn=h3%2Ch2%2Chttp%2F1.1&encryption=none&host=m-net.speedtestcustom.com&headerType=http&fp=chrome&type=tcp&sni=netflow.yoooka.lol#IR🇮🇷
