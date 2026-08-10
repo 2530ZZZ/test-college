@@ -170,8 +170,11 @@ class Collector:
         # ── 共享状态（线程安全保护） ──
         self._state_lock = MonitoredLock()            # 保护下方所有 set/dict/list（带持锁监控）
         self.all_links: List[str] = []
-        self.unique_nodes: Set[str] = set()            # 全局已收集节点 URI
-        self.global_dedup_keys: Set[tuple] = set()     # (server, port, protocol) 去重
+        self.unique_nodes: Set[str] = set()            # 全局已收集节点 URI（收尾统计用，运行时少量）
+        self.global_dedup_keys: Set[tuple] = set()     # (server, port, protocol) 去重（收尾统计用）
+        self._batch_dedup: Set[str] = set()            # 当前批次内去重（≤5000 条小 set，内存优化）
+        self._total_batch_nodes = 0                    # 批次累计节点数（含重复，统计展示）
+        self._final_node_count = 0                     # 收尾去重后唯一节点数（统计展示）
         self.seen_repos: Set[str] = set()  # 存储小写，大小写不敏感
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
@@ -218,6 +221,10 @@ class Collector:
         self._dump_done = False                         # faulthandler 转储已触发（去重）
         self._parsing_active = 0                        # 当前正在解析的文件数
         self._parsing_max_mb = 0.0                      # 正在解析文件的最大大小(MB)
+        # ── 08103 监测（定位卡死与内存增长）：下载中计数 / 文件耗时 ──
+        self._downloading_active = 0                    # 当前正在下载的文件数
+        self._file_times = deque(maxlen=500)            # 每文件耗时: (下载s, 解析s, 大小MB) 近500条
+        self._file_times_total = 0                      # 累计记录数（统计平均）
         self._last_activity = 0.0                       # 最近一次 _wlog 时间（监控降频信号）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
@@ -711,8 +718,10 @@ class Collector:
                     f" | 并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
                     f"(峰值{self._clone_active_peak})",
                     f"   诊断: log队列 {_log_q}/{_log_ok} | "
+                    f"下载中 {self._downloading_active} | "
                     f"解析中 {self._parsing_active}文件"
-                    f"(最大{self._parsing_max_mb:.0f}MB) | {_lk_txt}",
+                    f"(最大{self._parsing_max_mb:.0f}MB) | "
+                    f"线程 {threading.active_count()} | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
                     f"关键词 {self._kw_progress or '-'} | "
                     f"Code {self._cd_progress or '-'}",
@@ -979,6 +988,7 @@ class Collector:
             nodes_to_write = list(self.batch_buffer)
             node_count = len(nodes_to_write)
             self.batch_buffer.clear()
+            self._batch_dedup.clear()  # 内存优化：新批次开始，重置批次内去重
 
         batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
         os.makedirs(batch_dir, exist_ok=True)
@@ -992,26 +1002,17 @@ class Collector:
         dq = getattr(self, '_disc_queue', None)
         mq_sz = mq.qsize() if mq else 0
         dq_sz = dq.qsize() if dq else 0
+        self._total_batch_nodes += node_count  # 累计（含批次间重复，收尾去重为准）
         self._wlog(f"📦 批次 {seq:04d} 已持久化: "
-              f"{filepath} ({node_count} 个节点, 累计 {len(self.unique_nodes)} 个)"
+              f"{filepath} ({node_count} 个节点, 累计 {self._total_batch_nodes} 个)"
               f" | {self._qs()}")
         # 批次刷盘时顺带保存持久化状态，防止中途崩溃丢失
         self.save_sha_cache()
         self.save_seen_cache()
 
-        # 同步写入 no/ 分片和 no_w_li.txt（边搜集边持久化）
-        no_dir = os.path.join(os.getcwd(), "no")
-        os.makedirs(no_dir, exist_ok=True)
-        no_filename = f"{seq:03d}.txt"
-        no_filepath = os.path.join(no_dir, no_filename)
-        with open(no_filepath, "w", encoding="utf-8") as f:
-            f.write(text)
-        repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
-        branch_name = os.getenv("GITHUB_REF_NAME", "main")
-        no_link = f"https://raw.githubusercontent.com/{repo_name}/{branch_name}/no/{no_filename}"
-        with open("no_w_li.txt", "a", encoding="utf-8") as f:
-            f.write(no_link + "\n")
-        # 覆写 no_li.txt（源链接去重）
+        # 内存优化（两阶段持久化）：运行时只写 batches 中间产物，
+        # no/ 分片与 no_w_li.txt 由 _finalize 收尾全量去重后统一生成。
+        # 保留 no_li.txt（源链接，量小）与 failed_candidates.txt。
         with open("no_li.txt", "w", encoding="utf-8", errors="replace") as f:
             f.write("\n".join(dict.fromkeys(self.all_links)))
         # 覆写 failed_candidates.txt（解析失败记录）
@@ -1026,6 +1027,53 @@ class Collector:
             except Exception as e:
                 self._wlog(f"⚠️ 批次回调异常: {e}")
 
+    def _dedup_batches_write_no(self):
+        """读全部 batches 中间产物 → 全量去重 → 写 no/ 分片（两阶段持久化收尾）。
+
+        内存优化：运行时节点只写 batches（批次内去重小 set），内存不存全量
+        节点集合（08103：24.8 万节点/h × 2 个全局 set = 内存大头，6h 必爆）；
+        收尾（run() 已先 join Worker，内存空出）读 batches 全量去重，
+        内存峰值 = 唯一节点数（约 1-2GB），安全。
+        """
+        import glob
+        batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
+        batch_files = sorted(glob.glob(os.path.join(batch_dir, "no_batch_*.txt")))
+        if not batch_files:
+            return  # 无产出 → 保留上次 no/（崩溃/无节点场景）
+        all_nodes = set()
+        for f in batch_files:
+            with open(f, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    line = line.rstrip("\n")
+                    if line:
+                        all_nodes.add(line)
+        nodes = sorted(all_nodes)
+        # 清空旧 no/（上次运行的分片，本次重新生成）
+        no_dir = os.path.join(os.getcwd(), "no")
+        if os.path.isdir(no_dir):
+            for old in glob.glob(os.path.join(no_dir, "*.txt")):
+                try:
+                    os.remove(old)
+                except OSError:
+                    pass
+        os.makedirs(no_dir, exist_ok=True)
+        repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
+        branch_name = os.getenv("GITHUB_REF_NAME", "main")
+        with open("no_w_li.txt", "w", encoding="utf-8") as fw:
+            for i in range(0, len(nodes), 5000):
+                chunk = nodes[i:i + 5000]
+                seq = i // 5000 + 1
+                no_filename = f"{seq:03d}.txt"
+                with open(os.path.join(no_dir, no_filename),
+                          "w", encoding="utf-8") as f:
+                    f.write("\n".join(chunk))
+                fw.write(f"https://raw.githubusercontent.com/{repo_name}"
+                         f"/{branch_name}/no/{no_filename}\n")
+        self._final_node_count = len(nodes)  # 收尾唯一节点数（_finalize 统计展示）
+        self._wlog(f"📦 收尾去重: {len(batch_files)} 批次 "
+              f"→ {len(nodes)} 唯一节点 → "
+              f"{len(nodes) // 5000 + 1} 个 no/ 分片")
+
     def _add_node(self, node_uri: str, proxy=None) -> str:
         """添加节点到当前批次 buffer。
 
@@ -1036,9 +1084,10 @@ class Collector:
             "dup":   与已有节点重复（URI 已存在）
         """
         with self._state_lock:
-            if node_uri in self.unique_nodes:
+            # 内存优化：批次内去重（全局去重收尾做）
+            if node_uri in self._batch_dedup:
                 return "dup"
-            self.unique_nodes.add(node_uri)
+            self._batch_dedup.add(node_uri)
             self.batch_buffer.append(node_uri)
             need_flush = len(self.batch_buffer) >= BATCH_FLUSH_SIZE
 
@@ -1301,20 +1350,22 @@ class Collector:
         for _ in workers: main_queue.put((float('inf'), -1, None))
         for _ in workers: disc_queue.put((float('inf'), float('inf'), -1, None))
 
-        # ── 先保存所有状态（不依赖 Worker 全部完成） ──
-        with self._state_lock:
-            self._sort_seeds(repo_seeds)
-        self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
-        self._finalize(elapsed_seconds=time.time() - self._start_time)
-
-        # ── 最后等待 Worker（总超时 30 分钟，超时强制退出，Worker 是 daemon） ──
-        deadline = time.time() + 1800
+        # ── 内存优化（两阶段持久化）收尾顺序：先等 Worker 停（300s 上限，
+        # 处理完当前任务即退；卡死的任务超时后放弃）→ 内存空出 →
+        # 收尾全量去重（读 batches 写 no/，需空余内存）→ 保存状态 ──
+        deadline = time.time() + 300
         for w in workers:
             remaining = deadline - time.time()
             if remaining <= 0:
                 break
             w.join(timeout=remaining)
         self._task_queue = None
+
+        # ── 保存所有状态（Worker 已停，内存空出） ──
+        with self._state_lock:
+            self._sort_seeds(repo_seeds)
+        self._save_seed_file(SEED_REPOS_FILE, "repos", repo_seeds)
+        self._finalize(elapsed_seconds=time.time() - self._start_time)
 
     def _wait_queue_drain(self, main_queue, disc_queue, wait_full: bool = False):
         """等待队列清空（阶段切换条件）。
@@ -1404,7 +1455,7 @@ class Collector:
         self._wlog(f"🔵 关键词: {len(all_queries)} 个")
         self._kw_total = len(all_queries)  # 进度显示用
         for idx, query in enumerate(all_queries, 1):
-            nb = len(self.unique_nodes)
+            nb = self._total_batch_nodes  # 内存优化：批次累计节点数（含重复）
             qs = time.time()
             if self._should_stop(): break
             try:
@@ -1413,7 +1464,7 @@ class Collector:
                 break
             self._wlog(f"⏱️ [{idx}/{len(all_queries)}] "
                   f"{query[:60]} | {time.time()-qs:.0f}s | "
-                  f"+{len(self.unique_nodes)-nb} | "
+                  f"+{self._total_batch_nodes-nb} | "
                   f"{self._qt()}")
 
         # 保存统计
@@ -1741,6 +1792,12 @@ class Collector:
             self._flush_batch()
         except Exception as e:
             self._wlog(f"⚠️ buffer 刷盘异常: {e}")
+        # 内存优化（两阶段持久化）：读全部 batches → 全量去重 → 写 no/ 分片。
+        # Worker 已停（run() 先 join 后 _finalize），内存空出，去重安全。
+        try:
+            self._dedup_batches_write_no()
+        except Exception as e:
+            self._wlog(f"⚠️ 收尾去重写 no/ 异常: {e}")
         try:
             self.save_results()
         except Exception as e:
@@ -1785,7 +1842,7 @@ class Collector:
         total_new = sum(s.get("nodes_new", 0) for s in self._channel_stats.values())
         qs = self.quota_mgr.get_stats()
         print(f"  ─────────────────────────", flush=True)
-        print(f"  节点总数: {len(self.unique_nodes)}, "
+        print(f"  节点总数: {self._final_node_count or len(self.unique_nodes)}, "
               f"批次: {len(self.batch_file_paths)}, "
               f"主队列仓库: {self._main_queue_total}, "
               f"源链接: {len(self.all_links)}", flush=True)
@@ -1794,6 +1851,16 @@ class Collector:
               f"{' ⚠️已耗尽' if qs['exceeded'] else ''}", flush=True)
         print(f"  主动限速: {qs['throttled']} 次, "
               f"失败请求: {qs['failed']}", flush=True)
+        # 08103 监测：文件耗时分布（下载 vs 解析，定位慢在哪一步）
+        if self._file_times_total > 0:
+            _ft = list(self._file_times)
+            _dl_avg = sum(t[0] for t in _ft) / len(_ft)
+            _ex_avg = sum(t[1] for t in _ft) / len(_ft)
+            _dl_max = max(t[0] for t in _ft)
+            _ex_max = max(t[1] for t in _ft)
+            print(f"  文件耗时(近{len(_ft)}条/累计{self._file_times_total}): "
+                  f"下载 平均{_dl_avg:.0f}s/最大{_dl_max:.0f}s | "
+                  f"解析 平均{_ex_avg:.0f}s/最大{_ex_max:.0f}s", flush=True)
         fc = len(self.failed_candidates_buffer)
         if fc > 0:
             print(f"  解析失败文件: {fc} 个 → 详见 failed_candidates.txt", flush=True)
@@ -2893,9 +2960,14 @@ class Collector:
         # 下载文件（总时长限制：CDN 慢速限速 0.1MB/s 持续送数据不触发
         # read timeout，100MB 文件能慢速下载 1000s+（08102 W-3 卡 2600s），
         # MAX_DOWNLOAD_SECONDS 超时即放弃，下次重试）
+        # 08103 监测：下载中计数 + 耗时记录
+        self._downloading_active += 1
+        _dl_t0 = time.time()
         content_bytes = self.http.download_with_timeout(
             raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
             f"下载 {file_path}")
+        _dl_s = time.time() - _dl_t0
+        self._downloading_active -= 1
         if content_bytes is None:
             return  # 下载失败/超总时长 → 不标记（下次重试）
 
@@ -2932,6 +3004,7 @@ class Collector:
         def extract():
             return extract_all_strategies(content)
 
+        _ex_t0 = time.time()
         try:
             if FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
                 # 不用 with（with 退出时 shutdown(wait=True) 会等卡死的
@@ -2953,8 +3026,15 @@ class Collector:
             return
         finally:
             self._parsing_active -= 1
+            # 08103 监测：记录每文件耗时（下载/解析/大小），定位慢在哪一步
+            self._file_times.append((round(_dl_s, 1), round(time.time() - _ex_t0, 1),
+                                     round(content_size_mb, 1)))
+            self._file_times_total += 1
 
-        # ---- 过滤 + 去重 + 入 buffer（线程安全） ----
+        # ---- 过滤 + 批次内去重 + 入 buffer（线程安全） ----
+        # 内存优化（08103：24.8 万节点/h × 2 个全局 set = 内存大头）：
+        # 运行时只做"批次内去重"（≤5000 条小 set），批次间重复靠收尾
+        # 全量去重（_finalize 读 batches → 去重 → 写 no/）。
         raw_count = len(proxies)
         valid_count = 0
         new_count = 0
@@ -2963,16 +3043,11 @@ class Collector:
                 continue
             valid_count += 1
 
-            # 全局去重 + 写入 — 整个"检查-添加"操作必须原子
             with self._state_lock:
-                if DEDUP_ENABLED:
-                    dedup_key = proxy.dedup_key(DEDUP_STRATEGY)
-                    if dedup_key in self.global_dedup_keys:
-                        continue
-                    self.global_dedup_keys.add(dedup_key)
-
                 node_uri = proxy.to_uri()
-                self.unique_nodes.add(node_uri)
+                if node_uri in self._batch_dedup:
+                    continue
+                self._batch_dedup.add(node_uri)
                 self.batch_buffer.append(node_uri)
                 new_count += 1
                 ch = threading.current_thread().name
@@ -3067,13 +3142,10 @@ class Collector:
                     for _p in _sub_proxies:
                         if _p.is_valid():
                             with self._state_lock:
-                                if DEDUP_ENABLED:
-                                    _dk = _p.dedup_key(DEDUP_STRATEGY)
-                                    if _dk in self.global_dedup_keys:
-                                        continue
-                                    self.global_dedup_keys.add(_dk)
                                 _uri = _p.to_uri()
-                                self.unique_nodes.add(_uri)
+                                if _uri in self._batch_dedup:
+                                    continue
+                                self._batch_dedup.add(_uri)
                                 self.batch_buffer.append(_uri)
                                 self.all_links.append(_url)
                                 has_nodes[0] = True
