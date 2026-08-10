@@ -184,6 +184,10 @@ class Collector:
         self._budget_wait_count = 0                    # 预算等待次数（统计）
         self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
         self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
+        self._parsing_waiting = 0                      # 等待解析名额的文件数（预算排队）
+        self._parsing_waiting_bytes = 0                # 等待解析的 content 总字节
+        self._total_parsed_nodes = 0                   # 累计提取的有效节点数（监控）
+        self._nodes_60s = deque()                      # 近60秒提取节点数: [(time, count)]
         self.seen_repos: Set[str] = set()  # 存储小写，大小写不敏感
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
@@ -523,7 +527,7 @@ class Collector:
         """配额状态：剩余/上限 + UTC 时间（看距整点刷新还有多久）。"""
         from datetime import datetime, timezone
         utc = datetime.now(timezone.utc).strftime('%H:%M')
-        return f"配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {utc}UTC"
+        return f"剩余配额 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} {utc}UTC"
 
     # ── 系统观测（监控线程） ──
 
@@ -718,7 +722,7 @@ class Collector:
                     f"磁盘: {disk_free_gb:.1f}/{disk_total_gb:.0f}GB 可用",
                     f"   网络近60s: 总下载 {net['total_mb']/1024:.2f}GB | "
                     f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s",
-                    f"   API: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
+                    f"   API剩余: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
                     f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB | "
                     f"clone近60s: {_ok60_repos}仓库/{_ok60_files}文件/{_tr60_mb:.0f}MB"
@@ -728,8 +732,12 @@ class Collector:
                     f"(峰值{self._clone_active_peak})",
                     f"   诊断: log队列 {_log_q}/{_log_ok} | "
                     f"下载中 {self._downloading_active} | "
+                    f"等待解析 {self._parsing_waiting}文件"
+                    f"/{self._parsing_waiting_bytes/1024/1024:.0f}MB | "
                     f"解析中 {self._parsing_active}文件"
                     f"(最大{self._parsing_max_mb:.0f}MB) | "
+                    f"解析节点 近60s {sum(c for _t, c in self._nodes_60s)}"
+                    f"/累计 {self._total_parsed_nodes} | "
                     f"累计解析 {self._total_parsed_files}文件"
                     f"/{self._total_parsed_mb/1024:.1f}GB | "
                     f"线程 {threading.active_count()} | {_lk_txt}",
@@ -3028,11 +3036,16 @@ class Collector:
         if self._budget_wait_count == 0:
             self._wlog(f"⏳ 内存预算 {DOWNLOAD_MEMORY_BUDGET_MB}MB 满，"
                   f"解析名额排队（首次提示）")
+        # 等待计数（监控显示：等待解析的文件数与大小）
+        self._parsing_waiting += 1
+        self._parsing_waiting_bytes += len(content)
         while True:
             with self._state_lock:
                 if (self._parsing_bytes + len(content)
                         <= DOWNLOAD_MEMORY_BUDGET_MB * 1024 * 1024):
                     self._parsing_bytes += len(content)
+                    self._parsing_waiting -= 1
+                    self._parsing_waiting_bytes -= len(content)
                     break
             self._budget_wait_count += 1
             time.sleep(0.5)
@@ -3097,6 +3110,14 @@ class Collector:
                 new_count += 1
                 ch = threading.current_thread().name
                 self._channel_new_nodes[ch] = self._channel_new_nodes.get(ch, 0) + 1
+
+        # 监控：累计/近60秒提取节点数（valid_count = 有效节点）
+        if valid_count > 0:
+            self._total_parsed_nodes += valid_count
+            _nw = time.time()
+            self._nodes_60s.append((_nw, valid_count))
+            while self._nodes_60s and self._nodes_60s[0][0] < _nw - 60:
+                self._nodes_60s.popleft()
 
         with self._state_lock:
             if valid_count > 0:

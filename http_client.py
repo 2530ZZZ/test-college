@@ -226,8 +226,10 @@ class HttpClient:
                 while not self.api_gate.acquire(url):
                     time.sleep(random.uniform(0.3, 0.8))  # 自旋重试（抖动防惊群）
 
-            # ---- 配额检查：主动限速 + 配额耗尽等待恢复 ----
-            if is_api_call and not self.quota.check():
+            # ---- 配额检查：原子预占（防超发）+ 配额耗尽等待恢复 ----
+            # acquire() 在单次加锁内完成检查+计数（08105 超发 4806/4800
+            # 触发 GitHub 惩罚的根因：check/record 分开有竞态窗口）。
+            if is_api_call and not self.quota.acquire():
                 self._record_call(url, 0)
                 self.quota.wait_for_reset()
                 continue  # 配额恢复，重试本次请求
@@ -235,7 +237,7 @@ class HttpClient:
             try:
                 resp = self.session.get(url, headers=self.headers, timeout=timeout)
 
-                # 记录调用：仅 API 调用消耗配额
+                # 记录调用：仅 API 调用消耗配额（acquire 已预占计数）
                 remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
                 remaining = None
                 if remaining_hdr and is_api_call:
@@ -247,7 +249,6 @@ class HttpClient:
                 # 只在 403 核心配额耗尽分支设置（下方 403 处理）。
                 self._record_call(url, resp.status_code, remaining)
                 if is_api_call:
-                    self.quota.record()
                     # 记录响应状态（次级限流观测）
                     if self.api_gate is not None:
                         retry_after = resp.headers.get("Retry-After")
@@ -285,47 +286,59 @@ class HttpClient:
                 log_sink.emit(f"[{_now()}] {operation_name} 返回 {resp.status_code} "
                       f"(尝试 {attempt}/{max_retries})")
 
-                # ---- 403 处理 ----
+                # ---- 403 处理（区分限流类型） ----
                 if resp.status_code == 403:
-                    wait_seconds = self._parse_ratelimit_wait(resp)
-                    if wait_seconds <= 0:
-                        log_sink.emit(f"[{_now()}] {operation_name} 403（访问拒绝），跳过")
-                        return None
-
-                    # 检查剩余配额：X-RateLimit-Remaining > 0 说明没限流，是访问控制
                     remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
-                    if remaining_hdr is not None and int(remaining_hdr) > 0:
-                        body = (resp.text or "").lower()
-                        if "secondary rate limit" in body:
-                            self.quota.secondary_limited = True
-                            log_sink.emit(f"[{_now()}] ⚠️ 次级限流！等待 60s...")
-                            time.sleep(60)
-                            self.quota.secondary_limited = False
-                            continue  # 重试
-                        log_sink.emit(f"[{_now()}] {operation_name} 403（访问被拒，"
-                              f"配额剩余 {int(remaining_hdr)}），跳过")
-                        return None
+                    retry_after = resp.headers.get("Retry-After")
+                    body = (resp.text or "").lower()
+                    remaining_val = (int(remaining_hdr)
+                                     if remaining_hdr is not None else -1)
+                    # 次级限流特征：Retry-After 头 或 body 含 secondary
+                    # （速率过快/超发惩罚——短等待重试，不设 _reset_time，
+                    #  不当核心配额等整点；08105 超发触发惩罚的教训）
+                    if retry_after is not None \
+                            or "secondary rate limit" in body:
+                        wait_s = 60
+                        if retry_after is not None:
+                            try:
+                                wait_s = min(max(int(retry_after), 1), 120)
+                            except (ValueError, TypeError):
+                                pass
+                        log_sink.emit(f"[{_now()}] ⚠️ 次级限流"
+                              f"{f'（Retry-After {retry_after}s）' if retry_after is not None else ''}"
+                              f"，等待 {wait_s}s 后重试（remaining={remaining_val}）")
+                        self.quota.secondary_limited = True
+                        time.sleep(wait_s)
+                        self.quota.secondary_limited = False
+                        continue  # 重试
 
-                    # 核心配额耗尽（remaining=0）→ 记录真实重置时间
-                    # （403-only：200 响应带同一 reset 头但语义不同，见上方注释）
-                    if reset_hdr and is_api_call:
-                        try:
-                            self.quota.set_reset_time(int(reset_hdr))
-                        except Exception:
-                            pass
+                    if remaining_val == 0:
+                        # 核心 API 配额耗尽（remaining=0）→ 记录 GitHub 重置时间
+                        # （403-only：200 响应带同一 reset 头但语义不同，见上方注释）
+                        if reset_hdr and is_api_call:
+                            try:
+                                self.quota.set_reset_time(int(reset_hdr))
+                            except Exception:
+                                pass
+                        wait_seconds = self._parse_ratelimit_wait(resp)
+                        log_sink.emit(f"[{_now()}] ⚠️ 核心 API 配额耗尽"
+                              f"（remaining=0，重置 {reset_hdr}），"
+                              f"等待 {wait_seconds}s 恢复")
+                        # 计算是否会导致超限
+                        if self.limiter.total_wait + wait_seconds > self.limiter.max_wait:
+                            log_sink.emit(f"[{_now()}] 限流等待 {wait_seconds}s 后将超过阈值 "
+                                  f"（累计 {self.limiter.total_wait:.0f}s），放弃后续请求")
+                            self.limiter.exceeded = True
+                            return None
+                        ok = self.limiter.record_wait(wait_seconds)
+                        if not ok:
+                            return None
+                        continue  # 等待结束，重试本次请求
 
-                    # 计算是否会导致超限
-                    if self.limiter.total_wait + wait_seconds > self.limiter.max_wait:
-                        log_sink.emit(f"[{_now()}] 限流等待 {wait_seconds}s 后将超过阈值 "
-                              f"（累计 {self.limiter.total_wait:.0f}s），放弃后续请求")
-                        self.limiter.exceeded = True
-                        return None
-
-                    log_sink.emit(f"[{_now()}] 触发限流，等待 {wait_seconds}s ...")
-                    ok = self.limiter.record_wait(wait_seconds)
-                    if not ok:
-                        return None
-                    continue  # 等待结束，重试本次请求
+                    # 其他 403（remaining > 0 且非次级）→ 访问被拒
+                    log_sink.emit(f"[{_now()}] {operation_name} 403（访问被拒，"
+                          f"配额剩余 {remaining_val}），跳过")
+                    return None
 
                 # 其他可重试错误（500, 502, 503 等）
                 wait = 3 + attempt * 2

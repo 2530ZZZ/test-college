@@ -102,6 +102,48 @@ class QuotaManager:
 
             return True
 
+    def acquire(self) -> bool:
+        """原子操作：检查配额并预占一个名额（防超发）。
+
+        check()+record() 分开调用有竞态窗口——多线程并发时多个线程
+        同时通过 check（calls 都 < max）再同时 record → 超发
+        （08105：UTC 11:00 窗口 4806/4800，超发触发 GitHub 惩罚 403，
+        _reset_time 被推到 13:00，24 个 worker 傻等 60 分钟）。
+        acquire() 在单次加锁内完成检查+计数，杜绝超发。
+
+        Returns:
+            True: 已预占一个名额，可以发起调用
+            False: 配额耗尽（exceeded=True），不应调用
+        """
+        with self._lock:
+            now = time.time()
+            elapsed = now - self.window_start
+            # 窗口重置（每小时）
+            if elapsed >= 3600:
+                self.calls = 0
+                self.window_start = now
+                self.exceeded = False
+                self._check_utc_window()
+                return True
+            # 配额耗尽 — 硬停止
+            if self.calls >= self.max_per_hour:
+                self.exceeded = True
+                return False
+            # 主动限速：超前预算 20% 则延迟（与 check 一致，锁内 sleep ≤2s）
+            expected = (elapsed / 3600) * self.max_per_hour
+            if self.calls > expected * 1.2:
+                deficit = self.calls - expected
+                avg_interval = 3600 / self.max_per_hour
+                delay = min(deficit * avg_interval, 2.0)
+                if delay > 0.01:
+                    self.throttle_count += 1
+                    time.sleep(delay)
+            # 预占名额（原子：检查+计数在同一锁内）
+            self.calls += 1
+            self.total_calls += 1
+            self._check_utc_window()
+            return True
+
     # ── 调用记录 ──
 
     def record(self):
@@ -231,7 +273,8 @@ class QuotaManager:
                         time.time() + wait, tz=timezone(timedelta(hours=8))
                     ).strftime('%H:%M')
                 log_sink.emit(f"[{self._bj_now()}] "
-                      f"⏳ 配额耗尽 {self.calls}/{self.max_per_hour}，等待 {wait/60:.0f}min 至 {reset_bj} 北京时间")
+                      f"⏳ 已用 {self.calls}/{self.max_per_hour}（配额耗尽），"
+                      f"等待 {wait/60:.0f}min 至 {reset_bj} 北京时间")
             # 计算等待时长
             with self._lock:
                 if self._reset_time:
