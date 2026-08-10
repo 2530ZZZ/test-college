@@ -182,6 +182,8 @@ class Collector:
                               if EXTRACT_PROCESSES > 0 else None)
         self._parsing_bytes = 0                        # 解析中+等待解析的 content 总字节（预算控制）
         self._budget_wait_count = 0                    # 预算等待次数（统计）
+        self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
+        self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
         self.seen_repos: Set[str] = set()  # 存储小写，大小写不敏感
         self.checked_count: int = 0
         self.processed_dir_shas: Set[str] = set()
@@ -728,6 +730,8 @@ class Collector:
                     f"下载中 {self._downloading_active} | "
                     f"解析中 {self._parsing_active}文件"
                     f"(最大{self._parsing_max_mb:.0f}MB) | "
+                    f"累计解析 {self._total_parsed_files}文件"
+                    f"/{self._total_parsed_mb/1024:.1f}GB | "
                     f"线程 {threading.active_count()} | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
                     f"关键词 {self._kw_progress or '-'} | "
@@ -3002,6 +3006,9 @@ class Collector:
         content = content.encode('utf-8', errors='surrogatepass').decode('utf-8', errors='replace')
 
         content_size_mb = len(content) / 1024 / 1024
+        # 累计解析文件统计（监控显示）
+        self._total_parsed_files += 1
+        self._total_parsed_mb += content_size_mb
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
             self._wlog(f"📄 {raw_url} ⚠️ 文件过大 "
                   f"({content_size_mb:.1f}MB)，跳过")
