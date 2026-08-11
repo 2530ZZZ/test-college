@@ -357,20 +357,25 @@ class HttpClient:
         return None
 
     def download_with_timeout(self, url: str, timeout: Tuple[float, float],
-                              max_total_s: int, operation_name: str = "") \
-            -> Optional[bytes]:
+                              max_total_s: int, operation_name: str = "",
+                              idle_max_s: int = 0) -> Optional[bytes]:
         """流式下载 + 总时长上限（防 CDN 慢速限速无限下载）。
 
         read timeout 只防"无数据"——CDN 慢速限速（0.1MB/s 持续送数据）不会
         触发，100MB 文件能慢速下载 1000s+（08102 W-3 卡 2600s 根因）。
         此方法累计下载耗时，超过 max_total_s 立即放弃。
 
+        idle_max_s（08111 新增）：0 字节窗口——持续 idle_max_s 秒收不到
+        任何数据即判定为限流挂起并放弃（raw CDN 限流特征：连接挂着但
+        不给数据，0MB 且空 chunk 持续送，read timeout 不触发）。传 0 禁用。
+
         Returns:
-            完整内容 bytes，失败/超总时长返回 None。
+            完整内容 bytes，失败/超总时长/超 0 字节窗口返回 None。
         """
         t0 = time.time()
         chunks = []
         total = 0
+        last_data = t0
         try:
             with self.session.get(url, headers=self.headers,
                                   timeout=timeout, stream=True) as resp:
@@ -386,6 +391,13 @@ class HttpClient:
                     if chunk:
                         chunks.append(chunk)
                         total += len(chunk)
+                        last_data = time.time()
+                    elif idle_max_s > 0 and time.time() - last_data > idle_max_s:
+                        # 0 字节窗口超时：连接挂着但无数据 = 限流挂起，
+                        # 快速放弃（下次重试），不再死等 MAX_DOWNLOAD_SECONDS
+                        log_sink.emit(f"[{_now()}] {operation_name} "
+                              f"无数据({idle_max_s}s/{total/1024/1024:.0f}MB)，放弃")
+                        return None
         except requests.exceptions.Timeout:
             log_sink.emit(f"[{_now()}] {operation_name} 下载超时，放弃")
             return None

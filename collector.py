@@ -35,6 +35,8 @@ from config import (
     REPO_TIMEOUT_SECONDS, MAX_FILE_SIZE, FILE_PROCESS_TIMEOUT,
     ALLOWED_EXTENSIONS, SKIP_LANGUAGES,
     SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
+    DOWNLOAD_IDLE_TIMEOUT, MAX_DOWNLOAD_CONCURRENCY,
+    DOWNLOAD_STALL_THRESHOLD, DOWNLOAD_THROTTLE_SECONDS,
     EXTRACT_PROCESSES, DOWNLOAD_MEMORY_BUDGET_MB, EXTRACT_PROCESS_MIN_MB,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
@@ -182,6 +184,16 @@ class Collector:
                               if EXTRACT_PROCESSES > 0 else None)
         self._parsing_bytes = 0                        # 解析中+等待解析的 content 总字节（预算控制）
         self._budget_wait_count = 0                    # 预算等待次数（统计）
+        # ── 08111：进程池调度（大文件优先，小文件补位）──
+        self._pool_big_running = 0                     # 进程池中未完成的大文件数
+        self._pool_small_running = 0                   # 进程池中未完成的小文件数
+        self._parsing_sizes = set()                    # 当前解析中文件的 size(MB)（监控实时最大）
+        # ── 08111：下载并发上限 + 限流退避 ──
+        self._download_sem = threading.Semaphore(MAX_DOWNLOAD_CONCURRENCY)
+        self._download_stall_count = 0                 # 连续下载失败计数（触发退避）
+        self._download_throttled_until = 0.0           # 限流退避截止时间（期间并发减半）
+        self._pending_downloads = 0                    # 待下载文件数（监控）
+        self._pending_download_bytes = 0               # 待下载文件总字节（监控）
         self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
         self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
         self._parsing_waiting = 0                      # 等待解析名额的文件数（预算排队）
@@ -233,7 +245,7 @@ class Collector:
         # ── OOM 定位诊断（08084：内存 100% OOM 终止，线程静默卡死）──
         self._dump_done = False                         # faulthandler 转储已触发（去重）
         self._parsing_active = 0                        # 当前正在解析的文件数
-        self._parsing_max_mb = 0.0                      # 正在解析文件的最大大小(MB)
+        # 08111：_parsing_max_mb（历史峰值）已废弃，改 _parsing_sizes 实时集合
         # ── 08103 监测（定位卡死与内存增长）：下载中计数 / 文件耗时 ──
         self._downloading_active = 0                    # 当前正在下载的文件数
         self._file_times = deque(maxlen=500)            # 每文件耗时: (下载s, 解析s, 大小MB) 近500条
@@ -731,11 +743,17 @@ class Collector:
                     f" | 并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
                     f"(峰值{self._clone_active_peak})",
                     f"   诊断: log队列 {_log_q}/{_log_ok} | "
-                    f"下载中 {self._downloading_active} | "
+                    f"下载中 {self._downloading_active}"
+                    f"(待下载 {self._pending_downloads}文件"
+                    f"/{self._pending_download_bytes/1024/1024:.0f}MB) | "
                     f"等待解析 {self._parsing_waiting}文件"
                     f"/{self._parsing_waiting_bytes/1024/1024:.0f}MB | "
                     f"解析中 {self._parsing_active}文件"
-                    f"(最大{self._parsing_max_mb:.0f}MB) | "
+                    f"(最大{self._parsing_cur_max_mb():.0f}MB) | "
+                    f"预算 {self._parsing_bytes/1024/1024:.0f}"
+                    f"/{DOWNLOAD_MEMORY_BUDGET_MB}MB | "
+                    f"进程池 {self._pool_big_running + self._pool_small_running}"
+                    f"/{EXTRACT_PROCESSES} | "
                     f"解析节点 近60s {sum(c for _t, c in self._nodes_60s)}"
                     f"/累计 {self._total_parsed_nodes} | "
                     f"累计解析 {self._total_parsed_files}文件"
@@ -748,7 +766,8 @@ class Collector:
                     f"   Worker: {_w}忙/{_i}闲({_r}%) | " + " | ".join(wc),
                 ]
                 _ts = now_str()
-                log_sink.emit(f"[{_ts}] " + f"\n[{_ts}] ".join(lines))
+                # 08111：高优先级通道——刷屏日志再多监控块也不丢（盲区根因）
+                log_sink.emit_priority(f"[{_ts}] " + f"\n[{_ts}] ".join(lines))
             except Exception as e:
                 # 首次异常打印一次（定位监控静默根因），之后静默不影响主流程
                 if not getattr(self, '_monitor_err_logged', False):
@@ -2619,7 +2638,7 @@ class Collector:
                 if self.limiter.should_stop():
                     raise RuntimeError("限流超限")
                 self._handle_one_file(repo, branch, file_path, sha, has_nodes,
-                                      raw_depth, stats, tag)
+                                      raw_depth, stats, tag, size=_size)
         else:
             # 按文件大小升序 → 小文件先跑完释放内存
             files_to_check.sort(key=lambda x: x[2])
@@ -2633,7 +2652,7 @@ class Collector:
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 futures = {executor.submit(
                     self._handle_one_file, repo, branch, fp, s, has_nodes,
-                    raw_depth, stats, tag
+                    raw_depth, stats, tag, size=_sz
                 ): fp for fp, s, _sz in files_to_check}
                 for future in as_completed(futures):
                     if self.limiter.should_stop():
@@ -2971,9 +2990,44 @@ class Collector:
 
     # ==================== 文件处理 ====================
 
+    # ---- 进程池调度（08111）：大文件优先，小文件补位 ----
+    # 计数语义：submit 时 +1，future 完成（done 回调）时 -1。
+    # 小文件仅在"池中无大文件占满空位"时进池；大文件无条件进池，
+    # 因此小文件永远不会挡在大文件前面（最多让大文件等一个几秒的
+    # 小文件周期，FIFO 队列）。卡死进程的任务计数保持挂着不释放，
+    # 与进程池真实状态一致（此时小文件全部回落线程解析，行为同旧版）。
+    def _pool_small_can_enter(self) -> bool:
+        """小文件能否补位进程池：池中还有空位（总进程数 - 大文件数）。"""
+        with self._state_lock:
+            return self._pool_small_running < EXTRACT_PROCESSES - self._pool_big_running
+
+    def _pool_submit(self, fn, is_big: bool):
+        """提交进程池并维护占用计数。"""
+        with self._state_lock:
+            if is_big:
+                self._pool_big_running += 1
+            else:
+                self._pool_small_running += 1
+        future = self._extract_pool.submit(fn)
+        future.add_done_callback(lambda f, b=is_big: self._pool_done(b))
+        return future
+
+    def _pool_done(self, is_big: bool):
+        with self._state_lock:
+            if is_big:
+                self._pool_big_running -= 1
+            else:
+                self._pool_small_running -= 1
+
+    def _parsing_cur_max_mb(self) -> float:
+        """当前解析中文件的最大大小(MB)——实时值（08111 替代历史峰值）。"""
+        with self._state_lock:
+            return max(self._parsing_sizes, default=0.0)
+
     def _handle_one_file(self, repo: str, branch: str, file_path: str,
                          sha: str, has_nodes: List[bool], raw_depth: int,
-                         stats: List[int] = None, tag: str = "[种子仓库]"):
+                         stats: List[int] = None, tag: str = "[种子仓库]",
+                         size: int = 0):
         """处理单个文件：下载 → 提取节点 → 去重 → 入 buffer。
 
         使用 uri_parser 协议解析层提取 StandardProxy，
@@ -2992,16 +3046,40 @@ class Collector:
         # 下载文件（总时长限制：CDN 慢速限速 0.1MB/s 持续送数据不触发
         # read timeout，100MB 文件能慢速下载 1000s+（08102 W-3 卡 2600s），
         # MAX_DOWNLOAD_SECONDS 超时即放弃，下次重试）
-        # 08103 监测：下载中计数 + 耗时记录
+        # 08111：全局并发信号量封顶（36 worker×8 线程无上限 → 259 并发
+        # 触发 CDN 限流）；限流退避窗口内并发减半（acquire 两次）。
+        # idle_max_s：0 字节窗口快速放弃（限流挂起 30s 无数据即弃，不再
+        # 死等 240s）。
+        _dl_locks = 2 if self._download_throttled_until > time.time() else 1
+        for _ in range(_dl_locks):
+            self._download_sem.acquire()
+        # 08103 监测：下载中计数 + 耗时记录；08111：待下载计数（监控）
         self._downloading_active += 1
+        self._pending_downloads += 1
+        self._pending_download_bytes += size
         _dl_t0 = time.time()
-        content_bytes = self.http.download_with_timeout(
-            raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
-            f"下载 {file_path}")
+        try:
+            content_bytes = self.http.download_with_timeout(
+                raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
+                f"下载 {file_path}", idle_max_s=DOWNLOAD_IDLE_TIMEOUT)
+        finally:
+            self._download_sem.release()
+            self._downloading_active -= 1
+            self._pending_downloads -= 1
+            self._pending_download_bytes -= size
         _dl_s = time.time() - _dl_t0
-        self._downloading_active -= 1
         if content_bytes is None:
+            # 下载失败（超时/0 字节/连接错误）→ 连续失败计数触发限流退避：
+            # 连续 DOWNLOAD_STALL_THRESHOLD 次后，退避窗口内并发减半，
+            # 降低连接压力，避免"并发越高被限越狠"的恶性循环（08111 全挂）
+            self._download_stall_count += 1
+            if self._download_stall_count >= DOWNLOAD_STALL_THRESHOLD:
+                self._download_stall_count = 0
+                self._download_throttled_until = time.time() + DOWNLOAD_THROTTLE_SECONDS
+                self._wlog(f"⚠️ 连续 {DOWNLOAD_STALL_THRESHOLD} 次下载失败，"
+                      f"限流退避 {DOWNLOAD_THROTTLE_SECONDS}s（下载并发减半）")
             return  # 下载失败/超总时长 → 不标记（下次重试）
+        self._download_stall_count = 0
 
         # 读取内容（surrogate 字符兼容）
         content = None
@@ -3033,16 +3111,16 @@ class Collector:
         # OOM 诊断：记录正在解析的文件数与最大大小（监控显示，
         # 08084 内存 100% 时需确认是否解析线程持有大文件）。
         self._parsing_active += 1
-        if content_size_mb > self._parsing_max_mb:
-            self._parsing_max_mb = content_size_mb
+        with self._state_lock:
+            # 08111：实时集合替代历史峰值——监控"最大"不再误导
+            self._parsing_sizes.add(content_size_mb)
 
         # 内存预算控制（08104：64-120 文件并发解析，content 占满 11GB）：
         # 解析前检查"解析中"的 content 总大小，超预算则等待
         # （不发起新解析，下载线程被占住 → 自然不再下载新文件，
         # 排队的是 URL 而非 content，不占内存）。
-        if self._budget_wait_count == 0:
-            self._wlog(f"⏳ 内存预算 {DOWNLOAD_MEMORY_BUDGET_MB}MB 满，"
-                  f"解析名额排队（首次提示）")
+        # （08111：已删除"首次提示"日志——预算满的状态由监控的
+        # "等待解析/预算已用"显示，此日志曾因计数 bug 刷屏 98 万次）
         # 等待计数（监控显示：等待解析的文件数与大小）
         self._parsing_waiting += 1
         self._parsing_waiting_bytes += len(content)
@@ -3063,10 +3141,15 @@ class Collector:
         _ex_t0 = time.time()
         try:
             if self._extract_pool is not None \
-                    and content_size_mb > EXTRACT_PROCESS_MIN_MB:
+                    and (content_size_mb > EXTRACT_PROCESS_MIN_MB
+                         or self._pool_small_can_enter()):
                 # 大文件 → 多进程解析池（绕 GIL 用满多核；content pickle
-                # 传递内存×2，由预算封顶；卡住的进程占池子不累积）
-                future = self._extract_pool.submit(extract)
+                # 传递内存×2，由预算封顶；卡住的进程占池子不累积）。
+                # 08111：小文件在池有空位时也进池——纯小文件时段进程池
+                # 空转只用了 1 核；大文件永远优先（无条件进池），小文件
+                # 只占 EXTRACT_PROCESSES - 大文件数的空位，不抢大文件位置。
+                future = self._pool_submit(
+                    extract, content_size_mb > EXTRACT_PROCESS_MIN_MB)
                 proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
             elif FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
                 # 小文件 → 线程解析（pickle 开销占比大，进程池反而慢）
@@ -3091,6 +3174,7 @@ class Collector:
             self._parsing_active -= 1
             with self._state_lock:
                 self._parsing_bytes -= len(content)  # 释放预算
+                self._parsing_sizes.discard(content_size_mb)  # 08111 实时最大
             # 08103 监测：记录每文件耗时（下载/解析/大小），定位慢在哪一步
             self._file_times.append((round(_dl_s, 1), round(time.time() - _ex_t0, 1),
                                      round(content_size_mb, 1)))

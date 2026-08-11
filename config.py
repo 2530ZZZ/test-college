@@ -708,6 +708,25 @@ FILE_DOWNLOAD_TIMEOUT = (15, 180)
 # 超过此上限放弃该文件（下次重试），避免 worker 卡死在慢速下载。
 MAX_DOWNLOAD_SECONDS = 240
 
+# 下载 0 字节窗口（秒）：连接建立后持续 idle_max_s 无任何数据 → 立即放弃。
+# 08111 实测：raw CDN 限流时连接挂着但不给数据（0MB），read timeout 因
+# 持续空 chunk 不触发，只能靠 MAX_DOWNLOAD_SECONDS 死等 240s×259 线程。
+# 此窗口把"无数据挂起"快速判定为限流，配合退避（collector 内实现）。
+# 影响：30s 内 0 字节基本就是挂了；正常下载首字节 <1s，不会误杀。
+DOWNLOAD_IDLE_TIMEOUT = 30
+
+# 全局下载并发上限：36 worker × 每仓库 8 线程（+clone 25）无上限叠加
+# 可达 259 并发（08111 实测），高并发堆积触发 CDN 限流。此信号量封顶。
+# 影响：只限制并发与排队时长，不影响正确性。可随时调整。
+MAX_DOWNLOAD_CONCURRENCY = 64
+
+# 连续 0 字节失败多少次后触发限流退避（秒）：退避窗口内下载并发减半。
+# 08111 的 20:37-20:41：raw CDN 限流 5 分钟全挂。退避降低连接压力，
+# 避免"并发越高被限越狠"的恶性循环。
+DOWNLOAD_STALL_THRESHOLD = 5
+DOWNLOAD_THROTTLE_SECONDS = 60
+
+
 # 多进程解析池进程数。
 # 解析(extract_all_strategies)是纯 Python CPU 密集——GIL 限制下多线程
 # 解析永远只用 1 核（08104 实测 64 线程并发也仅 50% CPU）。多进程每个
