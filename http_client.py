@@ -74,6 +74,11 @@ class HttpClient:
         # 调用方 get_json 返回 None 后查此集合决定 404 处理）
         self.last_404 = set()
 
+        # 08112：下载失败限频汇总（原 ConnectionError/HTTP 错误静默返回，
+        # 08:07 批量失败源头无法从日志确认——故障不可见）
+        self._dl_fail_count = 0          # 距上次汇总的失败数
+        self._dl_fail_last_log = 0.0     # 上次汇总打印时间（限频 30s）
+
         # 构建带重试策略的 Session
         self.session = self._create_session(pool_connections, pool_maxsize)
 
@@ -356,6 +361,22 @@ class HttpClient:
         log_sink.emit(f"[{_now()}] {operation_name} 多次失败，已跳过")
         return None
 
+    def _note_dl_failure(self, reason: str):
+        """下载失败限频汇总（08112：静默失败导致故障不可见）。
+
+        每 30s 打印一次"近 30s 下载失败 N 次（最新原因）"——08:07 批量
+        连接错误时能确认源头，而不是只有结果（退避触发）没有原因。
+        多线程并发计数用 GIL 原子性，统计性质不要求精确。
+        """
+        self._dl_fail_count += 1
+        now = time.time()
+        if now - self._dl_fail_last_log >= 30:
+            if self._dl_fail_count:
+                log_sink.emit(f"[{_now()}] 下载失败汇总: 近30s "
+                      f"{self._dl_fail_count} 次（最新: {reason}）")
+            self._dl_fail_count = 0
+            self._dl_fail_last_log = now
+
     def download_with_timeout(self, url: str, timeout: Tuple[float, float],
                               max_total_s: int, operation_name: str = "",
                               idle_max_s: int = 0) -> Optional[bytes]:
@@ -382,6 +403,9 @@ class HttpClient:
                 if resp.status_code != 200:
                     if resp.status_code == 404:
                         self.last_404.add(operation_name)
+                        self._note_dl_failure("404")
+                    else:
+                        self._note_dl_failure(f"HTTP {resp.status_code}")
                     return None
                 for chunk in resp.iter_content(chunk_size=65536):
                     if time.time() - t0 > max_total_s:
@@ -402,8 +426,10 @@ class HttpClient:
             log_sink.emit(f"[{_now()}] {operation_name} 下载超时，放弃")
             return None
         except requests.exceptions.ConnectionError:
+            self._note_dl_failure("连接错误")
             return None
-        except Exception:
+        except Exception as e:
+            self._note_dl_failure(str(e)[:60])
             return None
         return b"".join(chunks) if chunks else None
 

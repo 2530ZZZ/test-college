@@ -281,7 +281,9 @@ class Collector:
         self._parsing_sizes = set()                    # 当前解析中文件的 size(MB)（监控实时最大）
         # ── 08111：下载并发上限 + 限流退避 ──
         self._download_sem = threading.Semaphore(MAX_DOWNLOAD_CONCURRENCY)
-        self._download_stall_count = 0                 # 连续下载失败计数（触发退避）
+        # 08112：失败计数改 60s 窗口统计（原共享计数被 288 线程共用 →
+        # 2 秒刷屏 12 次退避 + 窗口续期 + 信号量泄漏 → 全 worker 卡死 2h）
+        self._download_fail_times = deque()            # 近 60s 下载失败时间戳
         self._download_throttled_until = 0.0           # 限流退避截止时间（期间并发减半）
         self._pending_downloads = 0                    # 待下载文件数（监控）
         self._pending_download_bytes = 0               # 待下载文件总字节（监控）
@@ -346,7 +348,8 @@ class Collector:
         self._monitor_start = time.time()               # 监控基准
         self._net_bytes_start = self._read_net_bytes()  # 网络基准（程序启动）
         self._net_samples = []                           # [(time, bytes)] 10 秒采样
-        self._net_peak = 0.0                            # 峰值速率（MB/s）
+        # 08112：_net_peak（历史最大值）已删除——监控"峰值"改 60s 窗口
+        # 最大速率，静止时不再残留旧峰值误导判断
         self._worker_local = threading.local()          # 线程独立前缀
         self._disc_seq = None                             # 发现队列 PriorityQueue 序号（分配在 run 中）
         self._worker_idle_since: Dict[str, float] = {} # Worker 闲置起始时间
@@ -732,15 +735,15 @@ class Collector:
         total_mb = max(0, db) / 1024 / 1024
         avg_mb = total_mb / dt if dt > 0 else 0.0
         # 峰值：相邻采样点差值的最大速率
+        # 08112：返回 60 秒窗口内峰值（原返回历史最大值 _net_peak——
+        # 静止 2 小时仍显示 07:53 的 26.87MB/s，误导判断，已删除）
         peak_mb = 0.0
         for i in range(1, len(self._net_samples)):
             dti = self._net_samples[i][0] - self._net_samples[i - 1][0]
             dbi = self._net_samples[i][1] - self._net_samples[i - 1][1]
             if dti > 0:
                 peak_mb = max(peak_mb, dbi / dti / 1024 / 1024)
-        self._net_peak = max(self._net_peak, peak_mb)
-        return {"total_mb": total_mb, "avg_mb": avg_mb,
-                "peak_mb": self._net_peak}
+        return {"total_mb": total_mb, "avg_mb": avg_mb, "peak_mb": peak_mb}
 
     def _monitor_loop(self):
         """监控线程：每 MONITOR_INTERVAL 秒输出一个集中监控块。
@@ -843,8 +846,11 @@ class Collector:
                     f"(最大{self._parsing_cur_max_mb():.0f}MB) | "
                     f"预算 {self._parsing_bytes/1024/1024:.0f}"
                     f"/{DOWNLOAD_MEMORY_BUDGET_MB}MB | "
-                    f"进程池 {self._pool_big_running + self._pool_small_running}"
-                    f"/{EXTRACT_PROCESSES} | "
+                    f"进程池 {min(self._pool_big_running + self._pool_small_running, EXTRACT_PROCESSES)}"
+                    f"/{EXTRACT_PROCESSES}"
+                    f"(排队{max(0, self._pool_big_running + self._pool_small_running - EXTRACT_PROCESSES)}) | "
+                    f"下载并发 {self._downloading_active}/{MAX_DOWNLOAD_CONCURRENCY}"
+                    f"(余{self._download_sem._value}) | "
                     f"解析节点 近60s {sum(c for _t, c in self._nodes_60s)}"
                     f"/累计 {self._total_parsed_nodes} | "
                     f"累计解析 {self._total_parsed_files}文件"
@@ -3107,9 +3113,22 @@ class Collector:
         # 触发 CDN 限流）；限流退避窗口内并发减半（acquire 两次）。
         # idle_max_s：0 字节窗口快速放弃（限流挂起 30s 无数据即弃，不再
         # 死等 240s）。
+        # 08112 修复：
+        # 1) acquire(timeout=10) 兜底——信号量异常（许可泄漏等）时 worker
+        #    不再永久阻塞，超时放弃本次下载并打日志；
+        # 2) release 与 acquire 严格配对（此前退避窗口 acquire 2 次只
+        #    release 1 次 → 64 许可泄漏耗尽 → 全 worker 卡死 2 小时）。
         _dl_locks = 2 if self._download_throttled_until > time.time() else 1
-        for _ in range(_dl_locks):
-            self._download_sem.acquire()
+        _dl_got = 0
+        while _dl_got < _dl_locks:
+            if not self._download_sem.acquire(timeout=10):
+                # 部分获取时也要释放已拿到的许可（否则同样泄漏）
+                for _ in range(_dl_got):
+                    self._download_sem.release()
+                self._wlog(f"⚠️ 下载并发信号量获取超时"
+                      f"（{_dl_got}/{_dl_locks} 许可），放弃下载 {file_path}")
+                return  # 信号量异常兜底：不阻塞 worker
+            _dl_got += 1
         # 08103 监测：下载中计数 + 耗时记录；08111：待下载计数（监控）
         self._downloading_active += 1
         self._pending_downloads += 1
@@ -3120,23 +3139,30 @@ class Collector:
                 raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
                 f"下载 {file_path}", idle_max_s=DOWNLOAD_IDLE_TIMEOUT)
         finally:
-            self._download_sem.release()
+            for _ in range(_dl_got):
+                self._download_sem.release()  # 08112：与 acquire 严格配对
             self._downloading_active -= 1
             self._pending_downloads -= 1
             self._pending_download_bytes -= size
         _dl_s = time.time() - _dl_t0
         if content_bytes is None:
-            # 下载失败（超时/0 字节/连接错误）→ 连续失败计数触发限流退避：
-            # 连续 DOWNLOAD_STALL_THRESHOLD 次后，退避窗口内并发减半，
-            # 降低连接压力，避免"并发越高被限越狠"的恶性循环（08111 全挂）
-            self._download_stall_count += 1
-            if self._download_stall_count >= DOWNLOAD_STALL_THRESHOLD:
-                self._download_stall_count = 0
-                self._download_throttled_until = time.time() + DOWNLOAD_THROTTLE_SECONDS
-                self._wlog(f"⚠️ 连续 {DOWNLOAD_STALL_THRESHOLD} 次下载失败，"
+            # 下载失败（超时/0 字节/连接错误/HTTP 错误）→ 60s 窗口失败总数
+            # 触发限流退避：近 60s 失败 ≥ DOWNLOAD_STALL_THRESHOLD 时，
+            # 退避窗口内并发减半，降低连接压力，避免"并发越高被限越狠"
+            # （08111 全挂）。08112：原共享计数被 288 线程共用 → 2 秒刷屏
+            # 12 次退避 + 窗口续期；现为 60s 窗口统计 + 退避窗口内不重复
+            # 触发（不续期）。
+            _now = time.time()
+            self._download_fail_times.append(_now)
+            while self._download_fail_times and \
+                    _now - self._download_fail_times[0] > 60:
+                self._download_fail_times.popleft()
+            if (self._download_throttled_until <= _now
+                    and len(self._download_fail_times) >= DOWNLOAD_STALL_THRESHOLD):
+                self._download_throttled_until = _now + DOWNLOAD_THROTTLE_SECONDS
+                self._wlog(f"⚠️ 近60s 下载失败 {len(self._download_fail_times)} 次，"
                       f"限流退避 {DOWNLOAD_THROTTLE_SECONDS}s（下载并发减半）")
             return  # 下载失败/超总时长 → 不标记（下次重试）
-        self._download_stall_count = 0
 
         # 读取内容（surrogate 字符兼容）
         content = None

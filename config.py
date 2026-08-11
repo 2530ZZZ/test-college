@@ -720,10 +720,15 @@ DOWNLOAD_IDLE_TIMEOUT = 30
 # 影响：只限制并发与排队时长，不影响正确性。可随时调整。
 MAX_DOWNLOAD_CONCURRENCY = 64
 
-# 连续 0 字节失败多少次后触发限流退避（秒）：退避窗口内下载并发减半。
+# 限流检测：近 60 秒内下载失败（0 字节/连接错误/超时/HTTP 错误）总数
+# 达到此值 → 触发退避。退避窗口（DOWNLOAD_THROTTLE_SECONDS）内下载并发
+# 减半，且不重复触发（不续期）。
 # 08111 的 20:37-20:41：raw CDN 限流 5 分钟全挂。退避降低连接压力，
 # 避免"并发越高被限越狠"的恶性循环。
-DOWNLOAD_STALL_THRESHOLD = 5
+# 08112：原"连续 5 次"共享计数被 288 个下载线程共用 → 2 秒刷屏 12 次
+# 退避 + 窗口续期 + 信号量泄漏；改为 60s 窗口失败总数检测（20 次/60s
+# 才算限流，正常波动不触发）。
+DOWNLOAD_STALL_THRESHOLD = 20
 DOWNLOAD_THROTTLE_SECONDS = 60
 
 
