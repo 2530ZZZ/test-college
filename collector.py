@@ -38,6 +38,7 @@ from config import (
     DOWNLOAD_IDLE_TIMEOUT, MAX_DOWNLOAD_CONCURRENCY,
     DOWNLOAD_STALL_THRESHOLD, DOWNLOAD_THROTTLE_SECONDS,
     EXTRACT_PROCESSES, DOWNLOAD_MEMORY_BUDGET_MB, EXTRACT_PROCESS_MIN_MB,
+    NO_HIS_DIR, NO_HISTORY_DAYS, NO_SPLIT_SIZE,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
@@ -87,6 +88,96 @@ from parsers import (
 from utils import now_str
 from quota_manager import QuotaManager
 from log_sink import log_sink
+
+
+def dedup_batches_write_no() -> int:
+    """读本轮 batches + 旧 no_his/ → 7 天窗口全量去重 → 写 no_his/ 与 no/。
+
+    供主流程 _finalize 与 workflow 兜底脚本 finalize.py 共用（两条路径
+    产出一致——08111 取消场景下主流程收尾日志进 devnull、git 抢跑，
+    no/ 丢失，此函数作为独立进程兜底）。
+
+    语义（08111+）：no/ 是"含今天共 NO_HISTORY_DAYS 个自然日内出现过
+    的全部节点"——本轮新节点 + 补充窗口内有而本轮没有的历史节点。
+    同 IP:端口不同协议的节点 URI 字符串不同 → 天然都保留；同 URI
+    重复 → 保留最新日期（本轮优先）。no_his/ 每行 URI<TAB>YYYY-MM-DD
+    （带获取日期），no/ 是同一集合去掉日期的纯 URI 视图，两处一致。
+
+    Returns:
+        唯一节点数；0 = 无批次且无窗口内历史（保留旧文件不动）。
+    """
+    import glob
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cutoff = (datetime.now(timezone.utc)
+              - timedelta(days=NO_HISTORY_DAYS - 1)).strftime("%Y-%m-%d")
+    his: Dict[str, str] = {}  # URI -> 获取日期
+
+    # 1. 本轮批次（运行时 _flush_batch 写盘的中间产物）→ 日期 = 今天
+    batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
+    batch_files = sorted(glob.glob(os.path.join(batch_dir, "no_batch_*.txt")))
+    for f in batch_files:
+        with open(f, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                line = line.rstrip("\n")
+                if line:
+                    his[line] = today  # 本轮覆盖旧日期（同 URI 保留最新）
+
+    # 2. 旧 no_his/（跨运行历史）→ 保留原日期；7 天窗口外删除
+    his_dir = os.path.join(os.getcwd(), NO_HIS_DIR)
+    if os.path.isdir(his_dir):
+        for f in glob.glob(os.path.join(his_dir, "*.txt")):
+            try:
+                with open(f, encoding="utf-8", errors="replace") as fh:
+                    for line in fh:
+                        line = line.rstrip("\n")
+                        if not line:
+                            continue
+                        parts = line.split("\t")
+                        if len(parts) != 2:
+                            continue  # 格式异常行跳过
+                        uri, date = parts[0], parts[1]
+                        if date < cutoff:
+                            continue  # 7 天窗口外 → 丢弃
+                        if uri not in his:
+                            his[uri] = date
+            except OSError:
+                continue
+
+    if not his:
+        return 0  # 无批次且无窗口内历史 → 保留旧文件不动（崩溃/首次空跑）
+
+    # 3. 清空旧 no_his/ 与 no/（本次重新生成，替换式更新）
+    no_dir = os.path.join(os.getcwd(), "no")
+    for d in (his_dir, no_dir):
+        if os.path.isdir(d):
+            for old in glob.glob(os.path.join(d, "*.txt")):
+                try:
+                    os.remove(old)
+                except OSError:
+                    pass
+    os.makedirs(his_dir, exist_ok=True)
+    os.makedirs(no_dir, exist_ok=True)
+
+    # 4. 写分片：no/ 纯 URI；no_his/ URI<TAB>日期（同一集合两种视图）
+    nodes = sorted(his)
+    his_lines = sorted(f"{u}\t{his[u]}" for u in nodes)
+    repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
+    branch_name = os.getenv("GITHUB_REF_NAME", "main")
+    with open("no_w_li.txt", "w", encoding="utf-8") as fw:
+        for i in range(0, len(nodes), NO_SPLIT_SIZE):
+            seq = i // NO_SPLIT_SIZE + 1
+            with open(os.path.join(no_dir, f"{seq:03d}.txt"),
+                      "w", encoding="utf-8") as f:
+                f.write("\n".join(nodes[i:i + NO_SPLIT_SIZE]))
+            with open(os.path.join(his_dir, f"no_his_{seq:03d}.txt"),
+                      "w", encoding="utf-8") as f:
+                f.write("\n".join(his_lines[i:i + NO_SPLIT_SIZE]))
+            fw.write(f"https://raw.githubusercontent.com/{repo_name}"
+                     f"/{branch_name}/no/{seq:03d}.txt\n")
+    log_sink.emit(f"[{now_str()}] 📦 收尾去重: {len(batch_files)} 批次 "
+                  f"+ {NO_HISTORY_DAYS}天窗口历史 → {len(nodes)} 唯一节点 "
+                  f"→ {len(nodes) // NO_SPLIT_SIZE + 1} 个分片")
+    return len(nodes)
 
 
 class MonitoredLock:
@@ -1073,51 +1164,17 @@ class Collector:
                 self._wlog(f"⚠️ 批次回调异常: {e}")
 
     def _dedup_batches_write_no(self):
-        """读全部 batches 中间产物 → 全量去重 → 写 no/ 分片（两阶段持久化收尾）。
+        """收尾去重（08111+）：委托模块级 dedup_batches_write_no()。
 
-        内存优化：运行时节点只写 batches（批次内去重小 set），内存不存全量
-        节点集合（08103：24.8 万节点/h × 2 个全局 set = 内存大头，6h 必爆）；
-        收尾（run() 已先 join Worker，内存空出）读 batches 全量去重，
-        内存峰值 = 唯一节点数（约 1-2GB），安全。
+        模块级函数与 workflow 兜底脚本 finalize.py 共用，两条路径产出
+        一致（正常完成 vs 取消/超时）。语义变化：no/ 从"本轮去重结果"
+        变为"7 天窗口内全部节点"（本轮新的 + 历史补充，见模块级函数）。
+        内存优化（两阶段持久化）不变：运行时只写 batches，收尾读全部
+        批次 + 旧 no_his 去重，内存峰值 = 唯一节点数（约 1-2GB），安全。
         """
-        import glob
-        batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
-        batch_files = sorted(glob.glob(os.path.join(batch_dir, "no_batch_*.txt")))
-        if not batch_files:
-            return  # 无产出 → 保留上次 no/（崩溃/无节点场景）
-        all_nodes = set()
-        for f in batch_files:
-            with open(f, encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    line = line.rstrip("\n")
-                    if line:
-                        all_nodes.add(line)
-        nodes = sorted(all_nodes)
-        # 清空旧 no/（上次运行的分片，本次重新生成）
-        no_dir = os.path.join(os.getcwd(), "no")
-        if os.path.isdir(no_dir):
-            for old in glob.glob(os.path.join(no_dir, "*.txt")):
-                try:
-                    os.remove(old)
-                except OSError:
-                    pass
-        os.makedirs(no_dir, exist_ok=True)
-        repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
-        branch_name = os.getenv("GITHUB_REF_NAME", "main")
-        with open("no_w_li.txt", "w", encoding="utf-8") as fw:
-            for i in range(0, len(nodes), 5000):
-                chunk = nodes[i:i + 5000]
-                seq = i // 5000 + 1
-                no_filename = f"{seq:03d}.txt"
-                with open(os.path.join(no_dir, no_filename),
-                          "w", encoding="utf-8") as f:
-                    f.write("\n".join(chunk))
-                fw.write(f"https://raw.githubusercontent.com/{repo_name}"
-                         f"/{branch_name}/no/{no_filename}\n")
-        self._final_node_count = len(nodes)  # 收尾唯一节点数（_finalize 统计展示）
-        self._wlog(f"📦 收尾去重: {len(batch_files)} 批次 "
-              f"→ {len(nodes)} 唯一节点 → "
-              f"{len(nodes) // 5000 + 1} 个 no/ 分片")
+        count = dedup_batches_write_no()
+        if count:
+            self._final_node_count = count  # 收尾唯一节点数（_finalize 统计展示）
 
     def _add_node(self, node_uri: str, proxy=None) -> str:
         """添加节点到当前批次 buffer。

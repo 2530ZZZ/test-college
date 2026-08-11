@@ -37,9 +37,16 @@ jobs:
       - name: 提交结果
         if: always()
         run: |
+          # 08111+ 收尾兜底：job 取消/超时时主流程 _finalize 可能未完成
+          # （日志进 devnull、git 抢跑），此步在 git add 前从 batches 分片
+          # + 旧 no_his 重新生成 no_his/ 与 no/（与主流程共用同一函数）。
+          python finalize.py || echo "finalize 失败（继续提交，保留旧 no/）"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global http.postBuffer 524288000
+          # 一次性清理（幂等）：batches/ 中间产物不再进仓库
+          #（.gitignore 已忽略新批次；历史批次从 index 移除随本次提交删除）
+          git rm -r --cached batches --ignore-unmatch 2>/dev/null || true
           BEIJING_TIME=$(date -u -d '+8 hours' +'%Y-%m-%d %H:%M:%S')
           export GIT_AUTHOR_DATE="$BEIJING_TIME +0800"
           export GIT_COMMITTER_DATE="$BEIJING_TIME +0800"

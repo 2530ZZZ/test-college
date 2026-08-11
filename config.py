@@ -745,6 +745,21 @@ DOWNLOAD_MEMORY_BUDGET_MB = 2048
 # 占比大，小文件进程池反而慢）；大于此值提交进程池（绕 GIL 用多核）。
 EXTRACT_PROCESS_MIN_MB = 1
 
+# ==================== 收尾去重（no_his / no） ====================
+
+# no_his 历史节点目录：收尾去重时保存"含今天共 NO_HISTORY_DAYS 个自然日"
+# 内出现过的全部节点（每行 URI<TAB>YYYY-MM-DD 带获取日期）。
+# 跨运行依赖：此目录必须随 git 提交/checkout（历史节点靠它跨轮补充）。
+NO_HIS_DIR = "no_his"
+
+# 7 天滑动窗口：收尾时删除 日期 < 今天-(NO_HISTORY_DAYS-1) 的节点；
+# 同 URI 重复的节点保留最新日期（本轮优先）。08111 起 no/ 的语义
+# 从"本轮去重结果"改为"7 天窗口内全部节点"（本轮新的 + 历史补充）。
+NO_HISTORY_DAYS = 7
+
+# no/ 与 no_his/ 每个分片的节点行数。
+NO_SPLIT_SIZE = 5000
+
 # Contents API（/repos/{repo}/contents/{path}）
 # 回退路径，仅树 API 失败时使用。逐目录遍历，速度慢。
 CONTENTS_API_TIMEOUT = (10, 20)
