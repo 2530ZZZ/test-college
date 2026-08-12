@@ -390,7 +390,7 @@ class HttpClient:
 
     def download_with_timeout(self, url: str, timeout: Tuple[float, float],
                               max_total_s: int, operation_name: str = "",
-                              idle_max_s: int = 0) -> Optional[bytes]:
+                              idle_max_s: int = 0) -> Tuple[Optional[bytes], str]:
         """流式下载 + 总时长上限（防 CDN 慢速限速无限下载）。
 
         read timeout 只防"无数据"——CDN 慢速限速（0.1MB/s 持续送数据）不会
@@ -402,7 +402,11 @@ class HttpClient:
         不给数据，0MB 且空 chunk 持续送，read timeout 不触发）。传 0 禁用。
 
         Returns:
-            完整内容 bytes，失败/超总时长/超 0 字节窗口返回 None。
+            (完整内容 bytes, "") 成功；
+            (None, reason) 失败——reason 归一化：404 / HTTP xxx /
+            timeout / connect / idle（0 字节窗口）/ max_total（超总时长）。
+            08121：调用方据此区分"网络类失败"（限流信号）与"404/4xx"
+            （文件不存在，不算限流）。
         """
         t0 = time.time()
         chunks = []
@@ -419,12 +423,12 @@ class HttpClient:
                         self._note_dl_failure("404")
                     else:
                         self._note_dl_failure(f"HTTP {resp.status_code}")
-                    return None
+                    return None, f"HTTP {resp.status_code}"
                 for chunk in resp.iter_content(chunk_size=65536):
                     if time.time() - t0 > max_total_s:
                         log_sink.emit(f"[{_now()}] {operation_name} "
                               f"下载超总时长({max_total_s}s/{total/1024/1024:.0f}MB)，放弃")
-                        return None
+                        return None, "max_total"
                     if chunk:
                         chunks.append(chunk)
                         total += len(chunk)
@@ -434,17 +438,27 @@ class HttpClient:
                         # 快速放弃（下次重试），不再死等 MAX_DOWNLOAD_SECONDS
                         log_sink.emit(f"[{_now()}] {operation_name} "
                               f"无数据({idle_max_s}s/{total/1024/1024:.0f}MB)，放弃")
-                        return None
+                        return None, "idle"
         except requests.exceptions.Timeout:
             log_sink.emit(f"[{_now()}] {operation_name} 下载超时，放弃")
-            return None
+            return None, "timeout"
         except requests.exceptions.ConnectionError:
             self._note_dl_failure("连接错误")
-            return None
+            return None, "connect"
         except Exception as e:
             self._note_dl_failure(str(e)[:60])
-            return None
-        return b"".join(chunks) if chunks else None
+            return None, "error"
+        content = b"".join(chunks) if chunks else None
+        if content:
+            # 08121：raw 下载统计（原在 get() 里，但 raw 下载走本方法不走
+            # get() → 统计永远 0；移到这里修复）
+            now = time.time()
+            self._raw_window.append((now, len(content)))
+            self._raw_total += len(content)
+            self._raw_count += 1
+            while self._raw_window and now - self._raw_window[0][0] > 60:
+                self._raw_window.pop(0)
+        return content, ""
 
     def get_json(self, url: str, timeout: Tuple[float, float] = (8, 15),
                  max_retries: int = 2, operation_name: str = "请求") -> Optional[dict]:

@@ -37,7 +37,7 @@ from config import (
     SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
     DOWNLOAD_IDLE_TIMEOUT, MAX_DOWNLOAD_CONCURRENCY,
     DOWNLOAD_STALL_THRESHOLD, DOWNLOAD_THROTTLE_SECONDS,
-    SMALL_REPO_CLONE_MB, MAX_DOWNLOAD_CONNECTS_PER_SEC,
+    SMALL_REPO_CLONE_MB, MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC,
     EXTRACT_PROCESSES, DOWNLOAD_MEMORY_BUDGET_MB, EXTRACT_PROCESS_MIN_MB,
     NO_HIS_DIR, NO_HISTORY_DAYS, NO_SPLIT_SIZE,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
@@ -827,41 +827,41 @@ class Collector:
                 _lk = self._state_lock.holder_info()
                 _lk_txt = f"锁: {_lk[0]} {_lk[1]:.0f}s" if _lk else "锁: 空闲"
                 _now_dt = datetime.fromtimestamp(now, tz=timezone.utc)
+                # 08121：监控行重排——下载/解析/API 分行，名称直白，同类合并
+                _dl_waiting = max(0, self._pending_downloads - self._downloading_active)
+                _pool_total = self._pool_big_running + self._pool_small_running
                 lines = [
                     f"📊 [{_now_dt.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
                     f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
                     f"内存: {mem_pct:.0f}% ({used_gb:.1f}/{total_gb:.1f}GB) | "
                     f"RSS: {py_rss_gb:.1f}GB | "
                     f"磁盘: {disk_free_gb:.1f}/{disk_total_gb:.0f}GB 可用",
-                    f"   网络近60s: 总下载 {net['total_mb']/1024:.2f}GB | "
+                    f"   网络: 60s下载 {net['total_mb']/1024:.2f}GB | "
                     f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s",
-                    f"   API剩余: {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
-                    f"放行 {self.api_gate.current_rate()}/分钟 | "
-                    f"raw {len(_hw)}文件/{_raw60_mb:.1f}MB | "
-                    f"clone近60s: {_ok60_repos}仓库/{_ok60_files}文件/{_tr60_mb:.0f}MB"
-                    f"(进行中{self._clone_active}) | "
-                    f"累计 成功{self._clone_repos}/失败{self._clone_fail_count}"
-                    f" | 并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
-                    f"(峰值{self._clone_active_peak})",
-                    f"   诊断: log队列 {_log_q}/{_log_ok} | "
-                    f"下载中 {self._downloading_active}"
-                    f"(待下载 {self._pending_downloads}文件"
-                    f"/{self._pending_download_bytes/1024/1024:.0f}MB) | "
-                    f"等待解析 {self._parsing_waiting}文件"
-                    f"/{self._parsing_waiting_bytes/1024/1024:.0f}MB | "
-                    f"解析中 {self._parsing_active}文件"
+                    f"   下载: 进行中 {self._downloading_active}/{MAX_DOWNLOAD_CONCURRENCY}"
+                    f"(空闲许可{self._download_sem._value}) | "
+                    f"待下载 {self._pending_downloads}文件"
+                    f"/{self._pending_download_bytes/1024/1024:.0f}MB"
+                    f"(等连接配额{_dl_waiting})",
+                    f"   解析: 进行中 {self._parsing_active}文件"
                     f"(最大{self._parsing_cur_max_mb():.0f}MB) | "
-                    f"预算 {self._parsing_bytes/1024/1024:.0f}"
+                    f"等解析名额 {self._parsing_waiting}文件"
+                    f"/{self._parsing_waiting_bytes/1024/1024:.0f}MB | "
+                    f"内存占用 {self._parsing_bytes/1024/1024:.0f}"
                     f"/{DOWNLOAD_MEMORY_BUDGET_MB}MB | "
-                    f"进程池 {min(self._pool_big_running + self._pool_small_running, EXTRACT_PROCESSES)}"
-                    f"/{EXTRACT_PROCESSES}"
-                    f"(排队{max(0, self._pool_big_running + self._pool_small_running - EXTRACT_PROCESSES)}) | "
-                    f"下载并发 {self._downloading_active}/{MAX_DOWNLOAD_CONCURRENCY}"
-                    f"(余{self._download_sem._value}) | "
-                    f"解析节点 近60s {sum(c for _t, c in self._nodes_60s)}"
+                    f"进程池 {min(_pool_total, EXTRACT_PROCESSES)}/{EXTRACT_PROCESSES}"
+                    f"(排队{max(0, _pool_total - EXTRACT_PROCESSES)}) | "
+                    f"节点 60s {sum(c for _t, c in self._nodes_60s)}"
                     f"/累计 {self._total_parsed_nodes} | "
                     f"累计解析 {self._total_parsed_files}文件"
-                    f"/{self._total_parsed_mb/1024:.1f}GB | "
+                    f"/{self._total_parsed_mb/1024:.1f}GB",
+                    f"   API: 剩余 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
+                    f"放行 {self.api_gate.current_rate()}/分钟 | "
+                    f"raw 60s {len(_hw)}文件/{_raw60_mb:.1f}MB | "
+                    f"clone 成功{self._clone_repos}/失败{self._clone_fail_count}"
+                    f" | clone并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
+                    f"(峰值{self._clone_active_peak})",
+                    f"   诊断: log队列 {_log_q}/{_log_ok} | "
                     f"线程 {threading.active_count()} | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
                     f"关键词 {self._kw_progress or '-'} | "
@@ -1904,20 +1904,32 @@ class Collector:
         两分布的累计百分比对齐处 = 合理分流阈值候选。
         例：候选文件 ≤99 的仓库占 75%，大小 ≤49MB 的仓库占 75% →
         50MB 阈值覆盖 75% 仓库走 clone（候选文件少，下载量可控）。
+        08121：同时写 stats_distribution.txt——手动结束/取消时 stdout
+        进 devnull，文件不丢（随 git 提交）。
         """
         def _dump(title, hist):
             total = sum(hist.values())
             if not total:
-                return
-            print(f"\n=== {title}（共 {total} 个）===", flush=True)
+                return []
+            out = [f"=== {title}（共 {total} 个）==="]
             acc = 0
             for k in sorted(hist, key=lambda s: int(s.split('-')[0])):
                 c = hist[k]
                 acc += c
-                print(f"  {k:>10s}: {c:>6d} ({c / total * 100:5.1f}%) "
-                      f"[累计 {acc / total * 100:5.1f}%]", flush=True)
-        _dump("候选文件数量分布", self._candidate_hist)
-        _dump("仓库大小分布", self._repo_size_hist)
+                line = (f"  {k:>10s}: {c:>6d} ({c / total * 100:5.1f}%) "
+                        f"[累计 {acc / total * 100:5.1f}%]")
+                out.append(line)
+                print(line, flush=True)
+            return out
+        _all = []
+        _all += _dump("候选文件数量分布", self._candidate_hist)
+        _all += _dump("仓库大小分布", self._repo_size_hist)
+        if _all:
+            try:
+                with open("stats_distribution.txt", "w", encoding="utf-8") as f:
+                    f.write("\n".join(_all) + "\n")
+            except Exception as e:
+                self._wlog(f"⚠️ stats_distribution.txt 写入失败: {e}")
 
     def _finalize(self, elapsed_seconds: float = 0):
         """最终保存和统计。即使之前发生错误也能安全调用。"""
@@ -3128,19 +3140,24 @@ class Collector:
     # ---- 08113：全局连接速率节流 + 分布统计 ----
 
     def _dl_rate_wait(self):
-        """全局 raw 下载连接速率节流：1 秒滑动窗口内最多
-        MAX_DOWNLOAD_CONNECTS_PER_SEC 个新连接（08113：36 连接/s 触发
-        CDN 慢速限速；封顶 10/s）。
+        """全局 raw 下载连接速率节流：1 秒滑动窗口内最多 N 个新连接。
+
+        N = MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC（30/s，08121：限速线 36/s
+        的 80% 余量）；限速信号触发降级（_download_throttled_until 窗口）
+        时减半（15/s）。只限 raw 下载（clone 走 git 协议不受此限）。
 
         必须全局共享（锁 + 时间戳列表）——不能用"每线程 sleep 间隔"：
         并发完成时各线程独立 sleep 不节流（实测会失效）。
         """
+        _limit = (MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC // 2
+                  if self._download_throttled_until > time.time()
+                  else MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC)
         while True:
             with self._dl_gap_lock:
                 now = time.time()
                 self._dl_gap_times = [
                     t for t in self._dl_gap_times if now - t < 1.0]
-                if len(self._dl_gap_times) < MAX_DOWNLOAD_CONNECTS_PER_SEC:
+                if len(self._dl_gap_times) < _limit:
                     self._dl_gap_times.append(now)
                     return
             time.sleep(0.05)
@@ -3193,60 +3210,55 @@ class Collector:
         # read timeout，100MB 文件能慢速下载 1000s+（08102 W-3 卡 2600s），
         # MAX_DOWNLOAD_SECONDS 超时即放弃，下次重试）
         # 08111：全局并发信号量封顶（36 worker×8 线程无上限 → 259 并发
-        # 触发 CDN 限流）；限流退避窗口内并发减半（acquire 两次）。
-        # idle_max_s：0 字节窗口快速放弃（限流挂起 30s 无数据即弃，不再
-        # 死等 240s）。
-        # 08112 修复：
-        # 1) acquire(timeout=10) 兜底——信号量异常（许可泄漏等）时 worker
-        #    不再永久阻塞，超时放弃本次下载并打日志；
-        # 2) release 与 acquire 严格配对（此前退避窗口 acquire 2 次只
-        #    release 1 次 → 64 许可泄漏耗尽 → 全 worker 卡死 2 小时）。
-        self._dl_rate_wait()  # 08113：全局连接速率节流（≤10 新连接/s）
-        _dl_locks = 2 if self._download_throttled_until > time.time() else 1
-        _dl_got = 0
-        while _dl_got < _dl_locks:
-            if not self._download_sem.acquire(timeout=10):
-                # 部分获取时也要释放已拿到的许可（否则同样泄漏）
-                for _ in range(_dl_got):
-                    self._download_sem.release()
-                self._wlog(f"⚠️ 下载并发信号量获取超时"
-                      f"（{_dl_got}/{_dl_locks} 许可），放弃下载 {file_path}")
-                return  # 信号量异常兜底：不阻塞 worker
-            _dl_got += 1
-        # 08103 监测：下载中计数 + 耗时记录；08111：待下载计数（监控）
-        self._downloading_active += 1
+        # 触发 CDN 限流）；idle_max_s：0 字节窗口快速放弃（限流挂起 30s
+        # 无数据即弃，不再死等 240s）。
+        # 08112 修复：acquire(timeout=10) 兜底 + release 严格配对
+        #（此前退避窗口 acquire 2 次只 release 1 次 → 许可泄漏全卡死）。
+        # 08121：退避（并发减半）已删，改动态降级——限速信号（近 60s
+        # 网络类失败 ≥ 阈值）→ 连接速率减半 60s（_dl_rate_wait 内生效）。
+        # 待下载计数（08121：含等连接配额——在 _dl_rate_wait 之前 +1，
+        # 监控"待下载"= 等配额 + 下载中）
         self._pending_downloads += 1
         self._pending_download_bytes += size
+        self._dl_rate_wait()  # 全局连接速率节流（限速信号时自动减半）
+        if not self._download_sem.acquire(timeout=10):
+            # 信号量异常兜底：不阻塞 worker；已计待下载回退
+            self._pending_downloads -= 1
+            self._pending_download_bytes -= size
+            self._wlog(f"⚠️ 下载并发信号量获取超时，放弃下载 {file_path}")
+            return
+        # 08103 监测：下载中计数 + 耗时记录
+        self._downloading_active += 1
         _dl_t0 = time.time()
         try:
-            content_bytes = self.http.download_with_timeout(
+            content_bytes, dl_fail_reason = self.http.download_with_timeout(
                 raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
                 f"下载 {file_path}", idle_max_s=DOWNLOAD_IDLE_TIMEOUT)
         finally:
-            for _ in range(_dl_got):
-                self._download_sem.release()  # 08112：与 acquire 严格配对
+            self._download_sem.release()  # 08112：与 acquire 严格配对
             self._downloading_active -= 1
             self._pending_downloads -= 1
             self._pending_download_bytes -= size
         _dl_s = time.time() - _dl_t0
         if content_bytes is None:
-            # 下载失败（超时/0 字节/连接错误/HTTP 错误）→ 60s 窗口失败总数
-            # 触发限流退避：近 60s 失败 ≥ DOWNLOAD_STALL_THRESHOLD 时，
-            # 退避窗口内并发减半，降低连接压力，避免"并发越高被限越狠"
-            # （08111 全挂）。08112：原共享计数被 288 线程共用 → 2 秒刷屏
-            # 12 次退避 + 窗口续期；现为 60s 窗口统计 + 退避窗口内不重复
-            # 触发（不续期）。
-            _now = time.time()
-            self._download_fail_times.append(_now)
-            while self._download_fail_times and \
-                    _now - self._download_fail_times[0] > 60:
-                self._download_fail_times.popleft()
-            if (self._download_throttled_until <= _now
-                    and len(self._download_fail_times) >= DOWNLOAD_STALL_THRESHOLD):
-                self._download_throttled_until = _now + DOWNLOAD_THROTTLE_SECONDS
-                self._wlog(f"⚠️ 近60s 下载失败 {len(self._download_fail_times)} 次，"
-                      f"限流退避 {DOWNLOAD_THROTTLE_SECONDS}s（下载并发减半）")
-            return  # 下载失败/超总时长 → 不标记（下次重试）
+            # 动态降级信号（08121）：近 60s 网络类下载失败 ≥ 阈值 →
+            # 连接速率减半 60s（_dl_rate_wait 内生效）。限速信号 = 网络类
+            # 失败（timeout/connect/idle/max_total/5xx）；404/4xx 是文件
+            # 不存在，不算限流不计入（08121 的 8 次退避多为 404 误触发）。
+            # 窗口内不重复触发（不续期）。
+            if dl_fail_reason != "404" and not dl_fail_reason.startswith("HTTP 4"):
+                _now = time.time()
+                self._download_fail_times.append(_now)
+                while self._download_fail_times and \
+                        _now - self._download_fail_times[0] > 60:
+                    self._download_fail_times.popleft()
+                if (self._download_throttled_until <= _now
+                        and len(self._download_fail_times) >= DOWNLOAD_STALL_THRESHOLD):
+                    self._download_throttled_until = _now + DOWNLOAD_THROTTLE_SECONDS
+                    self._wlog(f"⚠️ 近60s 网络类下载失败 {len(self._download_fail_times)} 次，"
+                          f"连接速率降级 {DOWNLOAD_THROTTLE_SECONDS}s"
+                          f"（{MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC}→{MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC // 2}/s）")
+            return  # 下载失败 → 不标记（下次重试）
 
         # 读取内容（surrogate 字符兼容）
         content = None

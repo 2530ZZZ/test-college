@@ -561,7 +561,7 @@ PARALLEL_DOWNLOAD_WORKERS = 8
 # 次级限流保护：API 队列端点限速 + 遇到 403 自动降级。
 # 注意：增大 Worker 时需同步调小 PARALLEL_DOWNLOAD_WORKERS，
 #       避免并行下载线程总数（Worker × 下载线程）超出 GA runner 内存。
-SHARED_POOL_WORKERS = 36
+SHARED_POOL_WORKERS = 72
 
 # 主队列最大长度（搜索渠道：种子/关键词/Code Search）。
 # 作用：满时搜索线程阻塞（背压），防止搜索结果浪费 API 配额。
@@ -618,7 +618,7 @@ DISC_MAIN_OK_AT = 1000
 #       disc 低于阈值（DISC_MAIN_OK_AT）且冷却结束才补充下一个源头。
 #       锁（_main_take_lock）保证同一瞬间只有一个 Worker 执行取动作（原子性）。
 # 默认值：60。建议 30-120。设 0 = 无冷却（不推荐，源头会过快补充）。
-MAIN_TAKE_COOLDOWN = 10
+MAIN_TAKE_COOLDOWN = 1
 
 # 同时允许几个源头仓库（从主队列取出正在处理）运行。
 # 作用：限制扩展仓库的"产生方"数量，防队列膨胀。
@@ -718,7 +718,7 @@ DOWNLOAD_IDLE_TIMEOUT = 30
 # 全局下载并发上限：36 worker × 每仓库 8 线程（+clone 25）无上限叠加
 # 可达 259 并发（08111 实测），高并发堆积触发 CDN 限流。此信号量封顶。
 # 影响：只限制并发与排队时长，不影响正确性。可随时调整。
-MAX_DOWNLOAD_CONCURRENCY = 64
+MAX_DOWNLOAD_CONCURRENCY = 96
 
 # 限流检测：近 60 秒内下载失败（0 字节/连接错误/超时/HTTP 错误）总数
 # 达到此值 → 触发退避。退避窗口（DOWNLOAD_THROTTLE_SECONDS）内下载并发
@@ -759,9 +759,11 @@ EXTRACT_PROCESS_MIN_MB = 1
 SMALL_REPO_CLONE_MB = 50
 
 # 全局 raw 下载连接速率（每秒新连接数）：08113 实测 36 连接/s 触发 CDN
-# 慢速限速；10/s 远低于触发线。下载信号量（MAX_DOWNLOAD_CONCURRENCY）控制
-# 并发，此节流控制连接建立频率（全局令牌桶，见 _dl_rate_wait）。
-MAX_DOWNLOAD_CONNECTS_PER_SEC = 10
+# 慢速限速；30/s = 限速线的 80% 余量，动态降级（限速信号）时自动减半。
+# 只限 raw 下载（_dl_rate_wait）——clone 走 git 协议另一条通道，不受此限。
+# 下载信号量（MAX_DOWNLOAD_CONCURRENCY）控制并发，此节流控制连接建立
+# 频率（全局令牌桶，见 collector._dl_rate_wait）。
+MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC = 30
 
 # ==================== 收尾去重（no_his / no） ====================
 
