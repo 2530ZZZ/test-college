@@ -750,6 +750,19 @@ DOWNLOAD_MEMORY_BUDGET_MB = 2048
 # 占比大，小文件进程池反而慢）；大于此值提交进程池（绕 GIL 用多核）。
 EXTRACT_PROCESS_MIN_MB = 1
 
+# ==================== 仓库处理分流（08113） ====================
+
+# 仓库大小分流阈值（MB）：size < 阈值的仓库用 partial clone 拿文件列表
+# （连接少、零 API）；≥ 阈值的仓库用 tree API 拿列表（大仓库 clone 元数据
+# 大、tree 响应可承受；tree 失败回退 clone）。阈值先用 50MB，等
+# _candidate_hist/_repo_size_hist 分布统计数据校准（_finalize 输出）。
+SMALL_REPO_CLONE_MB = 50
+
+# 全局 raw 下载连接速率（每秒新连接数）：08113 实测 36 连接/s 触发 CDN
+# 慢速限速；10/s 远低于触发线。下载信号量（MAX_DOWNLOAD_CONCURRENCY）控制
+# 并发，此节流控制连接建立频率（全局令牌桶，见 _dl_rate_wait）。
+MAX_DOWNLOAD_CONNECTS_PER_SEC = 10
+
 # ==================== 收尾去重（no_his / no） ====================
 
 # no_his 历史节点目录：收尾去重时保存"含今天共 NO_HISTORY_DAYS 个自然日"

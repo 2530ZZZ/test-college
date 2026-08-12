@@ -37,6 +37,7 @@ from config import (
     SEARCH_TIMEOUT, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
     DOWNLOAD_IDLE_TIMEOUT, MAX_DOWNLOAD_CONCURRENCY,
     DOWNLOAD_STALL_THRESHOLD, DOWNLOAD_THROTTLE_SECONDS,
+    SMALL_REPO_CLONE_MB, MAX_DOWNLOAD_CONNECTS_PER_SEC,
     EXTRACT_PROCESSES, DOWNLOAD_MEMORY_BUDGET_MB, EXTRACT_PROCESS_MIN_MB,
     NO_HIS_DIR, NO_HISTORY_DAYS, NO_SPLIT_SIZE,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
@@ -287,6 +288,12 @@ class Collector:
         self._download_throttled_until = 0.0           # 限流退避截止时间（期间并发减半）
         self._pending_downloads = 0                    # 待下载文件数（监控）
         self._pending_download_bytes = 0               # 待下载文件总字节（监控）
+        # ── 08113：全局连接速率节流（1s 窗口 ≤10 个新下载连接）──
+        self._dl_gap_lock = threading.Lock()
+        self._dl_gap_times = []                        # 最近 1s 内下载开始时间戳
+        # ── 08113：分布统计（收尾输出，校准分流阈值 SMALL_REPO_CLONE_MB）──
+        self._candidate_hist = {}                      # 候选文件数分布（分桶）
+        self._repo_size_hist = {}                      # 仓库大小分布（分桶）
         self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
         self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
         self._parsing_waiting = 0                      # 等待解析名额的文件数（预算排队）
@@ -1891,6 +1898,27 @@ class Collector:
 
     # ── 搜索辅助 ──
 
+    def _print_distributions(self):
+        """输出候选文件数与仓库大小分布（08113：校准分流阈值的依据）。
+
+        两分布的累计百分比对齐处 = 合理分流阈值候选。
+        例：候选文件 ≤99 的仓库占 75%，大小 ≤49MB 的仓库占 75% →
+        50MB 阈值覆盖 75% 仓库走 clone（候选文件少，下载量可控）。
+        """
+        def _dump(title, hist):
+            total = sum(hist.values())
+            if not total:
+                return
+            print(f"\n=== {title}（共 {total} 个）===", flush=True)
+            acc = 0
+            for k in sorted(hist, key=lambda s: int(s.split('-')[0])):
+                c = hist[k]
+                acc += c
+                print(f"  {k:>10s}: {c:>6d} ({c / total * 100:5.1f}%) "
+                      f"[累计 {acc / total * 100:5.1f}%]", flush=True)
+        _dump("候选文件数量分布", self._candidate_hist)
+        _dump("仓库大小分布", self._repo_size_hist)
+
     def _finalize(self, elapsed_seconds: float = 0):
         """最终保存和统计。即使之前发生错误也能安全调用。"""
         if self._max_runtime and elapsed_seconds > self._max_runtime:
@@ -1918,6 +1946,10 @@ class Collector:
             self._save_clone_stats(elapsed_seconds)
         except Exception as e:
             self._wlog(f"⚠️ clone_stats 保存异常: {e}")
+        try:
+            self._print_distributions()  # 08113：候选文件数/仓库大小分布（校准分流阈值）
+        except Exception as e:
+            self._wlog(f"⚠️ 分布统计输出异常: {e}")
         # 多进程解析池收尾：不等待卡住的任务（wait=False），进程退出释放内存
         try:
             if self._extract_pool is not None:
@@ -2280,6 +2312,10 @@ class Collector:
 
         self._wlog(f"{tag} 仓库 {github_url} (分支: {branch}, "
               f"size: {size}KB, pushed: {pushed_at})")
+        # 08113：仓库大小分布统计（收尾输出，校准 SMALL_REPO_CLONE_MB 阈值）
+        if size is not None:
+            _bk = self._hist_bucket_mb(size / 1024)
+            self._repo_size_hist[_bk] = self._repo_size_hist.get(_bk, 0) + 1
 
         has_nodes_flag = [False]
         repo_stats = [0, 0]  # [extracted, added] 本仓库级统计
@@ -2300,15 +2336,9 @@ class Collector:
                         size_kb=size)
 
             if not success:
-                if CONTENTS_API_FALLBACK_ENABLED:
-                    self._wlog(f"树 API 失败，回退到 Contents API")
-                    try:
-                        self.process_file_tree(repo, "", branch, has_nodes_flag,
-                                               repo_stats, tag)
-                    except RuntimeError:
-                        raise
-                else:
-                    self._wlog(f"树 API 失败，放弃（Contents 已关闭）")
+                # 08113：去掉 Contents 回退（逐文件遍历是核心 API 配额黑洞），
+                # 直接放弃——分流后 tree 失败在 _collect_files 内部已回退 clone
+                self._wlog(f"树 API 失败，放弃（{repo}）")
         else:
             # USE_RECURSIVE_TREE=False 路径
             if CONTENTS_API_FALLBACK_ENABLED:
@@ -2557,59 +2587,64 @@ class Collector:
             size_kb: 仓库大小（KB，clone 统计用；-1 = 未知）。
 
         Returns:
-            True 表示处理成功，False 表示需要回退到 Contents API
+            True 表示处理完成（含失败放弃），False 表示处理失败
+            （08113：Contents 回退已移除——逐文件遍历是核心 API 配额黑洞）
         """
         if self.limiter.should_stop():
             raise RuntimeError("限流超限")
 
-        # ── Clone-First 模式：跳过树 API，直接 git clone 拿文件树（零核心 API）──
-        if CLONE_FIRST_MODE:
+        # ── 仓库大小分流（08113）──
+        # 小仓库（size < SMALL_REPO_CLONE_MB）→ partial clone 拿列表
+        # （连接少、零 API；小仓库元数据小，clone 快）。
+        # 大仓库（≥ 阈值）→ tree API 拿列表（大仓库 clone 元数据大，
+        # tree 响应可承受；且只下候选文件，不下载仓库内容）。
+        # 回退链：小 clone 失败 → tree；大 tree 失败/截断 → clone；
+        # 两者再失败 → 放弃 + 日志（去掉 Contents 回退——逐文件遍历
+        # 是核心 API 配额黑洞，08113 已确认放弃该路径）。
+        _small_repo = CLONE_FIRST_MODE and (
+            size_kb is None or size_kb < SMALL_REPO_CLONE_MB * 1024)
+
+        if _small_repo:
             entries = self._partial_clone_file_list(repo, branch, size_kb=size_kb)
             if entries is not None:
                 return self._process_file_list(repo, branch, entries,
                                                has_nodes, raw_depth, stats, tag)
-            # clone 失败 → 看 Contents 开关（默认关闭：放弃）
-            if CONTENTS_API_FALLBACK_ENABLED:
-                self._wlog(f"Clone-First clone 失败，回退到 Contents API")
-                return False
-            self._wlog(f"Clone-First clone 失败，放弃（Contents 已关闭）")
-            self._repos_by_result["clone_fail"].append(
-                f"https://github.com/{repo}")
-            return True  # 视为处理完成（无节点）
+            # 小仓库 clone 失败 → 回退 tree（小仓库 tree 响应小，API 成本低）
+            self._wlog(f"小仓库 clone 失败，回退 tree API（{repo}）")
 
         tree_url = f"https://api.github.com/repos/{repo}/git/trees/{branch}?recursive=1"
         resp = self.http.get(tree_url, timeout=TREE_API_TIMEOUT,
                              operation_name="递归树")
         if not resp:
+            # 大仓库 tree 失败（网络错误）→ 回退 partial clone
+            if CLONE_FIRST_MODE:
+                self._wlog(f"tree API 失败，回退 partial clone（{repo}）")
+                entries = self._partial_clone_file_list(repo, branch, size_kb=size_kb)
+                if entries is not None:
+                    return self._process_file_list(repo, branch, entries,
+                                                   has_nodes, raw_depth, stats, tag)
+                self._wlog(f"tree + clone 均失败，放弃（{repo}）")
+                self._repos_by_result["clone_fail"].append(
+                    f"https://github.com/{repo}")
+                return True  # 视为处理完成（无节点）
             return False
 
         data = resp.json()
         if data.get('truncated', False):
-            if PARTIAL_CLONE_ENABLED:
-                self._wlog(f"树数据被截断，尝试 Partial Clone 获取完整文件树")
+            # tree 截断（超大仓库树响应过大）→ 回退 partial clone
+            if CLONE_FIRST_MODE:
+                self._wlog(f"树数据被截断，回退 partial clone（{repo}）")
                 entries = self._partial_clone_file_list(repo, branch, size_kb=size_kb)
                 if entries is not None:
-                    # entries 与 tree API 格式相同，走共用过滤逻辑
                     return self._process_file_list(repo, branch, entries,
                                                    has_nodes, raw_depth, stats, tag)
-                # clone 失败 → 看 Contents 开关
-                if CONTENTS_API_FALLBACK_ENABLED:
-                    self._wlog(f"Partial Clone 失败，回退到 Contents API")
-                    return False
-                # 默认关闭：放弃（大仓库 Contents 遍历是配额黑洞）
-                self._wlog(f"Partial Clone 失败，放弃（Contents 已关闭）")
+                self._wlog(f"tree（截断）+ clone 均失败，放弃（{repo}）")
                 self._repos_by_result["clone_fail"].append(
                     f"https://github.com/{repo}")
                 return True  # 视为处理完成（无节点）
             else:
-                self._wlog(f"树数据被截断（Partial Clone 关闭），放弃")
+                self._wlog(f"树数据被截断（clone 关闭），放弃（{repo}）")
                 return True
-        entries = data.get('tree', [])
-        if not entries:
-            return True
-        return self._process_file_list(repo, branch, entries, has_nodes,
-                                       raw_depth, stats, tag)
-
         entries = data.get('tree', [])
         if not entries:
             return True
@@ -2693,6 +2728,9 @@ class Collector:
 
         self._wlog(f"仓库 https://github.com/{repo} "
               f"候选文件 {len(files_to_check)} 个")
+        # 08113：候选文件数分布统计（收尾输出，校准分流阈值用）
+        _ck = self._hist_bucket_count(len(files_to_check))
+        self._candidate_hist[_ck] = self._candidate_hist.get(_ck, 0) + 1
 
         # ---- 并行下载处理 ----
         # 小量文件串行（省线程开销），大量文件用线程池并发下载
@@ -3087,6 +3125,51 @@ class Collector:
         with self._state_lock:
             return max(self._parsing_sizes, default=0.0)
 
+    # ---- 08113：全局连接速率节流 + 分布统计 ----
+
+    def _dl_rate_wait(self):
+        """全局 raw 下载连接速率节流：1 秒滑动窗口内最多
+        MAX_DOWNLOAD_CONNECTS_PER_SEC 个新连接（08113：36 连接/s 触发
+        CDN 慢速限速；封顶 10/s）。
+
+        必须全局共享（锁 + 时间戳列表）——不能用"每线程 sleep 间隔"：
+        并发完成时各线程独立 sleep 不节流（实测会失效）。
+        """
+        while True:
+            with self._dl_gap_lock:
+                now = time.time()
+                self._dl_gap_times = [
+                    t for t in self._dl_gap_times if now - t < 1.0]
+                if len(self._dl_gap_times) < MAX_DOWNLOAD_CONNECTS_PER_SEC:
+                    self._dl_gap_times.append(now)
+                    return
+            time.sleep(0.05)
+
+    @staticmethod
+    def _hist_bucket_count(n: int) -> str:
+        """候选文件数分桶：<200 每 10 一段；<1000 每 100 一段；≥1000 每 1000 一段。"""
+        if n < 200:
+            lo = n // 10 * 10
+            return f"{lo}-{lo + 9}"
+        if n < 1000:
+            lo = n // 100 * 100
+            return f"{lo}-{lo + 99}"
+        lo = n // 1000 * 1000
+        return f"{lo}-{lo + 999}"
+
+    @staticmethod
+    def _hist_bucket_mb(mb: float) -> str:
+        """仓库大小分桶（MB）：<200 每 10MB；<1000 每 100MB；≥1000 每 1000MB。"""
+        n = int(mb)
+        if n < 200:
+            lo = n // 10 * 10
+            return f"{lo}-{lo + 9}MB"
+        if n < 1000:
+            lo = n // 100 * 100
+            return f"{lo}-{lo + 99}MB"
+        lo = n // 1000 * 1000
+        return f"{lo}-{lo + 999}MB"
+
     def _handle_one_file(self, repo: str, branch: str, file_path: str,
                          sha: str, has_nodes: List[bool], raw_depth: int,
                          stats: List[int] = None, tag: str = "[种子仓库]",
@@ -3118,6 +3201,7 @@ class Collector:
         #    不再永久阻塞，超时放弃本次下载并打日志；
         # 2) release 与 acquire 严格配对（此前退避窗口 acquire 2 次只
         #    release 1 次 → 64 许可泄漏耗尽 → 全 worker 卡死 2 小时）。
+        self._dl_rate_wait()  # 08113：全局连接速率节流（≤10 新连接/s）
         _dl_locks = 2 if self._download_throttled_until > time.time() else 1
         _dl_got = 0
         while _dl_got < _dl_locks:

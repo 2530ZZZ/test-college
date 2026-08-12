@@ -54,7 +54,12 @@ class HttpClient:
         api_gate=None,
         pool_connections: int = 10,
         pool_maxsize: int = 10,
-        user_agent: str = "Mozilla/5.0 (compatible; FreeNodesCollector/5.0)",
+        # 08113：浏览器 UA——原 "FreeNodesCollector" 是爬虫标识，raw CDN
+        # 反爬检测（IP/UA/流量模型多层判定）直接命中 UA 层被限速。
+        # API 请求有 token 认证不受 UA 影响；raw 无认证只能靠 UA 伪装。
+        user_agent: str = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                           "Chrome/126.0.0.0 Safari/537.36"),
     ):
         self.token = token or GITHUB_TOKEN
         self.limiter = rate_limiter or RateLimiter()
@@ -179,17 +184,23 @@ class HttpClient:
 
     @property
     def headers(self) -> Dict[str, str]:
-        """构建请求头。
+        """API 请求头（api.github.com）：含 Authorization + User-Agent。
 
         每次访问动态生成，确保 token 变化后自动更新。
-
-        Returns:
-            包含 Authorization 和 User-Agent 的请求头字典
         """
         h = {"User-Agent": self.user_agent}
         if self.token:
             h["Authorization"] = f"token {self.token}"
         return h
+
+    @property
+    def raw_headers(self) -> Dict[str, str]:
+        """raw.githubusercontent.com 请求头（08113：不带 Authorization）。
+
+        raw 域名不支持认证头，社区实测携带 Authorization 的 raw 请求
+        会被反爬特殊对待（触发 429/限流）——raw 下载只能靠 UA 伪装。
+        """
+        return {"User-Agent": self.user_agent}
 
     def get(
         self,
@@ -398,7 +409,9 @@ class HttpClient:
         total = 0
         last_data = t0
         try:
-            with self.session.get(url, headers=self.headers,
+            # 08113：raw_headers（无 Authorization）——raw 域名不支持认证，
+            # 带 token 反而触发反爬
+            with self.session.get(url, headers=self.raw_headers,
                                   timeout=timeout, stream=True) as resp:
                 if resp.status_code != 200:
                     if resp.status_code == 404:
