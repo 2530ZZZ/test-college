@@ -427,8 +427,10 @@ class HttpClient:
             return None, "timeout"
         except requests.exceptions.ConnectionError:
             return None, "connect"
-        except Exception:
-            return None, "error"
+        except Exception as e:
+            # 08132：error 带具体异常名（如 error:SSLError）——监控失败
+            # 分类可追溯；此类通用异常不计入降级信号（非限流特征）
+            return None, f"error:{type(e).__name__}"
         content = b"".join(chunks) if chunks else None
         if content:
             # 08121：raw 下载统计（原在 get() 里，但 raw 下载走本方法不走
@@ -479,6 +481,8 @@ class HttpClient:
         reset_time = resp.headers.get("X-RateLimit-Reset")
         if reset_time:
             try:
+                # +5 秒余量：GitHub 与本地时钟可能有秒级偏差，
+                # 提前恢复会立刻撞上未重置的配额 → 403 风暴
                 wait_seconds = max(0, int(reset_time) - int(time.time()) + 5)
                 return wait_seconds
             except (ValueError, TypeError):

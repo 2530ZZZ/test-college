@@ -16,6 +16,15 @@ URI 协议解析层 — 将原始代理链接解析为 StandardProxy 对象。
   3. 不依赖网络请求，纯本地 CPU 操作。
   4. 每个函数可独立测试、独立优化。
 
+设计背景：
+  - 协议解析器注册表（PARSER_REGISTRY + @register）：新增协议 = 新增一个
+    函数 + 一个装饰器，validate_candidate 按 scheme 分发，无需改分发逻辑。
+  - 容错基调：全网数据格式千奇百怪（乱码、截断、嵌套 base64），解析器
+    只认"协议自身的语法边界"，其余一律宽松处理——宁可放过一个可疑节点，
+    也不误杀一个真节点（"解析节点是第一原则"的用户约定）。
+  - 参考实现：各协议字段映射的设计参考了 sing-box / v2rayN /
+    subconverter / mihomo 开源解析器（8 月 11 日的源码分析记录）。
+
 使用：
   from uri_parser import validate_candidate
   proxy = validate_candidate("vmess://eyJhZGQiOiIxLjIuMy40Iiw...")
@@ -55,6 +64,9 @@ _SPLIT_RE = re.compile(
 )
 
 # Base64 块（用于递归解码发现）
+# 长度下限 100：太短的"疑似 base64"基本是普通英文单词（如 "configuration"），
+# 误判会导致大量无效递归解码；上限 200000：防单块超大文本解码耗时失控。
+# 订阅文件整块 base64（聚合订阅常见）通常在 100-50 万字符之间，200k 可覆盖大部分。
 BASE64_BLOCK_RE = re.compile(r'[A-Za-z0-9+/=]{100,200000}')
 
 # 代码块
@@ -89,8 +101,10 @@ def discover_candidates(text: str, max_depth: int = 3) -> List[str]:
 
     # 1. URI scheme 直接扫描
     for m in URI_RE.finditer(text):
-        uri = m.group(0).rstrip(',;|')
+        uri = m.group(0).rstrip(',;|')  # 去掉末尾常见分隔符（列表格式的残留）
         uri = _trim_trailing_non_uri(uri)
+        # len>15 过滤：真实节点 URI 至少 ~20 字符（如 ss://xx@1.2.3.4:8388），
+        # 更短的基本是残缺片段/噪音，验证阶段也会拒掉，提前滤掉省一次验证
         if uri not in seen and len(uri) > 15:
             seen.add(uri)
             candidates.append(uri)
@@ -142,6 +156,8 @@ def _trim_trailing_non_uri(uri: str) -> str:
     for scheme in _SUPPORTED_SCHEMES:
         # 查找 scheme:// 在 URI 中间出现的位置
         scheme_prefix = scheme + "://"
+        # 从 len(scheme_prefix) 处开始找：跳过 URI 开头的 scheme 自身
+        # （否则 find 会命中自己，永远截断在位置 0）
         idx = uri.find(scheme_prefix, len(scheme_prefix))
         if idx > 0:
             return uri[:idx].rstrip()
@@ -261,6 +277,8 @@ def parse_trojan(uri: str) -> Optional[StandardProxy]:
 
         password = unquote(parsed.username or "")
         server = parsed.hostname or ""
+        # 默认端口 443：trojan 协议惯例（TLS 默认端口），
+        # 大量分享链接省略端口，缺失时按 443 处理
         port = parsed.port or 443
         params = parse_qs(parsed.query)
 
@@ -274,6 +292,9 @@ def parse_trojan(uri: str) -> Optional[StandardProxy]:
 
         sni = _param("sni", server)
         transport = _param("type", "tcp")
+        # ⚠️ 注意：表达式末端的 `or True` 是刻意的——trojan 协议本质上
+        # 必须走 TLS（明文 trojan 无意义），这里写死恒为 True。
+        # 不要"优化"掉它：看似是冗余判断，实为协议约束的显式声明。
         tls_enabled = _param("security", "") == "tls" or sni != server or True
         allow_insecure = _param("allowInsecure", "0") == "1"
 
@@ -410,7 +431,7 @@ def parse_ss(uri: str) -> Optional[StandardProxy]:
                 port = int(port_str)
             else:
                 server = server_part
-                port = 8388  # SS 默认端口
+                port = 8388  # SS 默认端口（Shadowsocks 官方惯例默认值）
         else:
             # 整个 payload 是 Base64（旧版格式）
             decoded = _safe_b64_decode(payload)
@@ -431,7 +452,9 @@ def parse_ss(uri: str) -> Optional[StandardProxy]:
                     server = server_part
                     port = 8388
             elif ":" in decoded:
-                # 可能是 server:port:method:password
+                # 可能是 server:port:method:password（旧版 SIP002 变体）
+                # password 用 ":".join 重组：SS 密码本身可能含冒号，
+                # 不能只取 parts[3]
                 parts = decoded.split(":")
                 if len(parts) >= 4:
                     server = parts[0]
@@ -691,6 +714,8 @@ def validate_candidate(candidate: str) -> Optional[StandardProxy]:
     if not candidate or "://" not in candidate:
         return None
 
+    # 按 scheme 分发到注册的协议解析器；未注册的 scheme（如
+    # http://、https:// 的普通链接）直接返回 None——它们不是代理节点
     scheme = candidate.split("://", 1)[0].lower()
     parser = PARSER_REGISTRY.get(scheme)
     if not parser:

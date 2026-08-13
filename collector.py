@@ -10,6 +10,24 @@ GitHub 节点收集器 — 使用 git/trees API 获取递归文件树，
   - 集成 uri_parser 协议解析层
   - 边搜集边持久化分批写入
   - 全局去重（server, port, protocol）
+
+【当前架构总览】（截至 08131，详见 docs/DESIGN.md）
+  数据流：搜索（种子/关键词/Code）→ 仓库入主队列 → 72 个 worker 消费 →
+  process_repo 前置判断（补信息/语言/缓存/size/年龄，零 API）→ size 分流
+  （<50MB partial clone / ≥50MB tree+commits 增量）→ raw 下载（连接节流
+  30/s + 并发信号量 96 + 0字节30s快速放弃）→ 解析（>1MB 进程池 2 进程，
+  其余线程，内存预算 2GB）→ 批次内去重写 batches/ 分片 → 收尾全量去重
+  → no_his/（7 天窗口）+ no/ 分片 → git push → 下游 subs-check 测速。
+
+  关键机制（都有对应事故记录，改动前必读 docs/DESIGN.md）：
+  - 队列：主队列 200 + 发现队列 20000（PriorityQueue），阈值调度
+    （disc≥19000 强制消费 / ≤1000 允许取主队列），源头 Semaphore 限并发
+  - 配额：QuotaManager 4800/h，UTC 整点对齐窗口，acquire 原子化防超发，
+    wait_for_reset 等整点（403-only 设置 reset_time，防"闹钟拨快"睡死）
+  - 追踪：标志位 [userN]/[forkN]/[rawN]/[kwN]/[cdN] 与层数解耦
+    （_should_trace = 层数 < MAX_TRACE_DEPTH），TRACE_RETRY_DAYS=30 重追踪
+  - 监控：60s 监控块（配额耗尽+60s 无日志降频 10min），log_sink 双队列
+    高优先级通道防盲区，内存>80% faulthandler 转储一次
 """
 
 import os
@@ -2088,6 +2106,10 @@ class Collector:
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
 
+        ⚠️ 遗留接口：当前主流程（run → _collect_keywords）已改用
+        _search_query_to_queue（主线程纯供应入队），本方法仅为兼容旧
+        调用保留（直接串行处理仓库，不经队列/worker 池）。
+
         Args:
             query: GitHub 搜索查询字符串
         """
@@ -3152,9 +3174,14 @@ class Collector:
         """近 60s raw 下载失败分类汇总（08131：监控块显示，替代独立打印）。
 
         分类：404 / 4xx / 5xx / 连接错误(connect) / 超时(timeout) /
-        无数据(idle) / 超总时长(max_total) / 其他。无失败时返回空串
-        （含尾随 "| " 便于监控行拼接）。
+        无数据(idle) / 超总时长(max_total) / error:异常名（具体异常，
+        08132：可追溯）。无失败时返回空串（含尾随 "| " 便于拼接）。
+        08132 修复：每次调用清理 60s 窗口——失败停止后旧条目滑出，
+        不再恒定显示过期数据。
         """
+        _now = time.time()
+        self._raw_fail_times = deque(
+            (t, r) for t, r in self._raw_fail_times if _now - t <= 60)
         cats = {}
         for _t, _r in self._raw_fail_times:
             if _r.startswith("HTTP 404"):
@@ -3171,12 +3198,16 @@ class Collector:
                 k = "无数据"
             elif _r == "max_total":
                 k = "超总时长"
+            elif _r.startswith("error:"):
+                k = _r[6:]  # 具体异常名（如 SSLError）
             else:
                 k = "其他"
             cats[k] = cats.get(k, 0) + 1
         if not cats:
             return ""
-        _order = ["404", "4xx", "5xx", "连接错误", "超时", "无数据", "超总时长", "其他"]
+        _order = ["404", "4xx", "5xx", "连接错误", "超时", "无数据",
+                  "超总时长", "SSLError", "ChunkedEncodingError",
+                  "ConnectionError", "其他"]
         return ("失败60s: "
                 + " ".join(f"{k}x{cats[k]}" for k in _order if k in cats)
                 + " | ")
@@ -3285,10 +3316,11 @@ class Collector:
         if content_bytes is None:
             # 08131：失败记录 (time, reason) 到 60s 窗口——分类计数（监控块
             # 显示）+ 降级信号共用。降级信号 = 网络类失败（timeout/idle/
-            # max_total/5xx/error）近 60s ≥ DOWNLOAD_STALL_THRESHOLD →
-            # 连接速率减半 60s（_dl_rate_wait 内生效）。
+            # max_total/5xx）近 60s ≥ DOWNLOAD_STALL_THRESHOLD → 连接速率
+            # 减半 60s（_dl_rate_wait 内生效）。
             # 排除：404/4xx（文件不存在）、connect（连接池/本地连接问题，
-            # 08131 的 20:12 爆发 59 次——不是"速率过快"，不应触发降级）。
+            # 08131 的 20:12 爆发 59 次）、error:*（通用异常，08132 的
+            # 30 个偶发 error 误触发降级）——都不是"速率过快"，不触发。
             # 触发不再单独打日志——监控块"下载"行显示降级状态（剩 Ns）。
             _now = time.time()
             self._raw_fail_times.append((_now, dl_fail_reason))
@@ -3297,7 +3329,7 @@ class Collector:
                 self._raw_fail_times.popleft()
             _net_fails = sum(
                 1 for _t, _r in self._raw_fail_times
-                if _r in ("timeout", "idle", "max_total", "error")
+                if _r in ("timeout", "idle", "max_total")
                 or _r.startswith("HTTP 5"))
             if (self._download_throttled_until <= _now
                     and _net_fails >= DOWNLOAD_STALL_THRESHOLD):
@@ -3492,6 +3524,10 @@ class Collector:
             self._discover_recursive(raw_url, content, raw_depth, tag)
 
         # ---- 订阅链接自动发现（零 API 配额：raw HTTP，非 GitHub） ----
+        # 从已下载文件中嗅探第三方订阅链接（域名含 sub/subscribe/token
+        # 等关键词，路径特征匹配），拉取后同样提取节点。
+        # _black 黑名单：排除知名站点（google/apple/facebook...）——它们的
+        # 链接里常出现这些词但绝不是订阅源，白跑一趟浪费连接。
         _sub_urls = set()
         for _m in re.finditer(
             r'(?:https?://)'
@@ -3547,6 +3583,8 @@ class Collector:
             r'https://raw\.githubusercontent\.com/([^/]+/[^/]+)/([^/]+)/([^\s"\'`#]+)'
         )
         # 模式 2：GitHub 仓库链接
+        # 负向前瞻排除 /blob/、/tree/、/raw/ 等文件页路径——那些是文件
+        # 内嵌的代码链接不是仓库页，抓取它们没有递归价值
         repo_pattern = re.compile(
             r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
             r'(?!/blob/|/tree/|/raw/|/issues|/pull|/releases|/wiki)'
@@ -3756,6 +3794,11 @@ class Collector:
         """回退路径：使用 Contents API 逐层遍历目录。
 
         仅在递归树 API 失败时使用。对每个文件/目录单独发请求。
+
+        ⚠️ 配额黑洞：每目录 1 次核心 API，大仓库（上万目录）能把
+        4800/h 配额吃光——因此入口由 CONTENTS_API_FALLBACK_ENABLED
+        （默认 False）控制，tree + clone 都失败时直接放弃该仓库，
+        不再走到这里（08113 决策，见 docs/DESIGN.md 决策 20）。
 
         Args:
             stats: [extracted, added] 本仓库级统计累加。

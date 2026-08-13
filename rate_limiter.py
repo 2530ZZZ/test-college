@@ -39,7 +39,9 @@ class RateLimiter:
 
         Args:
             max_wait: 最大允许累计等待秒数。
-                      默认使用 config.MAX_TOTAL_RATE_LIMIT_WAIT (600)。
+                      默认使用 config.MAX_TOTAL_RATE_LIMIT_WAIT（当前 7200，
+                      配额耗尽场景由 quota_manager.wait_for_reset 接管，
+                      本类累计等待上限主要兜底 403 处理路径，§1）。
                       设为 0 相当于关闭限流保护（不推荐）。
         """
         self.max_wait = max_wait if max_wait is not None else MAX_TOTAL_RATE_LIMIT_WAIT

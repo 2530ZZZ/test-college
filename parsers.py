@@ -10,6 +10,16 @@
   1. 每个提取策略一个独立函数，可单独测试
   2. 直接产出 StandardProxy 列表（已解析、已验证）
   3. 不处理 URI（交给 uri_parser.py）
+
+设计背景（多级兜底哲学）：
+  - 全网配置格式没有标准可依：同一份 Clash 配置可能是标准 YAML、
+    压缩单行 flow、JSON 数组、甚至带语法错误的残缺块。每个格式的
+    提取函数内部按"最可靠 → 最宽松"的次序逐级尝试，前一级失败
+    才进下一级（yaml.safe_load 失败 → 正则兜底 → 逐行解析）。
+  - 代价权衡：误杀一个节点 = 永久丢失一个可用节点；误收一个噪音
+    会在后续去重/测速被滤掉。所以宁多勿漏（"解析节点是第一原则"）。
+  - 参考实现：Clash / Sing-box / Surge 各生态的字段语义参考了
+    sing-box / v2rayN / subconverter / mihomo 开源解析器分析记录。
 """
 
 import re
@@ -135,6 +145,8 @@ def extract_clash_yaml(text: str) -> List[StandardProxy]:
                         if key not in seen:
                             seen.add(key)
                             proxies.append(proxy)
+        # 整块 YAML 解析成功（产出节点）就短路返回：yaml.safe_load 是
+        # 最可靠的路径，正则策略只是它的兜底，不重复执行
         if proxies:
             return proxies
     except ImportError:
@@ -354,6 +366,8 @@ def extract_surge_format(text: str) -> List[StandardProxy]:
             continue
 
         uuid = ""
+        # Surge 参数后半段是凭据/选项混排（uuid、password、tls=true、sni=xx...），
+        # 没有标准顺序——取第一个"不是选项"的参数当凭据（tls=/sni= 前缀是选项）
         for arg in args[2:]:
             if arg and not arg.startswith("tls=") and not arg.startswith("sni="):
                 uuid = arg
@@ -452,6 +466,9 @@ def _walk_dict_for_proxies(doc: dict, proxies: List[StandardProxy],
         return
 
     # 查找代理数组
+    # 注意 'proxy-groups' 是 Clash 策略组（url-test/load-balance 等），
+    # 不是节点——但 dict_to_standard_proxy 要求 type 在 supported 集合里，
+    # 策略组的 type 永远不在其中，会返回 None，天然被过滤，不会误收
     for key in ('proxies', 'outbounds', 'proxy-groups'):
         if key in doc and isinstance(doc[key], list):
             for item in doc[key]:
@@ -489,6 +506,10 @@ def extract_all_strategies(text: str, max_depth: int = 3) -> List[StandardProxy]
         StandardProxy 列表（当前文本内已去重）
     """
     # 文件大小限制：默认 100MB。超大文件跳过避免 OOM
+    # 注意与 config.MAX_FILE_SIZE=None 的关系（两个不同的层）：
+    #   MAX_FILE_SIZE=None  → 下载阶段不设上限（100MB 节点文件正常下载）
+    #   此处的 100MB 兜底    → 解析阶段防 OOM（10+ 正则策略×超大文本会爆内存）
+    # 即"下载不限制、解析兜底限制"，两者不矛盾
     from config import MAX_FILE_SIZE
     limit = MAX_FILE_SIZE or 100_000_000
     if not text or len(text) > limit:

@@ -6,6 +6,12 @@
   → 边搜集边持久化 → 输出 alive.txt
 
 所有日志同时输出到控制台和 log/ 文件夹。
+
+运行环境：GitHub Actions（Linux，2 核，单次 6 小时上限），也可本机运行。
+本入口只负责：日志 Tee、搜索关键词构建、信号处理、启动 Collector。
+队列调度 / 下载 / 解析 / 收尾去重等全部逻辑在 collector.py 中。
+文件头 docstring 中"输出 alive.txt"为早期版本描述，当前实际输出
+由 collector 收尾阶段写入 no.txt / no/ 分片（详见 docs/DESIGN.md）。
 """
 
 import os
@@ -27,6 +33,9 @@ from config import (
 # ==================== 日志持久化 ====================
 
 os.makedirs(LOG_DIR, exist_ok=True)
+# 文件名用 UTC 时间（与 GA 控制台时间戳同源，便于对账下载日志），
+# 而日志内容时间戳用北京时间（now_str()）——两者相差 8 小时，
+# 分析时勿混用（曾把 UTC 当北京时间导致运行状态误判，见 docs/DESIGN.md 踩坑 27）
 log_filename = f"collect_{datetime.now(timezone.utc).strftime('%Y-%m-%d_%H-%M-%S')}.log"
 log_path = os.path.join(LOG_DIR, log_filename)
 
@@ -38,6 +47,8 @@ class Tee:
         self.stream = stream
 
     def write(self, data):
+        # 每次写入都立即 flush：GA 的日志管道有缓冲，进程随时可能被
+        # 强杀/取消（SIGKILL 不触发任何收尾），不逐行刷出会丢最后一段日志
         self.file.write(data)
         self.file.flush()
         self.stream.write(data)
@@ -61,6 +72,9 @@ existing_logs = sorted(
     glob.glob(os.path.join(LOG_DIR, "collect_*.log")),
     key=os.path.getctime
 )
+# 只保留最近 MAX_LOG_FILES 个日志：每轮运行都生成一个 log 文件，
+# 长期不清理会膨胀（曾把 66MB 日志误提交进 GA 仓库，见 docs/DESIGN.md）；
+# 按创建时间逐个删最老的
 while len(existing_logs) > MAX_LOG_FILES:
     os.remove(existing_logs[0])
     existing_logs.pop(0)
@@ -71,6 +85,9 @@ while len(existing_logs) > MAX_LOG_FILES:
 def build_queries():
     """动态构建搜索关键词列表。"""
     utc_now = datetime.now(timezone.utc)
+    # pushed:>24h —— 与 SKIP_PROCESSING_AGE_HOURS=24 保持一致的唯一年龄阈值
+    # （历史上曾用 168h，是黑名单机制的配套遗留，黑名单删除后 168h 分支
+    #  同步废弃，统一为 24h，见 docs/DESIGN.md 决策 33）
     time_limit = (utc_now - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')
     time_suffix = f"pushed:>{time_limit}"
     queries = []

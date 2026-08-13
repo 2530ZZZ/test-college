@@ -139,7 +139,12 @@ class ApiRateGate:
             return True
 
     def _prune(self, now: float):
-        """弹出 60 秒前的记录（O(1) 摊销）。"""
+        """弹出 60 秒前的记录（O(1) 摊销）。
+
+        双计数结构：_window（全量时间序列，用于全局速率）与
+        _by_type（端点计数，用于端点级限速）必须同步增删；
+        max(0, ...) 防负数——防御性写法，正常流程不会为负。
+        """
         while self._window and self._window[0][0] < now - 60:
             _, etype = self._window.popleft()
             self._by_type[etype] = max(0, self._by_type.get(etype, 0) - 1)

@@ -214,6 +214,9 @@ class QuotaManager:
 
     def set_reset_time(self, reset_timestamp: int):
         """记录 GitHub API 返回的 X-RateLimit-Reset 时间戳。"""
+        # 只增不减：多个 worker 并发上报，取"最晚的重置时间"为权威——
+        # 若允许被更早的值覆盖，等待中的 worker 可能提前恢复触发 403
+        # （与 http_client 中"200 响应不调用本方法"配合，见 08081 事故）
         if reset_timestamp > self._reset_time:
             self._reset_time = reset_timestamp
 
@@ -281,6 +284,8 @@ class QuotaManager:
                     wait = max(0, self._reset_time - time.time()) + 2
                 else:
                     wait = 3600 - (time.time() - self.window_start) + 10
+            # 30 秒轮询上限：等待期间不空睡（每 30s 检查一次恢复/停止信号），
+            # 也不高频轮询（避免无谓 CPU 与日志噪音）
             sleep_sec = min(30, wait)
             if sleep_sec > 0:
                 time.sleep(sleep_sec)

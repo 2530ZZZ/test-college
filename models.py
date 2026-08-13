@@ -5,6 +5,17 @@
 后续的测速、过滤、输出等模块都基于 StandardProxy 工作。
 
 去重 key 生成逻辑集中在此模块，确保全局一致。
+
+设计背景：
+- 协议字段统一映射：vmess/vless/trojan/ss/ssr/hysteria2/tuic 各协议的
+  字段命名（uuid/password/cipher/method...）统一归并到同一组属性，
+  解析层输出一份标准模型，消费方（去重/输出/下游测速）只认这一种结构。
+- CLASH_FIELD_MAP / SINGBOX_FIELD_MAP 的字段差异来自 Clash 与 Sing-box
+  两种生态的命名习惯，映射设计参考了 sing-box / v2rayN / subconverter /
+  mihomo 开源解析器的实现（详见 docs/DESIGN.md 与 8 月 11 日解析器源码分析）。
+- 层级区分：本模块的 dedup_key() 是"字段级去重"（解析/收集阶段用）；
+  最终输出文件 no/ 的去重键是完整 URI 字符串（finalize.py 实现），
+  两者层级不同，勿混淆（见 docs/DESIGN.md 决策 43）。
 """
 
 from dataclasses import dataclass, field
@@ -83,6 +94,11 @@ class StandardProxy:
         """生成完全一致性的标识 key。
 
         server + port + protocol + uuid → 用于判断两个节点是否完全相同。
+
+        与 dedup_key 的区别：dedup_key 是"宽泛去重"（同服同端口同协议
+        即视为重复，用于收集阶段去重），identity_key 是"严格相等"
+        （还比较 uuid，驱动 __hash__/__eq__，用于判断同一节点不同
+        来源/格式的表示是否真的是同一个）。
         """
         return (self.server, self.port, self.protocol, self.uuid)
 
@@ -142,6 +158,9 @@ class StandardProxy:
 
         if p == "vmess":
             # vmess://base64(json)
+            # "v": "2" 是 vmess 协议固定版本号（标准分享格式即版本 2）；
+            # aid=0 是 alterId 的默认值——绝大多数服务端默认 0，
+            # 逐节点探测实际 alterId 不现实，统一取兼容性最好的默认
             obj = {"v": "2", "ps": self.remark, "add": self.server,
                    "port": self.port, "id": self.uuid, "aid": 0,
                    "scy": self.security or "auto", "net": self.transport,
@@ -153,6 +172,8 @@ class StandardProxy:
 
         if p == "ss":
             # ss://base64(method:password)@server:port#remark
+            # 默认 aes-256-gcm：原链接未带加密方法（security 为空）时的兜底，
+            # 选主流客户端兼容性最好的现代加密
             creds = base64.b64encode(
                 f"{self.security or 'aes-256-gcm'}:{self.uuid}".encode()
             ).decode().rstrip("=")
@@ -160,6 +181,9 @@ class StandardProxy:
 
         if p == "ssr":
             # ssr://base64(...)
+            # SSR 标准格式的字段顺序固定：host:port:protocol:method:obfs:密码(base64)
+            # protocol/obfs 缺失时取默认 origin/plain（SSR 最通用的配置），
+            # 加密默认 aes-256-cfb（SSR 客户端默认值）
             from urllib.parse import quote as q
             body = f"{self.server}:{self.port}:{self.extra.get('ssr_protocol','origin')}:{self.security or 'aes-256-cfb'}:{self.extra.get('ssr_obfs','plain')}:{base64.b64encode(self.uuid.encode()).decode()}"
             params = f"?obfsparam={q(self.extra.get('obfsparam',''),safe='')}&remarks={q(self.remark,safe='')}"
@@ -173,7 +197,7 @@ class StandardProxy:
         if self.transport != "tcp":
             params.append(f"type={quote(str(self.transport), safe='')}")
         if self.security and p in ("ss",):
-            pass  # handled above
+            pass  # 遗留分支：ss 已在上面单独处理，此判断不产生任何效果（保留不删）
         query = "&".join(params)
         query_str = f"?{query}" if query else ""
 
@@ -284,6 +308,9 @@ def dict_to_standard_proxy(d: dict, field_map: dict = None) -> Optional[Standard
             remark=d.get("name") or d.get("tag", ""),
             security=d.get("cipher") or d.get("method", ""),
             transport=d.get("network") or d.get("transport", "tcp"),
+            # 注意：若上游 YAML 未经类型转换，tls 可能是字符串 "true"/"false"，
+            # bool("false") == True 会误判开启 TLS——调用方（parsers.py）
+            # 需保证传入布尔值；此处保持直接转换以兼容既有调用路径
             tls=bool(d.get("tls", False)),
             sni=d.get("sni") or d.get("servername") or d.get("server_name", ""),
             allow_insecure=bool(d.get("skip-cert-verify", False)),

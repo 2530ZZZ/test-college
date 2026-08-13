@@ -15,6 +15,9 @@ from typing import Optional
 # ==================== 时间与日志 ====================
 
 # 北京时区（UTC+8），用于日志输出
+# 日志内容统一用北京时间（用户阅读习惯）；但 GA 控制台时间戳是 UTC，
+# 日志文件名也用 UTC（main.py）——分析对账时注意三者差 8 小时，
+# 曾因混用时区导致运行状态误判（见 docs/DESIGN.md 踩坑 27）
 _BEIJING_TZ = timezone(timedelta(hours=8))
 
 
@@ -63,6 +66,8 @@ def safe_base64_decode(s: str) -> Optional[str]:
     if padding:
         s += '=' * (4 - padding)
     try:
+        # errors='replace'：节点分享链接里偶发非 UTF-8 字节（乱码 remark 等），
+        # 用替换符而不是抛异常——一个坏节点不拖垮整批解析
         return base64.b64decode(s, validate=False).decode('utf-8', errors='replace')
     except Exception:
         return None
@@ -76,8 +81,12 @@ def timeout_decorator(seconds: int):
     ⚠️ 重要限制：
       - 仅在 Linux/macOS 上可用（Windows 无 SIGALRM）
       - 不能嵌套使用（signal 不可重入）
-      - 不能在 ThreadPoolExecutor 线程中使用
+      - 不能在 ThreadPoolExecutor 线程中使用（alarm 只能作用于主线程）
       - 如果 seconds 为 None 或 <= 0，则不应用超时
+
+    本项目在 GA（Linux）主线程场景下可用；线程/线程池内的超时一律改用
+    ThreadPoolExecutor + future.result(timeout)（决策记录见 docs/DESIGN.md 决策 7：
+    单个文件正则卡死不能拖整体，FILE_PROCESS_TIMEOUT=120s 即用该方案实现）。
 
     推荐替代方案：对于需要跨平台超时的场景，使用 ThreadPoolExecutor + future.result(timeout)。
 
@@ -148,6 +157,9 @@ def parse_host_port(node_str: str) -> Tuple[Optional[str], Optional[int]]:
         else:
             # ss://base64 或 vmess://base64（以 base64 起始，不包含 @）
             # 尝试 URL 解码
+            # 注意：纯 base64 形式（如 vmess://eyJhZGQiOi...）host/port 藏在
+            # base64 载荷里，urlparse 解析不出来，此时返回 (None, None)，
+            # 由调用方决定放行还是丢弃（tcp_prescreen 选择放行）
             parsed = urllib.parse.urlparse(node_str)
             if parsed.hostname and parsed.port:
                 return parsed.hostname, parsed.port
@@ -203,7 +215,10 @@ def tcp_prescreen(node_list: List[str], timeout: float = 2.0,
             if host and port:
                 tasks[executor.submit(tcp_check, host, port, timeout)] = node
             else:
-                alive.append(node)  # 无法解析的节点默认放行
+                # 无法解析的节点默认放行（宁可放过不可误杀——与
+                # "解析节点是第一原则"的用户约定一致；预筛选的职责
+                # 只是砍掉明显不可达的，不承担精确过滤）
+                alive.append(node)
 
         for future in as_completed(tasks):
             node = tasks[future]
