@@ -284,8 +284,10 @@ class Collector:
         self._download_sem = threading.Semaphore(MAX_DOWNLOAD_CONCURRENCY)
         # 08112：失败计数改 60s 窗口统计（原共享计数被 288 线程共用 →
         # 2 秒刷屏 12 次退避 + 窗口续期 + 信号量泄漏 → 全 worker 卡死 2h）
-        self._download_fail_times = deque()            # 近 60s 下载失败时间戳
-        self._download_throttled_until = 0.0           # 限流退避截止时间（期间并发减半）
+        # 08131：改为 (time, reason) 元组——分类计数（监控块显示）+ 降级
+        # 信号（网络类失败 ≥ 阈值）共用同一窗口
+        self._raw_fail_times = deque()                 # 近 60s raw 下载失败 [(time, reason)]
+        self._download_throttled_until = 0.0           # 限流降级截止时间（期间速率减半）
         self._pending_downloads = 0                    # 待下载文件数（监控）
         self._pending_download_bytes = 0               # 待下载文件总字节（监控）
         # ── 08113：全局连接速率节流（1s 窗口 ≤10 个新下载连接）──
@@ -830,6 +832,13 @@ class Collector:
                 # 08121：监控行重排——下载/解析/API 分行，名称直白，同类合并
                 _dl_waiting = max(0, self._pending_downloads - self._downloading_active)
                 _pool_total = self._pool_big_running + self._pool_small_running
+                # 08131：raw 下载失败分类（60s 窗口）+ 降级状态（触发不打日志，
+                # 监控行直接显示）
+                _dl_fail_txt = self._raw_fail_summary()
+                if self._download_throttled_until > now:
+                    _dl_fail_txt += (
+                        f"降级{MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC // 2}/s"
+                        f"(剩{max(0, self._download_throttled_until - now):.0f}s) | ")
                 lines = [
                     f"📊 [{_now_dt.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
                     f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
@@ -838,11 +847,11 @@ class Collector:
                     f"磁盘: {disk_free_gb:.1f}/{disk_total_gb:.0f}GB 可用",
                     f"   网络: 60s下载 {net['total_mb']/1024:.2f}GB | "
                     f"平均 {net['avg_mb']:.2f}MB/s | 峰值 {net['peak_mb']:.2f}MB/s",
-                    f"   下载: 进行中 {self._downloading_active}/{MAX_DOWNLOAD_CONCURRENCY}"
+                    f"   raw下载: 进行中 {self._downloading_active}/{MAX_DOWNLOAD_CONCURRENCY}"
                     f"(空闲许可{self._download_sem._value}) | "
                     f"待下载 {self._pending_downloads}文件"
                     f"/{self._pending_download_bytes/1024/1024:.0f}MB"
-                    f"(等连接配额{_dl_waiting})",
+                    f"(等连接配额{_dl_waiting}) | {_dl_fail_txt}",
                     f"   解析: 进行中 {self._parsing_active}文件"
                     f"(最大{self._parsing_cur_max_mb():.0f}MB) | "
                     f"等解析名额 {self._parsing_waiting}文件"
@@ -1401,11 +1410,11 @@ class Collector:
         threading.Thread(target=self._monitor_loop, name="Monitor",
                          daemon=True).start()
 
-        # 阶段专用 http
+        # 阶段专用 http（08131：连接池用默认 128——72 worker + 96 并发
+        # 下载共享连接池，10/20 太小会在并发升高时报 HTTPSConnectionPool）
         http = HttpClient(token=self.token, rate_limiter=self.limiter,
                           quota_manager=self.quota_mgr,
-                          api_gate=self.api_gate,
-                          pool_connections=20, pool_maxsize=20)
+                          api_gate=self.api_gate)
         self.http = http
 
         # ═══════════════════════════════════════════
@@ -3139,6 +3148,39 @@ class Collector:
 
     # ---- 08113：全局连接速率节流 + 分布统计 ----
 
+    def _raw_fail_summary(self) -> str:
+        """近 60s raw 下载失败分类汇总（08131：监控块显示，替代独立打印）。
+
+        分类：404 / 4xx / 5xx / 连接错误(connect) / 超时(timeout) /
+        无数据(idle) / 超总时长(max_total) / 其他。无失败时返回空串
+        （含尾随 "| " 便于监控行拼接）。
+        """
+        cats = {}
+        for _t, _r in self._raw_fail_times:
+            if _r.startswith("HTTP 404"):
+                k = "404"
+            elif _r.startswith("HTTP 4"):
+                k = "4xx"
+            elif _r.startswith("HTTP 5"):
+                k = "5xx"
+            elif _r == "connect":
+                k = "连接错误"
+            elif _r == "timeout":
+                k = "超时"
+            elif _r == "idle":
+                k = "无数据"
+            elif _r == "max_total":
+                k = "超总时长"
+            else:
+                k = "其他"
+            cats[k] = cats.get(k, 0) + 1
+        if not cats:
+            return ""
+        _order = ["404", "4xx", "5xx", "连接错误", "超时", "无数据", "超总时长", "其他"]
+        return ("失败60s: "
+                + " ".join(f"{k}x{cats[k]}" for k in _order if k in cats)
+                + " | ")
+
     def _dl_rate_wait(self):
         """全局 raw 下载连接速率节流：1 秒滑动窗口内最多 N 个新连接。
 
@@ -3241,23 +3283,25 @@ class Collector:
             self._pending_download_bytes -= size
         _dl_s = time.time() - _dl_t0
         if content_bytes is None:
-            # 动态降级信号（08121）：近 60s 网络类下载失败 ≥ 阈值 →
-            # 连接速率减半 60s（_dl_rate_wait 内生效）。限速信号 = 网络类
-            # 失败（timeout/connect/idle/max_total/5xx）；404/4xx 是文件
-            # 不存在，不算限流不计入（08121 的 8 次退避多为 404 误触发）。
-            # 窗口内不重复触发（不续期）。
-            if dl_fail_reason != "404" and not dl_fail_reason.startswith("HTTP 4"):
-                _now = time.time()
-                self._download_fail_times.append(_now)
-                while self._download_fail_times and \
-                        _now - self._download_fail_times[0] > 60:
-                    self._download_fail_times.popleft()
-                if (self._download_throttled_until <= _now
-                        and len(self._download_fail_times) >= DOWNLOAD_STALL_THRESHOLD):
-                    self._download_throttled_until = _now + DOWNLOAD_THROTTLE_SECONDS
-                    self._wlog(f"⚠️ 近60s 网络类下载失败 {len(self._download_fail_times)} 次，"
-                          f"连接速率降级 {DOWNLOAD_THROTTLE_SECONDS}s"
-                          f"（{MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC}→{MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC // 2}/s）")
+            # 08131：失败记录 (time, reason) 到 60s 窗口——分类计数（监控块
+            # 显示）+ 降级信号共用。降级信号 = 网络类失败（timeout/idle/
+            # max_total/5xx/error）近 60s ≥ DOWNLOAD_STALL_THRESHOLD →
+            # 连接速率减半 60s（_dl_rate_wait 内生效）。
+            # 排除：404/4xx（文件不存在）、connect（连接池/本地连接问题，
+            # 08131 的 20:12 爆发 59 次——不是"速率过快"，不应触发降级）。
+            # 触发不再单独打日志——监控块"下载"行显示降级状态（剩 Ns）。
+            _now = time.time()
+            self._raw_fail_times.append((_now, dl_fail_reason))
+            while self._raw_fail_times and \
+                    _now - self._raw_fail_times[0][0] > 60:
+                self._raw_fail_times.popleft()
+            _net_fails = sum(
+                1 for _t, _r in self._raw_fail_times
+                if _r in ("timeout", "idle", "max_total", "error")
+                or _r.startswith("HTTP 5"))
+            if (self._download_throttled_until <= _now
+                    and _net_fails >= DOWNLOAD_STALL_THRESHOLD):
+                self._download_throttled_until = _now + DOWNLOAD_THROTTLE_SECONDS
             return  # 下载失败 → 不标记（下次重试）
 
         # 读取内容（surrogate 字符兼容）
