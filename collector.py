@@ -314,6 +314,8 @@ class Collector:
         # ── 08113：分布统计（收尾输出，校准分流阈值 SMALL_REPO_CLONE_MB）──
         self._candidate_hist = {}                      # 候选文件数分布（分桶）
         self._repo_size_hist = {}                      # 仓库大小分布（分桶）
+        # ── 08133：近 60s 解析统计（监控显示，读取时清理窗口防残留）──
+        self._parsed_60s = deque()                     # [(time, size_mb)] 近 60s 解析完成
         self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
         self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
         self._parsing_waiting = 0                      # 等待解析名额的文件数（预算排队）
@@ -827,8 +829,29 @@ class Collector:
                           f"触发线程转储（仅一次，定位静默卡死）")
                     faulthandler.dump_traceback()
                 net = self._net_status()
-                _hw = getattr(getattr(self, 'http', None), '_raw_window', [])
-                _raw60_mb = sum(b for _, b in _hw) / 1024 / 1024
+                # 08131：raw 下载失败分类（60s 窗口清理，先于 _raw_fail_n
+                # 统计执行——保证下方失败数/连接数不含过期条目）
+                _dl_fail_txt = self._raw_fail_summary()
+                if self._download_throttled_until > now:
+                    _dl_fail_txt += (
+                        f"降级{MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC // 2}/s"
+                        f"(剩{max(0, self._download_throttled_until - now):.0f}s) | ")
+                # 08133：近 60s raw 成功窗口（读取时过滤防旧数据残留）——
+                # 成功下载在 http_client._raw_window；失败在 _raw_fail_times
+                _raw_ok = [x for x in getattr(
+                    getattr(self, 'http', None), '_raw_window', [])
+                    if now - x[0] <= 60]
+                _raw_ok_n = len(_raw_ok)
+                _raw_ok_mb = sum(b for _, b in _raw_ok) / 1024 / 1024
+                _raw_fail_n = len(self._raw_fail_times)  # 上面 summary 已清理窗口
+                # 近 60s 解析完成窗口（清理防残留）
+                if self._parsed_60s:
+                    _p60 = [(t, s) for t, s in self._parsed_60s if now - t <= 60]
+                    self._parsed_60s = deque(_p60)
+                else:
+                    _p60 = []
+                _parsed_60s_n = len(_p60)
+                _parsed_60s_mb = sum(s for _, s in _p60)
                 # clone 近 60 秒窗口统计（成功仓库/文件 + 流量含失败）
                 _t60 = now - 60
                 _ok60_repos = sum(r for _t, r, _f in self._clone_ok_window if _t > _t60)
@@ -850,13 +873,6 @@ class Collector:
                 # 08121：监控行重排——下载/解析/API 分行，名称直白，同类合并
                 _dl_waiting = max(0, self._pending_downloads - self._downloading_active)
                 _pool_total = self._pool_big_running + self._pool_small_running
-                # 08131：raw 下载失败分类（60s 窗口）+ 降级状态（触发不打日志，
-                # 监控行直接显示）
-                _dl_fail_txt = self._raw_fail_summary()
-                if self._download_throttled_until > now:
-                    _dl_fail_txt += (
-                        f"降级{MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC // 2}/s"
-                        f"(剩{max(0, self._download_throttled_until - now):.0f}s) | ")
                 lines = [
                     f"📊 [{_now_dt.strftime('%H:%M')} UTC] 运行 {elapsed:.0f}s",
                     f"   CPU: {cpu_pct:.0f}% (负载 {load:.2f}/2核) | "
@@ -869,9 +885,12 @@ class Collector:
                     f"(空闲许可{self._download_sem._value}) | "
                     f"待下载 {self._pending_downloads}文件"
                     f"/{self._pending_download_bytes/1024/1024:.0f}MB"
-                    f"(等连接配额{_dl_waiting}) | {_dl_fail_txt}",
+                    f"(等连接配额{_dl_waiting}) | "
+                    f"60s成功 {_raw_ok_n}文件/{_raw_ok_mb:.1f}MB | "
+                    f"60s连接 {_raw_ok_n + _raw_fail_n} | {_dl_fail_txt}",
                     f"   解析: 进行中 {self._parsing_active}文件"
                     f"(最大{self._parsing_cur_max_mb():.0f}MB) | "
+                    f"近60s解析 {_parsed_60s_n}文件/{_parsed_60s_mb:.1f}MB | "
                     f"等解析名额 {self._parsing_waiting}文件"
                     f"/{self._parsing_waiting_bytes/1024/1024:.0f}MB | "
                     f"内存占用 {self._parsing_bytes/1024/1024:.0f}"
@@ -884,7 +903,6 @@ class Collector:
                     f"/{self._total_parsed_mb/1024:.1f}GB",
                     f"   API: 剩余 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
-                    f"raw 60s {len(_hw)}文件/{_raw60_mb:.1f}MB | "
                     f"clone 成功{self._clone_repos}/失败{self._clone_fail_count}"
                     f" | clone并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
                     f"(峰值{self._clone_active_peak})",
@@ -3357,6 +3375,8 @@ class Collector:
         # 累计解析文件统计（监控显示）
         self._total_parsed_files += 1
         self._total_parsed_mb += content_size_mb
+        # 08133：近 60s 解析窗口（监控读取时清理，防旧数据残留）
+        self._parsed_60s.append((time.time(), content_size_mb))
         if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
             self._wlog(f"📄 {raw_url} ⚠️ 文件过大 "
                   f"({content_size_mb:.1f}MB)，跳过")
