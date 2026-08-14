@@ -586,12 +586,23 @@ PARALLEL_DOWNLOAD_WORKERS = 8
 # 次级限流保护：API 队列端点限速 + 遇到 403 自动降级。
 # 注意：增大 Worker 时需同步评估 PARALLEL_DOWNLOAD_WORKERS 与
 #       MAX_DOWNLOAD_CONCURRENCY——三者乘积决定潜在下载线程与内存峰值。
-SHARED_POOL_WORKERS = 72
+SHARED_POOL_WORKERS = 200
 
 # 主队列最大长度（搜索渠道：种子/关键词/Code Search）。
 # 作用：满时搜索线程阻塞（背压），防止搜索结果浪费 API 配额。
-# 默认值：200。取值范围 50-500。
-MAIN_QUEUE_SIZE = 200
+# 08141：200→3000（work 200 时队列要够装需 API 任务，配合末段消耗策略）。
+MAIN_QUEUE_SIZE = 3000
+
+# 搜索入队阈值：主队列 ≥ MAIN_QUEUE_PAUSE_AT 暂停搜索翻页，
+# < MAIN_QUEUE_RESUME_AT 恢复（_wait_queue_slot 用）。
+# 08141：20/80 → 1000/2500（大队列下的滞回，防搜索频繁启停）。
+MAIN_QUEUE_PAUSE_AT = 2500
+MAIN_QUEUE_RESUME_AT = 1000
+
+# 配额末段策略：距整点剩 QUOTA_ENDGAME_MINUTES 分钟且核心 API 还有剩余时，
+# worker 允许取主队列 + 扩展队列需 API 仓库优先消费（消化配额，避免整点
+# 浪费）。整点/配额耗尽后回到常规策略（零 API 优先、disc 优先）。
+QUOTA_ENDGAME_MINUTES = 10
 
 # 发现队列最大长度（fork 链/用户仓库/raw 递归）。
 # 作用：单源头仓库展开的全部扩展仓库的缓冲容量。
@@ -649,7 +660,7 @@ DISC_MAIN_OK_AT = 1000
 # 当前值 1（历史 60→10→1）：72 worker 下冷却太长会让源头补充太慢；
 # 且冷却只在 disc 非空时生效（disc 空 = 无追踪活动，冷却无意义——
 # 08112 发现主队列满+disc 空时 16 个 work 空转 30 秒等冷却，§4）。
-MAIN_TAKE_COOLDOWN = 1
+MAIN_TAKE_COOLDOWN = 0
 
 # 同时允许几个源头仓库（从主队列取出正在处理）运行。
 # 作用：限制扩展仓库的"产生方"数量，防队列膨胀。
@@ -795,6 +806,18 @@ EXTRACT_PROCESS_MIN_MB = 1
 # _candidate_hist/_repo_size_hist 分布统计数据校准（_finalize 输出）。
 SMALL_REPO_CLONE_MB = 50
 
+# 全量下载阈值（MB）：size < 阈值的仓库 → 全量 clone（不 partial，
+# checkout 工作区）→ 本地遍历候选后缀文件解析（零 API、不占 raw 速率）。
+# 收益：配额耗尽时 work 的零 API 供给 +1 种；小仓库全量 clone 流量可控
+# （≤阈值 MB/仓库，git 协议）。
+# 阈值分层：< FULL_CLONE_MB 全量 clone / [FULL_CLONE_MB, SMALL_REPO_CLONE_MB)
+# partial clone（拿列表 + raw 下载候选）/ ≥ SMALL_REPO_CLONE_MB tree。
+FULL_CLONE_MB = 10
+
+# 全量 clone 磁盘警戒（GB）：工作区可用 < 此值 → 暂停新的全量 clone
+# （GA 磁盘 70GB+，全量 clone 处理完即删，正常不会到警戒线）。
+FULL_CLONE_DISK_MIN_GB = 20
+
 # 全局 raw 下载连接速率（每秒新连接数）：08113 实测 36 连接/s 触发 CDN
 # 慢速限速；30/s = 限速线的 80% 余量，动态降级（限速信号）时自动减半。
 # 只限 raw 下载（_dl_rate_wait）——clone 走 git 协议另一条通道，不受此限。
@@ -802,19 +825,13 @@ SMALL_REPO_CLONE_MB = 50
 # 频率（全局令牌桶，见 collector._dl_rate_wait）。
 MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC = 30
 
-# ==================== 收尾去重（no_his / no） ====================
+# ==================== 收尾去重（no/） ====================
 
-# no_his 历史节点目录：收尾去重时保存"含今天共 NO_HISTORY_DAYS 个自然日"
-# 内出现过的全部节点（每行 URI<TAB>YYYY-MM-DD 带获取日期）。
-# 跨运行依赖：此目录必须随 git 提交/checkout（历史节点靠它跨轮补充）。
-NO_HIS_DIR = "no_his"
+# 08141：7 天窗口（no_his）已回退——no_his 存储/提交过大，用户改为
+# 本地自行合并 7 天节点。收尾只做"本轮批次单次去重"写 no/。
+# 说明：no_his 相关代码已删除（模块级函数回退见 collector）。
 
-# 7 天滑动窗口：收尾时删除 日期 < 今天-(NO_HISTORY_DAYS-1) 的节点；
-# 同 URI 重复的节点保留最新日期（本轮优先）。08111 起 no/ 的语义
-# 从"本轮去重结果"改为"7 天窗口内全部节点"（本轮新的 + 历史补充）。
-NO_HISTORY_DAYS = 7
-
-# no/ 与 no_his/ 每个分片的节点行数。
+# no/ 每个分片的节点行数。
 NO_SPLIT_SIZE = 5000
 
 # Contents API（/repos/{repo}/contents/{path}）

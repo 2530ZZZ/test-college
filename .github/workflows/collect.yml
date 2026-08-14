@@ -11,6 +11,10 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       NODE_NO_WARNINGS: "1"
+      # 08141：OOM 防护——glibc 释放 ≥64KB 块时立即 trim 归还 OS。
+      # 大量中小 content 分配/释放默认被 glibc 缓存（RSS 只增不减），
+      # 08141 实测 5 小时累积 12GB 缓存 → 96% OOM 进程被杀无日志。
+      MALLOC_TRIM_THRESHOLD_: "65536"
     permissions:
       contents: write
       actions: read

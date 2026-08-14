@@ -37,6 +37,7 @@ import random
 import shutil
 import re
 import faulthandler
+import gc
 import pickle
 import subprocess
 import threading
@@ -56,8 +57,10 @@ from config import (
     DOWNLOAD_IDLE_TIMEOUT, MAX_DOWNLOAD_CONCURRENCY,
     DOWNLOAD_STALL_THRESHOLD, DOWNLOAD_THROTTLE_SECONDS,
     SMALL_REPO_CLONE_MB, MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC,
+    FULL_CLONE_MB, FULL_CLONE_DISK_MIN_GB,
     EXTRACT_PROCESSES, DOWNLOAD_MEMORY_BUDGET_MB, EXTRACT_PROCESS_MIN_MB,
-    NO_HIS_DIR, NO_HISTORY_DAYS, NO_SPLIT_SIZE,
+    NO_SPLIT_SIZE, MAIN_QUEUE_PAUSE_AT, MAIN_QUEUE_RESUME_AT,
+    QUOTA_ENDGAME_MINUTES,
     CONTENTS_API_TIMEOUT, COMMITS_API_TIMEOUT, TREE_API_TIMEOUT,
     USE_RECURSIVE_TREE, MAX_COMMITS_PER_REPO,
     MAX_RAW_DOWNLOADS_PER_REPO, SEED_REPOS_FILE,
@@ -110,76 +113,43 @@ from log_sink import log_sink
 
 
 def dedup_batches_write_no() -> int:
-    """读本轮 batches + 旧 no_his/ → 7 天窗口全量去重 → 写 no_his/ 与 no/。
+    """读本轮 batches → 单次去重 → 写 no/ 分片（08141：7 天窗口已回退）。
 
     供主流程 _finalize 与 workflow 兜底脚本 finalize.py 共用（两条路径
     产出一致——08111 取消场景下主流程收尾日志进 devnull、git 抢跑，
     no/ 丢失，此函数作为独立进程兜底）。
 
-    语义（08111+）：no/ 是"含今天共 NO_HISTORY_DAYS 个自然日内出现过
-    的全部节点"——本轮新节点 + 补充窗口内有而本轮没有的历史节点。
-    同 IP:端口不同协议的节点 URI 字符串不同 → 天然都保留；同 URI
-    重复 → 保留最新日期（本轮优先）。no_his/ 每行 URI<TAB>YYYY-MM-DD
-    （带获取日期），no/ 是同一集合去掉日期的纯 URI 视图，两处一致。
+    语义（08141+）：no/ = 本轮运行的去重结果（单次运行，不做跨轮
+    历史合并——7 天节点合并由用户本地自行处理）。内存优化不变：
+    运行时只写 batches，收尾读全部批次去重，内存峰值 = 唯一节点数。
 
     Returns:
-        唯一节点数；0 = 无批次且无窗口内历史（保留旧文件不动）。
+        唯一节点数；0 = 无批次（保留旧 no/ 不动）。
     """
     import glob
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    cutoff = (datetime.now(timezone.utc)
-              - timedelta(days=NO_HISTORY_DAYS - 1)).strftime("%Y-%m-%d")
-    his: Dict[str, str] = {}  # URI -> 获取日期
-
-    # 1. 本轮批次（运行时 _flush_batch 写盘的中间产物）→ 日期 = 今天
     batch_dir = os.path.join(os.getcwd(), BATCH_DIR)
     batch_files = sorted(glob.glob(os.path.join(batch_dir, "no_batch_*.txt")))
+    if not batch_files:
+        return 0  # 无产出 → 保留上次 no/（崩溃/无节点场景）
+    all_nodes = set()
     for f in batch_files:
         with open(f, encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 line = line.rstrip("\n")
                 if line:
-                    his[line] = today  # 本轮覆盖旧日期（同 URI 保留最新）
+                    all_nodes.add(line)
+    nodes = sorted(all_nodes)
 
-    # 2. 旧 no_his/（跨运行历史）→ 保留原日期；7 天窗口外删除
-    his_dir = os.path.join(os.getcwd(), NO_HIS_DIR)
-    if os.path.isdir(his_dir):
-        for f in glob.glob(os.path.join(his_dir, "*.txt")):
-            try:
-                with open(f, encoding="utf-8", errors="replace") as fh:
-                    for line in fh:
-                        line = line.rstrip("\n")
-                        if not line:
-                            continue
-                        parts = line.split("\t")
-                        if len(parts) != 2:
-                            continue  # 格式异常行跳过
-                        uri, date = parts[0], parts[1]
-                        if date < cutoff:
-                            continue  # 7 天窗口外 → 丢弃
-                        if uri not in his:
-                            his[uri] = date
-            except OSError:
-                continue
-
-    if not his:
-        return 0  # 无批次且无窗口内历史 → 保留旧文件不动（崩溃/首次空跑）
-
-    # 3. 清空旧 no_his/ 与 no/（本次重新生成，替换式更新）
+    # 清空旧 no/（上次运行的分片，本次重新生成）
     no_dir = os.path.join(os.getcwd(), "no")
-    for d in (his_dir, no_dir):
-        if os.path.isdir(d):
-            for old in glob.glob(os.path.join(d, "*.txt")):
-                try:
-                    os.remove(old)
-                except OSError:
-                    pass
-    os.makedirs(his_dir, exist_ok=True)
+    if os.path.isdir(no_dir):
+        for old in glob.glob(os.path.join(no_dir, "*.txt")):
+            try:
+                os.remove(old)
+            except OSError:
+                pass
     os.makedirs(no_dir, exist_ok=True)
 
-    # 4. 写分片：no/ 纯 URI；no_his/ URI<TAB>日期（同一集合两种视图）
-    nodes = sorted(his)
-    his_lines = sorted(f"{u}\t{his[u]}" for u in nodes)
     repo_name = os.getenv("GITHUB_REPOSITORY", "2530ZZZ/cooo")
     branch_name = os.getenv("GITHUB_REF_NAME", "main")
     with open("no_w_li.txt", "w", encoding="utf-8") as fw:
@@ -188,14 +158,11 @@ def dedup_batches_write_no() -> int:
             with open(os.path.join(no_dir, f"{seq:03d}.txt"),
                       "w", encoding="utf-8") as f:
                 f.write("\n".join(nodes[i:i + NO_SPLIT_SIZE]))
-            with open(os.path.join(his_dir, f"no_his_{seq:03d}.txt"),
-                      "w", encoding="utf-8") as f:
-                f.write("\n".join(his_lines[i:i + NO_SPLIT_SIZE]))
             fw.write(f"https://raw.githubusercontent.com/{repo_name}"
                      f"/{branch_name}/no/{seq:03d}.txt\n")
     log_sink.emit(f"[{now_str()}] 📦 收尾去重: {len(batch_files)} 批次 "
-                  f"+ {NO_HISTORY_DAYS}天窗口历史 → {len(nodes)} 唯一节点 "
-                  f"→ {len(nodes) // NO_SPLIT_SIZE + 1} 个分片")
+                  f"→ {len(nodes)} 唯一节点 → "
+                  f"{len(nodes) // NO_SPLIT_SIZE + 1} 个 no/ 分片")
     return len(nodes)
 
 
@@ -316,6 +283,17 @@ class Collector:
         self._repo_size_hist = {}                      # 仓库大小分布（分桶）
         # ── 08133：近 60s 解析统计（监控显示，读取时清理窗口防残留）──
         self._parsed_60s = deque()                     # [(time, size_mb)] 近 60s 解析完成
+        # ── 08141：仓库处理统计（监控显示，读取时清理窗口）──
+        self._repos_done_60s = deque()                 # [(time, size_mb)] 近 60s 完成仓库
+        self._repos_done_total = 0                     # 累计完成仓库数
+        self._repos_done_size_total = 0                # 累计完成仓库大小(KB)
+        self._repos_parsed_total = 0                   # 累计解析过文件的仓库数
+        # 解析过仓库的大小分布由 _repo_size_hist（收尾输出）覆盖
+        self._seed_repos_done_total = 0                # 累计完成种子仓库数
+        self._seed_repos_done_size_total = 0           # 累计完成种子仓库大小(KB)
+        self._full_clone_60s = deque()                 # [(time, size_mb)] 近 60s 全量下载仓库
+        self._full_clone_total = 0                     # 累计全量下载仓库数
+        self._full_clone_size_total = 0                # 累计全量下载仓库大小(MB)
         self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
         self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
         self._parsing_waiting = 0                      # 等待解析名额的文件数（预算排队）
@@ -820,12 +798,21 @@ class Collector:
                 # 资源峰值采样（clone_stats.json 用）
                 self._cpu_load_peak = max(self._cpu_load_peak, load)
                 self._disk_free_min = min(self._disk_free_min, disk_free_gb)
-                # ── OOM 定位：内存 > 80% 且未转储过 → 打印所有线程调用栈 ──
-                # faulthandler.dump_traceback() 直接显示每个 worker/extract
-                # 线程卡在哪一行（08084 OOM 前 30 分钟线程静默卡死的定位工具）。
-                if mem_pct > 80 and not self._dump_done:
+                # ── OOM 防护与定位（08141：内存 96% 持续 → OOM 进程被杀无日志）──
+                # 1. gc.collect() 定期（每 5 分钟）：回收循环引用对象，辅助降内存
+                # 2. 内存 > 75% 连续预警（每次 60s 监控打一条，仅 >75% 时）
+                # 3. 内存 > 85% 且未转储过 → faulthandler 打印线程栈
+                #    （08084 OOM 前 30 分钟线程静默卡死的定位工具；85% 而非
+                #    原 80%——转储本身耗内存，留余量避免转储加剧 OOM）
+                if int(elapsed // 300) > getattr(self, '_gc_round', -1):
+                    self._gc_round = int(elapsed // 300)
+                    gc.collect()
+                if mem_pct > 75:
+                    self._wlog(f"⚠️ 内存 {mem_pct:.0f}% 偏高（>75%），"
+                          f"RSS {py_rss_gb:.1f}GB")
+                if mem_pct > 85 and not self._dump_done:
                     self._dump_done = True
-                    self._wlog(f"🚨 内存 {mem_pct:.0f}% 超过 80%，"
+                    self._wlog(f"🚨 内存 {mem_pct:.0f}% 超过 85%，"
                           f"触发线程转储（仅一次，定位静默卡死）")
                     faulthandler.dump_traceback()
                 net = self._net_status()
@@ -906,6 +893,15 @@ class Collector:
                     f"clone 成功{self._clone_repos}/失败{self._clone_fail_count}"
                     f" | clone并发 {self._clone_active}/{PARTIAL_CLONE_CONCURRENCY}"
                     f"(峰值{self._clone_active_peak})",
+                    f"   仓库: 近60s完成 {self._repos_done_60s_clean(now)} | "
+                    f"累计完成 {self._repos_done_total}仓库"
+                    f"/{self._repos_done_size_total:.0f}MB | "
+                    f"解析过 {self._repos_parsed_total}仓库 | "
+                    f"种子 {self._seed_repos_done_total}仓库"
+                    f"/{self._seed_repos_done_size_total:.0f}MB | "
+                    f"全量 {self._full_clone_total}仓库"
+                    f"/{self._full_clone_size_total:.0f}MB"
+                    f"(60s {len(self._full_clone_60s_clean(now))})",
                     f"   诊断: log队列 {_log_q}/{_log_ok} | "
                     f"线程 {threading.active_count()} | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
@@ -935,7 +931,13 @@ class Collector:
         if not dq:
             return False
         tag = item[2].get("tag", "") if len(item) > 2 else ""
-        priority = 1 if self._should_trace(tag) else 0
+        # 08141 配额末段（方案 B）：priority 动态化——末段需 API 仓库
+        # （需追踪 = 非最深层）优先消费（priority 0），消化剩余配额；
+        # 平时保持"不追踪（最深层）先消费"（priority 0）。
+        if self._quota_endgame():
+            priority = 0 if self._should_trace(tag) else 1
+        else:
+            priority = 1 if self._should_trace(tag) else 0
         while dq.qsize() >= DISC_PUT_BACKPRESSURE:
             if self._should_stop():
                 return False
@@ -983,6 +985,31 @@ class Collector:
             with self._state_lock:
                 self._reset_waiting = False
 
+    def _repos_done_60s_clean(self, now: float) -> str:
+        """近 60s 完成仓库数/大小（读取时清理窗口防残留，08141）。"""
+        self._repos_done_60s = deque(
+            (t, s) for t, s in self._repos_done_60s if now - t <= 60)
+        _n = len(self._repos_done_60s)
+        _mb = sum(s for _, s in self._repos_done_60s)
+        return f"{_n}仓库/{_mb:.0f}MB"
+
+    def _full_clone_60s_clean(self, now: float) -> list:
+        """近 60s 全量下载仓库（读取时清理窗口防残留，08141）。"""
+        self._full_clone_60s = deque(
+            (t, s) for t, s in self._full_clone_60s if now - t <= 60)
+        return list(self._full_clone_60s)
+
+    def _quota_endgame(self) -> bool:
+        """配额末段判断（08141）：距整点 < QUOTA_ENDGAME_MINUTES 分钟
+        且核心 API 还有剩余 → 末段模式（需 API 任务优先，消化配额）。
+        """
+        try:
+            _rem = self.quota_mgr.remaining()
+            _sec_to_hour = 3600 - (time.time() % 3600)
+            return _rem > 0 and _sec_to_hour < QUOTA_ENDGAME_MINUTES * 60
+        except Exception:
+            return False
+
     def _requeue_for_quota(self, item: tuple, from_queue):
         """配额耗尽时，缺信息任务降级优先级放回原队列（排到队尾）。
 
@@ -1028,19 +1055,22 @@ class Collector:
             return True
 
     def _wait_queue_slot(self, mq) -> bool:
-        """队列背压：≥ 80 暂停，等 Worker 消费到 < 20。
+        """队列背压：≥ MAIN_QUEUE_PAUSE_AT 暂停，等 Worker 消费到
+        < MAIN_QUEUE_RESUME_AT（08141：大队列 3000 下的滞回阈值）。
         Returns: False=运行超时应终止, True=可继续。
         """
-        if mq.qsize() < 80:
+        if mq.qsize() < MAIN_QUEUE_PAUSE_AT:
             return True
         self._search_resume.clear()
-        self._wlog(f"⏸️  主队列 ≥ 80（{mq.qsize()}/{mq.maxsize}），搜索暂停")
-        while mq.qsize() >= 20:
+        self._wlog(f"⏸️  主队列 ≥ {MAIN_QUEUE_PAUSE_AT}"
+              f"（{mq.qsize()}/{mq.maxsize}），搜索暂停")
+        while mq.qsize() >= MAIN_QUEUE_RESUME_AT:
             if self._runtime_exceeded():
                 self._search_resume.set()
                 return False
             self._search_resume.wait(timeout=30)
-        self._wlog(f"▶️ 主队列 < 20（{mq.qsize()}/{mq.maxsize}），搜索恢复")
+        self._wlog(f"▶️ 主队列 < {MAIN_QUEUE_RESUME_AT}"
+              f"（{mq.qsize()}/{mq.maxsize}），搜索恢复")
         self._search_resume.set()
         return True
 
@@ -1689,12 +1719,14 @@ class Collector:
             # ═══ 阶段 0.5: 阈值+冷却 → 强制取主队列（优先补充源头） ═══
             # disc 低于阈值且冷却结束 → 先尝试取主队列（原子+源头并发），
             # 防止 Worker 只消费 disc 到 0 才取主队列（扩展队列长期低值）。
-            if disc_queue.qsize() <= DISC_MAIN_OK_AT:
+            # 08141：配额末段（_quota_endgame）打破 disc 阈值——允许取
+            # 主队列消化 API 配额（平时 disc≥阈值不取主队列）。
+            if disc_queue.qsize() <= DISC_MAIN_OK_AT or self._quota_endgame():
                 item, took, source_held = self._try_take_main(
                     main_queue, disc_queue)
                 if took:
                     from_queue = main_queue
-                    if main_queue.qsize() < 20:
+                    if main_queue.qsize() < MAIN_QUEUE_RESUME_AT:
                         self._search_resume.set()
                     # 取到源头 → 直接进入阶段 3 处理（不消费 disc）
                     return_to_phase1 = False
@@ -1740,29 +1772,37 @@ class Collector:
                 if self.limiter.should_stop() or self._runtime_exceeded():
                     break
                 if self.quota_mgr.exceeded:
-                    # 配额耗尽 → 零 API 模式：只处理有完整信息的仓库
-                    # （clone/下载/解析不调 API）；缺信息任务（需补查 repo
-                    # info）降级优先级放回队列排队尾，配额恢复后正常补查。
-                    # 连续遇到缺信息任务 → 队列已无可零 API 处理的任务，
-                    # _wait_reset 等待配额恢复（兜底）。
-                    if INFO_BACKFILL_ENABLED:
-                        try:
-                            _s, _r, _kw = item
-                            if not _kw.get("pushed_at") \
-                                    or not _kw.get("language"):
-                                self._requeue_for_quota(item, from_queue)
-                                quota_skip_count += 1
-                                if quota_skip_count >= 3:
-                                    quota_skip_count = 0
-                                    if not self._wait_reset():
-                                        break
-                                else:
-                                    time.sleep(0.3)  # 让其他 worker 先取有信息任务
-                                continue
-                        except (ValueError, TypeError):
-                            pass
-                    # 有信息任务 → 零 API 处理路径（process_repo 内部 API
-                    # 调用在配额耗尽时均有保护，见 _trace_repo/_discover_recursive）
+                    # 配额耗尽 → 零 API 模式（08141 判断升级）：
+                    # 只处理"零 API 仓库" = 有完整 info（pushed_at/language/
+                    # size 已知）且 层级 == MAX_TRACE_DEPTH（不需要追踪）
+                    # 且 size < SMALL_REPO_CLONE_MB（clone 路径，不走 tree）。
+                    # 需 API 任务（缺 info / 非最深层 / ≥50MB）→ requeue
+                    # 放回队列尾（不阻塞——_wait_reset 死等已取消）；
+                    # 连续取到需 API 任务 → 队列已无可零 API 任务，
+                    # 短暂 sleep 后重试（配额恢复由整点驱动，不自旋）。
+                    _zero_api = False
+                    try:
+                        _s, _r, _kw = item
+                        _size_kb = _kw.get("size", -1)
+                        _depth = self._tag_depth(_kw.get("tag", ""))
+                        _zero_api = (
+                            _kw.get("pushed_at") and _kw.get("language")
+                            and isinstance(_size_kb, int) and _size_kb >= 0
+                            and _depth >= MAX_TRACE_DEPTH
+                            and _size_kb < SMALL_REPO_CLONE_MB * 1024)
+                    except (ValueError, TypeError):
+                        _zero_api = False
+                    if not _zero_api:
+                        self._requeue_for_quota(item, from_queue)
+                        quota_skip_count += 1
+                        if quota_skip_count >= 5:
+                            quota_skip_count = 0
+                            time.sleep(2)  # 队列已无可零 API 任务，短暂等待
+                        else:
+                            time.sleep(0.3)  # 让其他 worker 先取零 API 任务
+                        continue
+                    # 零 API 处理路径（process_repo 内部 API 调用在配额
+                    # 耗尽时均有保护，见 _trace_repo/_discover_recursive）
                     quota_skip_count = 0
                 source, repo, kwargs = item
                 tag = kwargs.get("tag", "")
@@ -1777,6 +1817,17 @@ class Collector:
                 extracted, added = self.process_repo(repo, **kwargs)
                 self._wlog(f"✅ 完成 {tag} {repo}{pos_txt} | 提取 {extracted} | 新增 {added} "
                       f"| 耗时 {time.time()-_t0:.0f}s | {self._qt()} | {self._qs()}")
+                # 08141：仓库完成统计（近60s 窗口 + 累计；种子/非种子分开）
+                _rk = kwargs.get("size", -1)
+                _rk_mb = _rk / 1024 if _rk is not None and _rk >= 0 else 0
+                self._repos_done_60s.append((time.time(), _rk_mb))
+                self._repos_done_total += 1
+                if _rk_mb > 0:
+                    self._repos_done_size_total += _rk_mb
+                if "种子" in str(tag):
+                    self._seed_repos_done_total += 1
+                    if _rk_mb > 0:
+                        self._seed_repos_done_size_total += _rk_mb
                 tn = threading.current_thread().name
                 self._worker_repo_count[tn] = self._worker_repo_count.get(tn, 0) + 1
                 ch = self._channel_new_nodes
@@ -2654,16 +2705,27 @@ class Collector:
         if self.limiter.should_stop():
             raise RuntimeError("限流超限")
 
-        # ── 仓库大小分流（08113）──
-        # 小仓库（size < SMALL_REPO_CLONE_MB）→ partial clone 拿列表
-        # （连接少、零 API；小仓库元数据小，clone 快）。
-        # 大仓库（≥ 阈值）→ tree API 拿列表（大仓库 clone 元数据大，
-        # tree 响应可承受；且只下候选文件，不下载仓库内容）。
-        # 回退链：小 clone 失败 → tree；大 tree 失败/截断 → clone；
-        # 两者再失败 → 放弃 + 日志（去掉 Contents 回退——逐文件遍历
-        # 是核心 API 配额黑洞，08113 已确认放弃该路径）。
+        # ── 仓库大小分流（08113 + 08141 全量档）──
+        # 极小仓库（size < FULL_CLONE_MB）→ 全量 clone + 本地解析
+        #   （零 API、不占 raw 速率；08141 配额耗尽时的零 API 供给）。
+        # 小仓库（[FULL_CLONE_MB, SMALL_REPO_CLONE_MB)）→ partial clone
+        #   拿列表 + raw 下载候选。
+        # 大仓库（≥ SMALL_REPO_CLONE_MB）→ tree API 拿列表（大仓库 clone
+        #   元数据大，tree 响应可承受；且只下候选文件，不下载仓库内容）。
+        # 回退链：全量 clone 失败 → partial clone（降级为小仓库路径）；
+        # 小 clone 失败 → tree；大 tree 失败/截断 → partial clone；
+        # 再失败 → 放弃 + 日志（去掉 Contents 回退——配额黑洞）。
+        _full_clone = CLONE_FIRST_MODE and (
+            size_kb is not None and 0 <= size_kb < FULL_CLONE_MB * 1024)
         _small_repo = CLONE_FIRST_MODE and (
-            size_kb is None or size_kb < SMALL_REPO_CLONE_MB * 1024)
+            size_kb is None
+            or (FULL_CLONE_MB * 1024 <= size_kb < SMALL_REPO_CLONE_MB * 1024))
+
+        if _full_clone:
+            if self._full_clone_local_parse(repo, size_kb):
+                return True
+            # 全量 clone 失败 → 降级 partial clone（继续下方小仓库路径）
+            self._wlog(f"全量 clone 失败，降级 partial clone（{repo}）")
 
         if _small_repo:
             entries = self._partial_clone_file_list(repo, branch, size_kb=size_kb)
@@ -2792,6 +2854,9 @@ class Collector:
         # 08113：候选文件数分布统计（收尾输出，校准分流阈值用）
         _ck = self._hist_bucket_count(len(files_to_check))
         self._candidate_hist[_ck] = self._candidate_hist.get(_ck, 0) + 1
+        # 08141：解析过文件的仓库统计（累计数 + 大小，调用方 _collect_files
+        # 无 size 透传，用 _repo_size_hist 已覆盖大小分布——此处只计数）
+        self._repos_parsed_total += 1
 
         # ---- 并行下载处理 ----
         # 小量文件串行（省线程开销），大量文件用线程池并发下载
@@ -2905,6 +2970,103 @@ class Collector:
         if "ls-tree" in e:
             return "ls_tree"
         return "other"
+
+    def _full_clone_local_parse(self, repo: str, size_kb: int = -1) -> bool:
+        """08141：<FULL_CLONE_MB 仓库全量 clone → 本地遍历候选文件解析。
+
+        全量 clone（checkout 工作区）→ os.walk 遍历符合后缀的文件 →
+        逐个读入内存走 _handle_one_file(preloaded) 解析 → 处理完删 tmp。
+        零 API、不占 raw 连接配额——配额耗尽时 work 的零 API 供给 +1 种。
+        磁盘警戒：工作区可用 < FULL_CLONE_DISK_MIN_GB 时跳过。
+
+        Returns: True 处理完成（含失败放弃，不重试）。
+        """
+        import tempfile
+        import shutil as _shutil
+        import signal
+        try:
+            # 磁盘警戒（全量 clone 产物瞬时占用，GA 磁盘 70GB+ 正常不会到）
+            try:
+                _du = _shutil.disk_usage(os.getcwd())
+                if _du.free / 1024 ** 3 < FULL_CLONE_DISK_MIN_GB:
+                    self._wlog(f"⚠️ 磁盘可用 < {FULL_CLONE_DISK_MIN_GB}GB，"
+                          f"跳过全量 clone（{repo}）")
+                    return True
+            except Exception:
+                pass
+            tmp = tempfile.mkdtemp(prefix="fclone_")
+        except Exception:
+            return True
+        _prev_state = self._worker_state.get(
+            threading.current_thread().name, {}).get("what", "")
+        try:
+            token = self.token or GITHUB_TOKEN
+            if not token:
+                return True
+            self._clone_sem.acquire()
+            self._clone_active += 1
+            if self._clone_active > self._clone_active_peak:
+                self._clone_active_peak = self._clone_active
+            self._set_worker_state(f"全量Clone {repo}")
+            clone_url = f"https://x-access-token:{token}@github.com/{repo}.git"
+            p = subprocess.Popen(
+                ["git", "clone", "--depth", "1", "--single-branch",
+                 clone_url, tmp],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                start_new_session=True)
+            try:
+                _, err_text = p.communicate(timeout=PARTIAL_CLONE_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                os.killpg(p.pid, signal.SIGKILL)
+                p.communicate()
+                self._wlog(f"⚠️ 全量 clone 超时，放弃（{repo}）")
+                return True
+            if p.returncode != 0:
+                self._wlog(f"⚠️ 全量 clone 失败，放弃（{repo}）: "
+                      f"{(err_text or '')[-200:]}")
+                return True
+
+            # 遍历工作区：候选后缀文件逐个读入解析（串行，10MB 仓库文件少）
+            _size_mb = size_kb / 1024 if size_kb and size_kb > 0 else 0
+            _n = 0
+            _dl_total = 0
+            _has = [False]
+            for root, _dirs, files in os.walk(tmp):
+                if self.limiter.should_stop():
+                    break
+                for fn in files:
+                    ext = os.path.splitext(fn)[1].lower()
+                    if ext not in ALLOWED_EXTENSIONS:
+                        continue
+                    fpath = os.path.join(root, fn)
+                    try:
+                        with open(fpath, "rb") as fh:
+                            data = fh.read()
+                    except OSError:
+                        continue
+                    _dl_total += len(data)
+                    self._handle_one_file(
+                        repo, "HEAD", fpath, "", _has,
+                        raw_depth=0, stats=[0, 0], tag="[全量]",
+                        size=len(data), content_bytes_preloaded=data)
+                    _n += 1
+            _now = time.time()
+            self._full_clone_60s.append((_now, _size_mb))
+            self._full_clone_total += 1
+            self._full_clone_size_total += _size_mb
+            self._wlog(f"📦 全量下载: {repo} ({_size_mb:.1f}MB, "
+                  f"解析 {_n} 候选文件/{_dl_total/1024/1024:.1f}MB)")
+            return True
+        except Exception:
+            return True
+        finally:
+            self._clone_sem.release()
+            self._clone_active -= 1
+            self._set_worker_state(_prev_state)
+            try:
+                _shutil.rmtree(tmp, ignore_errors=True)
+            except Exception:
+                pass
 
     def _partial_clone_file_list(self, repo: str, branch: str,
                                  size_kb: int = -1):
@@ -3281,11 +3443,16 @@ class Collector:
     def _handle_one_file(self, repo: str, branch: str, file_path: str,
                          sha: str, has_nodes: List[bool], raw_depth: int,
                          stats: List[int] = None, tag: str = "[种子仓库]",
-                         size: int = 0):
-        """处理单个文件：下载 → 提取节点 → 去重 → 入 buffer。
+                         size: int = 0,
+                         content_bytes_preloaded: bytes = None):
+        """处理单个文件：下载（或本地预载）→ 提取节点 → 去重 → 入 buffer。
 
         使用 uri_parser 协议解析层提取 StandardProxy，
         按 (server, port, protocol) 全局去重后写入批次 buffer。
+
+        content_bytes_preloaded（08141 全量 clone）：非 None 时跳过
+        网络下载（文件已从本地工作区读出），直接走解析管线——零 API、
+        不占 raw 连接配额。本地全量 clone 场景专用。
 
         Args:
             stats: [extracted, added] 累加数组（本仓库级统计）。
@@ -3297,40 +3464,46 @@ class Collector:
 
         raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/{file_path}"
 
-        # 下载文件（总时长限制：CDN 慢速限速 0.1MB/s 持续送数据不触发
-        # read timeout，100MB 文件能慢速下载 1000s+（08102 W-3 卡 2600s），
-        # MAX_DOWNLOAD_SECONDS 超时即放弃，下次重试）
-        # 08111：全局并发信号量封顶（36 worker×8 线程无上限 → 259 并发
-        # 触发 CDN 限流）；idle_max_s：0 字节窗口快速放弃（限流挂起 30s
-        # 无数据即弃，不再死等 240s）。
-        # 08112 修复：acquire(timeout=10) 兜底 + release 严格配对
-        #（此前退避窗口 acquire 2 次只 release 1 次 → 许可泄漏全卡死）。
-        # 08121：退避（并发减半）已删，改动态降级——限速信号（近 60s
-        # 网络类失败 ≥ 阈值）→ 连接速率减半 60s（_dl_rate_wait 内生效）。
-        # 待下载计数（08121：含等连接配额——在 _dl_rate_wait 之前 +1，
-        # 监控"待下载"= 等配额 + 下载中）
-        self._pending_downloads += 1
-        self._pending_download_bytes += size
-        self._dl_rate_wait()  # 全局连接速率节流（限速信号时自动减半）
-        if not self._download_sem.acquire(timeout=10):
-            # 信号量异常兜底：不阻塞 worker；已计待下载回退
-            self._pending_downloads -= 1
-            self._pending_download_bytes -= size
-            self._wlog(f"⚠️ 下载并发信号量获取超时，放弃下载 {file_path}")
-            return
-        # 08103 监测：下载中计数 + 耗时记录
-        self._downloading_active += 1
-        _dl_t0 = time.time()
-        try:
-            content_bytes, dl_fail_reason = self.http.download_with_timeout(
-                raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
-                f"下载 {file_path}", idle_max_s=DOWNLOAD_IDLE_TIMEOUT)
-        finally:
-            self._download_sem.release()  # 08112：与 acquire 严格配对
-            self._downloading_active -= 1
-            self._pending_downloads -= 1
-            self._pending_download_bytes -= size
-        _dl_s = time.time() - _dl_t0
+        if content_bytes_preloaded is not None:
+            # 08141 全量 clone：本地文件直接解析（不走下载管道）
+            content_bytes = content_bytes_preloaded
+            dl_fail_reason = ""
+            _dl_s = 0.0
+        else:
+            # 下载文件（总时长限制：CDN 慢速限速 0.1MB/s 持续送数据不触发
+            # read timeout，100MB 文件能慢速下载 1000s+（08102 W-3 卡 2600s），
+            # MAX_DOWNLOAD_SECONDS 超时即放弃，下次重试）
+            # 08111：全局并发信号量封顶（36 worker×8 线程无上限 → 259 并发
+            # 触发 CDN 限流）；idle_max_s：0 字节窗口快速放弃（限流挂起 30s
+            # 无数据即弃，不再死等 240s）。
+            # 08112 修复：acquire(timeout=10) 兜底 + release 严格配对
+            #（此前退避窗口 acquire 2 次只 release 1 次 → 许可泄漏全卡死）。
+            # 08121：退避（并发减半）已删，改动态降级——限速信号（近 60s
+            # 网络类失败 ≥ 阈值）→ 连接速率减半 60s（_dl_rate_wait 内生效）。
+            # 待下载计数（08121：含等连接配额——在 _dl_rate_wait 之前 +1，
+            # 监控"待下载"= 等配额 + 下载中）
+            self._pending_downloads += 1
+            self._pending_download_bytes += size
+            self._dl_rate_wait()  # 全局连接速率节流（限速信号时自动减半）
+            if not self._download_sem.acquire(timeout=10):
+                # 信号量异常兜底：不阻塞 worker；已计待下载回退
+                self._pending_downloads -= 1
+                self._pending_download_bytes -= size
+                self._wlog(f"⚠️ 下载并发信号量获取超时，放弃下载 {file_path}")
+                return
+            # 08103 监测：下载中计数 + 耗时记录
+            self._downloading_active += 1
+            _dl_t0 = time.time()
+            try:
+                content_bytes, dl_fail_reason = self.http.download_with_timeout(
+                    raw_url, FILE_DOWNLOAD_TIMEOUT, MAX_DOWNLOAD_SECONDS,
+                    f"下载 {file_path}", idle_max_s=DOWNLOAD_IDLE_TIMEOUT)
+            finally:
+                self._download_sem.release()  # 08112：与 acquire 严格配对
+                self._downloading_active -= 1
+                self._pending_downloads -= 1
+                self._pending_download_bytes -= size
+            _dl_s = time.time() - _dl_t0
         if content_bytes is None:
             # 08131：失败记录 (time, reason) 到 60s 窗口——分类计数（监控块
             # 显示）+ 降级信号共用。降级信号 = 网络类失败（timeout/idle/
@@ -3489,8 +3662,11 @@ class Collector:
             if valid_count > 0:
                 self.all_links.append(raw_url)
                 has_nodes[0] = True
-            self.processed_file_shas.add(sha)
-            self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
+            # 08141：全量 clone（preloaded）本地文件无 SHA，跳过缓存写入
+            # （空 sha 会污染 processed_file_shas/sha_cache）
+            if content_bytes_preloaded is None:
+                self.processed_file_shas.add(sha)
+                self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
             if VERBOSE_LOG:
                 self._wlog(f"📄 SHA 缓存: {sha[:8]}... ({len(content)}B)")
 
