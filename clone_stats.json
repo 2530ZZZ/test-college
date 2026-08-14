@@ -1,87 +1,78 @@
 {
- "run_id": "20260808-2031",
+ "run_id": "20260814-2101",
  "mode": "clone_first",
- "clone_concurrency": 15,
- "duration_s": 19801,
- "api_used": 14707,
- "api_remaining": 4610,
- "nodes_added": 326510,
+ "clone_concurrency": 25,
+ "duration_s": 20127,
+ "api_used": 27227,
+ "api_remaining": 4800,
+ "nodes_added": 1826028,
  "resources": {
-  "cpu_load_max": 3.52,
-  "disk_free_min_gb": 86.8,
-  "clone_concurrency_peak": 10
+  "cpu_load_max": 2.69,
+  "disk_free_min_gb": 85.2,
+  "clone_concurrency_peak": 25
  },
  "clone": {
-  "total": 893,
-  "ok": 891,
-  "fail": 2,
-  "files_total": 1242232,
+  "total": 336,
+  "ok": 333,
+  "fail": 3,
+  "files_total": 1013122,
   "time_s": {
-   "avg": 1.7,
-   "max": 54.2,
-   "p90": 3.0
+   "avg": 110.5,
+   "max": 552.5,
+   "p90": 239.9
   },
   "fail_breakdown": {
-   "ls_tree": 1,
-   "disabled": 1
+   "disabled": 1,
+   "repo_not_found": 2
   }
  },
  "by_size_bucket": {
   "0-100MB": {
-   "count": 534,
-   "ok": 532,
-   "fail": 2,
-   "avg_s": 1.8,
-   "max_s": 54.2,
-   "files_total": 285136
+   "count": 332,
+   "ok": 329,
+   "fail": 3,
+   "avg_s": 108.2,
+   "max_s": 552.5,
+   "files_total": 193339
   },
   "100M-1GB": {
-   "count": 197,
-   "ok": 197,
+   "count": 3,
+   "ok": 3,
    "fail": 0,
-   "avg_s": 1.7,
-   "max_s": 15.7,
-   "files_total": 650071
-  },
-  "1-5GB": {
-   "count": 108,
-   "ok": 108,
-   "fail": 0,
-   "avg_s": 1.7,
-   "max_s": 10.8,
-   "files_total": 229331
-  },
-  "5-10GB": {
-   "count": 24,
-   "ok": 24,
-   "fail": 0,
-   "avg_s": 1.7,
-   "max_s": 4.6,
-   "files_total": 4740
+   "avg_s": 251.7,
+   "max_s": 445.2,
+   "files_total": 755688
   },
   ">10GB": {
-   "count": 30,
-   "ok": 30,
+   "count": 1,
+   "ok": 1,
    "fail": 0,
-   "avg_s": 2.2,
-   "max_s": 7.9,
-   "files_total": 72954
+   "avg_s": 466.0,
+   "max_s": 466.0,
+   "files_total": 64095
   }
  },
  "failures": [
   {
-   "repo": "example/test",
-   "size_kb": 48,
-   "time_s": 1,
-   "reason": "ls_tree",
-   "detail": "fatal: Not a valid object name HEAD\n"
-  },
-  {
    "repo": "alanbobs999/TopFreeProxies",
    "size_kb": -1,
-   "time_s": 0,
+   "time_s": 209,
    "reason": "disabled",
-   "detail": "Cloning into '/tmp/pclone_rvetpywv'...\nremote: Access to this repository has been disabled by GitHub staff.\nremote: If you are the repository owner, you can contact support via https://support.github.com/contact for more information.\nfatal: unable to access 'https://github.com/alanbobs999/TopFreeProxies.git/': The requested URL returned error: 403\n"
+   "detail": "Cloning into '/tmp/pclone_6zyvymjq'...\nremote: Access to this repository has been disabled by GitHub staff.\nremote: If you are the repository owner, you can contact support via https://support.github.com/contact for more information.\nfatal: unable to access 'https://github.com/alanbobs999/TopFreeProxies.git/': The requested URL returned error: 403\n"
+  },
+  {
+   "repo": "Alvin9999/new-pac",
+   "size_kb": 16186,
+   "time_s": 169,
+   "reason": "repo_not_found",
+   "detail": "Cloning into '/tmp/pclone_omi4g09u'...\nremote: Repository not found.\nfatal: repository 'https://github.com/Alvin9999/new-pac.git/' not found\n"
+  },
+  {
+   "repo": "Alvin9999/new-pac",
+   "size_kb": 16186,
+   "time_s": 211,
+   "reason": "repo_not_found",
+   "detail": "Cloning into '/tmp/pclone_afb65rwv'...\nremote: Repository not found.\nfatal: repository 'https://github.com/Alvin9999/new-pac.git/' not found\n"
   }
  ]
 }
