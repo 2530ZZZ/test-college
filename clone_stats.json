@@ -1,78 +1,79 @@
 {
- "run_id": "20260814-2101",
+ "run_id": "20260815-2030",
  "mode": "clone_first",
  "clone_concurrency": 25,
- "duration_s": 20127,
- "api_used": 27227,
+ "duration_s": 20123,
+ "api_used": 19940,
  "api_remaining": 4800,
- "nodes_added": 1826028,
+ "nodes_added": 1824432,
  "resources": {
-  "cpu_load_max": 2.69,
-  "disk_free_min_gb": 85.2,
+  "cpu_load_max": 1.92,
+  "disk_free_min_gb": 85.1,
   "clone_concurrency_peak": 25
  },
  "clone": {
-  "total": 336,
-  "ok": 333,
-  "fail": 3,
-  "files_total": 1013122,
+  "total": 315,
+  "ok": 314,
+  "fail": 1,
+  "files_total": 15527980,
   "time_s": {
-   "avg": 110.5,
-   "max": 552.5,
-   "p90": 239.9
+   "avg": 159.2,
+   "max": 1047.5,
+   "p90": 409.0
   },
   "fail_breakdown": {
-   "disabled": 1,
-   "repo_not_found": 2
+   "disabled": 1
   }
  },
  "by_size_bucket": {
   "0-100MB": {
-   "count": 332,
-   "ok": 329,
-   "fail": 3,
-   "avg_s": 108.2,
-   "max_s": 552.5,
-   "files_total": 193339
+   "count": 125,
+   "ok": 124,
+   "fail": 1,
+   "avg_s": 177.3,
+   "max_s": 1047.5,
+   "files_total": 88350
   },
   "100M-1GB": {
-   "count": 3,
-   "ok": 3,
+   "count": 182,
+   "ok": 182,
    "fail": 0,
-   "avg_s": 251.7,
-   "max_s": 445.2,
-   "files_total": 755688
+   "avg_s": 153.8,
+   "max_s": 1030.6,
+   "files_total": 13419181
+  },
+  "1-5GB": {
+   "count": 6,
+   "ok": 6,
+   "fail": 0,
+   "avg_s": 3.3,
+   "max_s": 4.9,
+   "files_total": 1571908
+  },
+  "5-10GB": {
+   "count": 1,
+   "ok": 1,
+   "fail": 0,
+   "avg_s": 2.5,
+   "max_s": 2.5,
+   "files_total": 279335
   },
   ">10GB": {
    "count": 1,
    "ok": 1,
    "fail": 0,
-   "avg_s": 466.0,
-   "max_s": 466.0,
-   "files_total": 64095
+   "avg_s": 2.3,
+   "max_s": 2.3,
+   "files_total": 169206
   }
  },
  "failures": [
   {
    "repo": "alanbobs999/TopFreeProxies",
    "size_kb": -1,
-   "time_s": 209,
+   "time_s": 294,
    "reason": "disabled",
-   "detail": "Cloning into '/tmp/pclone_6zyvymjq'...\nremote: Access to this repository has been disabled by GitHub staff.\nremote: If you are the repository owner, you can contact support via https://support.github.com/contact for more information.\nfatal: unable to access 'https://github.com/alanbobs999/TopFreeProxies.git/': The requested URL returned error: 403\n"
-  },
-  {
-   "repo": "Alvin9999/new-pac",
-   "size_kb": 16186,
-   "time_s": 169,
-   "reason": "repo_not_found",
-   "detail": "Cloning into '/tmp/pclone_omi4g09u'...\nremote: Repository not found.\nfatal: repository 'https://github.com/Alvin9999/new-pac.git/' not found\n"
-  },
-  {
-   "repo": "Alvin9999/new-pac",
-   "size_kb": 16186,
-   "time_s": 211,
-   "reason": "repo_not_found",
-   "detail": "Cloning into '/tmp/pclone_afb65rwv'...\nremote: Repository not found.\nfatal: repository 'https://github.com/Alvin9999/new-pac.git/' not found\n"
+   "detail": "Cloning into '/tmp/pclone_i3rw6med'...\nremote: Access to this repository has been disabled by GitHub staff.\nremote: If you are the repository owner, you can contact support via https://support.github.com/contact for more information.\nfatal: unable to access 'https://github.com/alanbobs999/TopFreeProxies.git/': The requested URL returned error: 403\n"
   }
  ]
 }
