@@ -804,7 +804,7 @@ EXTRACT_PROCESS_MIN_MB = 1
 # （连接少、零 API）；≥ 阈值的仓库用 tree API 拿列表（大仓库 clone 元数据
 # 大、tree 响应可承受；tree 失败回退 clone）。阈值先用 50MB，等
 # _candidate_hist/_repo_size_hist 分布统计数据校准（_finalize 输出）。
-SMALL_REPO_CLONE_MB = 50
+SMALL_REPO_CLONE_MB = 500
 
 # 全量下载阈值（MB）：size < 阈值的仓库 → 全量 clone（不 partial，
 # checkout 工作区）→ 本地遍历候选后缀文件解析（零 API、不占 raw 速率）。
@@ -812,11 +812,28 @@ SMALL_REPO_CLONE_MB = 50
 # （≤阈值 MB/仓库，git 协议）。
 # 阈值分层：< FULL_CLONE_MB 全量 clone / [FULL_CLONE_MB, SMALL_REPO_CLONE_MB)
 # partial clone（拿列表 + raw 下载候选）/ ≥ SMALL_REPO_CLONE_MB tree。
-FULL_CLONE_MB = 10
+FULL_CLONE_MB = 50
 
 # 全量 clone 磁盘警戒（GB）：工作区可用 < 此值 → 暂停新的全量 clone
 # （GA 磁盘 70GB+，全量 clone 处理完即删，正常不会到警戒线）。
 FULL_CLONE_DISK_MIN_GB = 20
+
+# ==================== 取样跳过无关仓库（08142） ====================
+
+# 候选文件数超过此值 → 取样判断：各后缀取 SAMPLE_PER_EXT 个文件（不同
+# 目录，代表性）下载解析；取样全部无节点 → 跳过该仓库并加入无节点
+# 黑名单（no_node_repos.txt，30 天重试）。
+# 背景：08142 的 deepseek-harness 系列（80+ fork × 3700-4355 候选文件）
+# 是配置/数据文件（匹配后缀但无节点）——每仓库 30-90 分钟拖垮吞吐。
+SAMPLE_THRESHOLD = 50
+
+# 每后缀取样文件数（不同目录轮询选取）。
+SAMPLE_PER_EXT = 10
+
+# 无节点黑名单持久化文件（每行 repo<TAB>unix时间戳，超 NO_NODE_RETRY_DAYS
+# 天重新尝试——仓库可能"这次无节点下次有"）。
+NO_NODE_REPOS_FILE = "no_node_repos.txt"
+NO_NODE_RETRY_DAYS = 30
 
 # 全局 raw 下载连接速率（每秒新连接数）：08113 实测 36 连接/s 触发 CDN
 # 慢速限速；30/s = 限速线的 80% 余量，动态降级（限速信号）时自动减半。

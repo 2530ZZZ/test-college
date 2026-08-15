@@ -58,6 +58,7 @@ from config import (
     DOWNLOAD_STALL_THRESHOLD, DOWNLOAD_THROTTLE_SECONDS,
     SMALL_REPO_CLONE_MB, MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC,
     FULL_CLONE_MB, FULL_CLONE_DISK_MIN_GB,
+    SAMPLE_THRESHOLD, SAMPLE_PER_EXT, NO_NODE_REPOS_FILE, NO_NODE_RETRY_DAYS,
     EXTRACT_PROCESSES, DOWNLOAD_MEMORY_BUDGET_MB, EXTRACT_PROCESS_MIN_MB,
     NO_SPLIT_SIZE, MAIN_QUEUE_PAUSE_AT, MAIN_QUEUE_RESUME_AT,
     QUOTA_ENDGAME_MINUTES,
@@ -294,6 +295,10 @@ class Collector:
         self._full_clone_60s = deque()                 # [(time, size_mb)] 近 60s 全量下载仓库
         self._full_clone_total = 0                     # 累计全量下载仓库数
         self._full_clone_size_total = 0                # 累计全量下载仓库大小(MB)
+        # ── 08142：无节点黑名单（取样判断跳过，no_node_repos.txt 持久化）──
+        self._repo_no_node = {}                        # repo(lower) -> 检查时间戳（30 天重试）
+        self._sample_skipped_60s = deque()             # [(time,)] 近 60s 取样跳过仓库
+        self._sample_skipped_total = 0                 # 累计取样跳过仓库数
         self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
         self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
         self._parsing_waiting = 0                      # 等待解析名额的文件数（预算排队）
@@ -399,6 +404,29 @@ class Collector:
                             self._repo_not_found.add(line)
                 if self._repo_not_found:
                     self._wlog(f"已加载 404 仓库 {len(self._repo_not_found)} 条")
+        except Exception:
+            pass
+
+        # 08142：加载无节点黑名单（取样判断跳过的仓库，NO_NODE_RETRY_DAYS
+        # 天后重试——仓库可能"这次无节点下次有"）
+        try:
+            if os.path.exists(NO_NODE_REPOS_FILE):
+                with open(NO_NODE_REPOS_FILE, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        parts = line.split("\t")
+                        r = parts[0].lower()
+                        ts = 0.0
+                        if len(parts) > 1:
+                            try:
+                                ts = float(parts[1])
+                            except ValueError:
+                                ts = 0.0
+                        self._repo_no_node[r] = ts
+                if self._repo_no_node:
+                    self._wlog(f"已加载无节点黑名单 {len(self._repo_no_node)} 条")
         except Exception:
             pass
 
@@ -901,7 +929,9 @@ class Collector:
                     f"/{self._seed_repos_done_size_total:.0f}MB | "
                     f"全量 {self._full_clone_total}仓库"
                     f"/{self._full_clone_size_total:.0f}MB"
-                    f"(60s {len(self._full_clone_60s_clean(now))})",
+                    f"(60s {len(self._full_clone_60s_clean(now))}) | "
+                    f"取样跳过 {self._sample_skipped_total}"
+                    f"(60s {self._sample_skipped_60s_clean(now)})",
                     f"   诊断: log队列 {_log_q}/{_log_ok} | "
                     f"线程 {threading.active_count()} | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
@@ -993,6 +1023,12 @@ class Collector:
         _mb = sum(s for _, s in self._repos_done_60s)
         return f"{_n}仓库/{_mb:.0f}MB"
 
+    def _sample_skipped_60s_clean(self, now: float) -> int:
+        """近 60s 取样跳过仓库数（读取时清理窗口防残留，08142）。"""
+        self._sample_skipped_60s = deque(
+            t for t in self._sample_skipped_60s if now - t <= 60)
+        return len(self._sample_skipped_60s)
+
     def _full_clone_60s_clean(self, now: float) -> list:
         """近 60s 全量下载仓库（读取时清理窗口防残留，08141）。"""
         self._full_clone_60s = deque(
@@ -1077,7 +1113,17 @@ class Collector:
     def _is_repo_dead(self, repo: str) -> bool:
         """检查仓库是否已知不可达（404/403，大小写不敏感）。"""
         r = repo.lower()
+        # 08142：无节点黑名单（取样判断跳过；超 NO_NODE_RETRY_DAYS 重试）
+        _nn = self._repo_no_node.get(r)
+        if _nn is not None and \
+                time.time() - _nn < NO_NODE_RETRY_DAYS * 86400:
+            return True
         return r in self._repo_not_found or r in self._repo_forbidden
+
+    def _mark_repo_no_node(self, repo: str):
+        """标记无节点黑名单（08142：取样全无节点跳过的仓库）。"""
+        with self._state_lock:
+            self._repo_no_node[repo.lower()] = time.time()
 
     def _mark_repo_not_found(self, repo: str):
         """记录 404 仓库（本轮内存 + 持久化文件追加，跨运行跳过）。"""
@@ -2150,6 +2196,13 @@ class Collector:
                 f.write("\n".join(nf) + "\n")
         except Exception:
             pass
+        # 08142：无节点黑名单持久化（repo + 检查时间戳，30 天重试）
+        try:
+            with open(NO_NODE_REPOS_FILE, "w", encoding="utf-8") as f:
+                for r, ts in sorted(self._repo_no_node.items()):
+                    f.write(f"{r}\t{ts:.0f}\n")
+        except Exception:
+            pass
 
         print(f"\n===== 仓库处理统计 =====", flush=True)
         print(f"  404 仓库: {len(self._repo_not_found)} 个 | 403 仓库: {len(self._repo_forbidden)} 个", flush=True)
@@ -2857,6 +2910,16 @@ class Collector:
         # 08141：解析过文件的仓库统计（累计数 + 大小，调用方 _collect_files
         # 无 size 透传，用 _repo_size_hist 已覆盖大小分布——此处只计数）
         self._repos_parsed_total += 1
+        # 08142 取样判断：候选 > SAMPLE_THRESHOLD 时先取样（raw 下载解析），
+        # 全无节点 → 跳过仓库 + 无节点黑名单（不浪费剩余文件下载/解析）
+        if not self._sample_judge_remote(repo, branch, files_to_check):
+            self._mark_repo_no_node(repo)
+            self._sample_skipped_60s.append(time.time())
+            self._sample_skipped_total += 1
+            self._wlog(f"⏭️ 取样全无节点，跳过并加入黑名单"
+                  f"（{repo}，候选 {len(files_to_check)} 个）")
+            has_nodes[0] = True  # 视为处理完成（不误入 404 黑名单）
+            return True
 
         # ---- 并行下载处理 ----
         # 小量文件串行（省线程开销），大量文件用线程池并发下载
@@ -2971,6 +3034,114 @@ class Collector:
             return "ls_tree"
         return "other"
 
+    # ---- 08142：取样跳过无关仓库 ----
+    # 背景：deepseek-harness 系列（80+ fork × 3700-4355 候选文件）是配置/
+    # 数据文件（匹配后缀但无节点）——每仓库 30-90 分钟拖垮吞吐。
+    # 机制：候选 > SAMPLE_THRESHOLD 时，各后缀取 ≤SAMPLE_PER_EXT 个不同
+    # 目录的文件下载解析；取样全部无节点 → 跳过仓库 + 无节点黑名单
+    # （NO_NODE_RETRY_DAYS 重试）；有节点 → 继续处理剩余候选。
+
+    @staticmethod
+    def _pick_samples(files):
+        """候选文件取样：各后缀 ≤SAMPLE_PER_EXT 个，目录尽量不同（代表性）。
+
+        Args:
+            files: [(path, sha, size)] 候选文件列表。
+        Returns:
+            取样子列表（原始元素引用）。
+        """
+        if len(files) <= SAMPLE_THRESHOLD:
+            return []
+        by_ext = {}
+        for item in files:
+            ext = os.path.splitext(item[0])[1].lower()
+            by_ext.setdefault(ext, []).append(item)
+        samples = []
+        for _ext, lst in by_ext.items():
+            # 目录分层轮询：不同目录优先，目录不足 10 个则同目录补足
+            by_dir = {}
+            for item in lst:
+                d = os.path.dirname(item[0])
+                by_dir.setdefault(d, []).append(item)
+            dirs = sorted(by_dir.keys())
+            picked = []
+            di = 0
+            while len(picked) < SAMPLE_PER_EXT and len(picked) < len(lst):
+                d = dirs[di % len(dirs)]
+                if by_dir[d]:
+                    picked.append(by_dir[d].pop(0))
+                di += 1
+            samples.extend(picked)
+        return samples
+
+    def _sample_judge_remote(self, repo: str, branch: str,
+                             files_to_check) -> bool:
+        """远程取样判断（clone/tree 路径）：取样文件走 raw 下载解析。
+
+        Returns: True = 取样有节点（继续处理）；False = 全无节点（跳过）。
+        取样文件解析后 SHA 已标记（_handle_one_file 内），剩余处理时
+        按 sha 排除避免重复下载。
+        """
+        samples = self._pick_samples(files_to_check)
+        if not samples:
+            return True  # 候选 ≤ 阈值 → 不取样，直接处理
+        has_node = [False]
+        _s_set = set(s[1] for s in samples)
+        for path, sha, _sz in samples:
+            if self.limiter.should_stop():
+                break
+            self._handle_one_file(repo, branch, path, sha, has_node,
+                                  raw_depth=0, stats=[0, 0],
+                                  tag="[取样]", size=_sz)
+        if not has_node[0]:
+            return False
+        # 取样有节点：剩余处理时排除已解析的取样文件（sha 已标记）
+        files_to_check[:] = [x for x in files_to_check if x[1] not in _s_set]
+        return True
+
+    def _sample_judge_local(self, repo: str, local_files) -> bool:
+        """本地取样判断（全量 clone 路径）：取样文件磁盘直读（不走 raw）。
+
+        local_files: [绝对路径] 工作区候选文件。
+        Returns: True = 取样有节点；False = 全无节点（调用方删仓库）。
+        """
+        if len(local_files) <= SAMPLE_THRESHOLD:
+            return True
+        # 按后缀目录分层取样（同 _pick_samples，但输入是路径列表）
+        by_ext = {}
+        for p in local_files:
+            ext = os.path.splitext(p)[1].lower()
+            by_ext.setdefault(ext, []).append(p)
+        samples = []
+        for _ext, lst in by_ext.items():
+            by_dir = {}
+            for p in lst:
+                d = os.path.dirname(p)
+                by_dir.setdefault(d, []).append(p)
+            dirs = sorted(by_dir.keys())
+            picked = []
+            di = 0
+            while len(picked) < SAMPLE_PER_EXT and len(picked) < len(lst):
+                d = dirs[di % len(dirs)]
+                if by_dir[d]:
+                    picked.append(by_dir[d].pop(0))
+                di += 1
+            samples.extend(picked)
+        has_node = [False]
+        for p in samples:
+            if self.limiter.should_stop():
+                break
+            try:
+                with open(p, "rb") as fh:
+                    data = fh.read()
+            except OSError:
+                continue
+            self._handle_one_file(repo, "HEAD", p, "", has_node,
+                                  raw_depth=0, stats=[0, 0],
+                                  tag="[取样]", size=len(data),
+                                  content_bytes_preloaded=data)
+        return has_node[0]
+
     def _full_clone_local_parse(self, repo: str, size_kb: int = -1) -> bool:
         """08141：<FULL_CLONE_MB 仓库全量 clone → 本地遍历候选文件解析。
 
@@ -3026,11 +3197,9 @@ class Collector:
                       f"{(err_text or '')[-200:]}")
                 return True
 
-            # 遍历工作区：候选后缀文件逐个读入解析（串行，10MB 仓库文件少）
+            # 遍历工作区收集候选后缀文件路径
             _size_mb = size_kb / 1024 if size_kb and size_kb > 0 else 0
-            _n = 0
-            _dl_total = 0
-            _has = [False]
+            _cands = []
             for root, _dirs, files in os.walk(tmp):
                 if self.limiter.should_stop():
                     break
@@ -3038,18 +3207,34 @@ class Collector:
                     ext = os.path.splitext(fn)[1].lower()
                     if ext not in ALLOWED_EXTENSIONS:
                         continue
-                    fpath = os.path.join(root, fn)
-                    try:
-                        with open(fpath, "rb") as fh:
-                            data = fh.read()
-                    except OSError:
-                        continue
-                    _dl_total += len(data)
-                    self._handle_one_file(
-                        repo, "HEAD", fpath, "", _has,
-                        raw_depth=0, stats=[0, 0], tag="[全量]",
-                        size=len(data), content_bytes_preloaded=data)
-                    _n += 1
+                    _cands.append(os.path.join(root, fn))
+            # 08142 取样判断：候选 > SAMPLE_THRESHOLD 时先取样（磁盘直读），
+            # 全无节点 → 删仓库 + 无节点黑名单（不浪费剩余文件的读取/解析）
+            if not self._sample_judge_local(repo, _cands):
+                self._mark_repo_no_node(repo)
+                self._sample_skipped_60s.append(time.time())
+                self._sample_skipped_total += 1
+                self._wlog(f"⏭️ 取样全无节点，跳过并加入黑名单（{repo}，"
+                      f"候选 {len(_cands)} 个）")
+                return True  # finally 删 tmp
+            # 取样有节点（或候选 ≤ 阈值）→ 逐个读入解析（串行）
+            _n = 0
+            _dl_total = 0
+            _has = [False]
+            for fpath in _cands:
+                if self.limiter.should_stop():
+                    break
+                try:
+                    with open(fpath, "rb") as fh:
+                        data = fh.read()
+                except OSError:
+                    continue
+                _dl_total += len(data)
+                self._handle_one_file(
+                    repo, "HEAD", fpath, "", _has,
+                    raw_depth=0, stats=[0, 0], tag="[全量]",
+                    size=len(data), content_bytes_preloaded=data)
+                _n += 1
             _now = time.time()
             self._full_clone_60s.append((_now, _size_mb))
             self._full_clone_total += 1
