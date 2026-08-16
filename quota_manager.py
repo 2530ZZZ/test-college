@@ -53,6 +53,7 @@ class QuotaManager:
         self.throttle_count = 0       # 主动延迟次数（统计用）
         self.failed_calls = 0         # 失败调用次数（403/网络错误）
         self._reset_wait_logged = False  # 配额等待日志去重（跨线程只打一条）
+        self._exhausted_window = 0     # 08161：耗尽时的 UTC 窗口序号（恢复判断基准）
 
     @staticmethod
     def _bj_now() -> str:
@@ -224,12 +225,14 @@ class QuotaManager:
         """配额耗尽时暂停等待 GitHub 窗口恢复。
 
         优先使用 GitHub 返回的 X-RateLimit-Reset 时间戳（真实恢复时间），
-        无数据时才用本地估算（window_start + 3600 + 10s 冗余）。
+        无数据时用绝对 UTC 窗口判断（08161 修复）。
 
-        重要：重置时不更新 window_start——由 check() 在下一次 API 调用时
-        自然更新。若在此更新，第一个恢复的线程会重置它，其他等待线程的
-        估算条件（now - window_start >= 3600）将永久不满足 → 睡死
-        （08071 日志：17:01 耗尽后 23 个 work 睡到运行结束，只剩 W-13 独活）。
+        08161 修复：无真实时间的恢复条件从"now - window_start >= 3600"
+        （相对 elapsed）改为"绝对窗口序号变化"（int(now//3600) !=
+        _exhausted_window）——原相对判断会被"恢复后第一个 API 调用重置
+        window_start"推后破坏 → 死等到下一整点且每整点重复（08161 实测
+        16:00/17:00/18:00 连续死等，2 小时配额全浪费）。窗口序号用 UTC
+        整点（北京时间整点与 UTC 整点一致）。
 
         日志去重：首次进入打印一条"配额耗尽"，多线程并发只打一次
         （_reset_wait_logged 实例标志），恢复时复位。
@@ -241,6 +244,8 @@ class QuotaManager:
             True: 配额已恢复可以继续
             False: 提前终止
         """
+        # 记录耗尽时的 UTC 窗口序号（恢复判断基准，08161）
+        self._exhausted_window = int(time.time() // 3600)
         while True:
             with self._lock:
                 now = time.time()
@@ -255,8 +260,8 @@ class QuotaManager:
                             log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
                         return True
                 else:
-                    # 无真实时间 → 本地估算（window_start + 3600）
-                    if now - self.window_start >= 3600:
+                    # 无真实时间 → 绝对窗口变化（整点已过）即恢复
+                    if int(now // 3600) != self._exhausted_window:
                         self.calls = 0
                         self.exceeded = False
                         if self._reset_wait_logged:

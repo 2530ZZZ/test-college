@@ -299,6 +299,9 @@ class Collector:
         self._repo_no_node = {}                        # repo(lower) -> 检查时间戳（30 天重试）
         self._sample_skipped_60s = deque()             # [(time,)] 近 60s 取样跳过仓库
         self._sample_skipped_total = 0                 # 累计取样跳过仓库数
+        # 08161：跳过原因细分（监控显示 worker 时间去向）
+        self._repos_no_cand_total = 0                  # 无候选文件仓库数
+        self._repos_black_hit_total = 0                # 黑名单（404/403/无节点）命中跳过数
         self._total_parsed_files = 0                   # 累计下载解析的文件数（监控）
         self._total_parsed_mb = 0.0                    # 累计下载解析的文件总大小（MB）
         self._parsing_waiting = 0                      # 等待解析名额的文件数（预算排队）
@@ -925,13 +928,15 @@ class Collector:
                     f"累计完成 {self._repos_done_total}仓库"
                     f"/{self._repos_done_size_total:.0f}MB | "
                     f"解析过 {self._repos_parsed_total}仓库 | "
+                    f"跳过: 取样{self._sample_skipped_total}"
+                    f"(60s {self._sample_skipped_60s_clean(now)})/"
+                    f"无候选{self._repos_no_cand_total}/"
+                    f"黑名单{self._repos_black_hit_total} | "
                     f"种子 {self._seed_repos_done_total}仓库"
                     f"/{self._seed_repos_done_size_total:.0f}MB | "
                     f"全量 {self._full_clone_total}仓库"
                     f"/{self._full_clone_size_total:.0f}MB"
-                    f"(60s {len(self._full_clone_60s_clean(now))}) | "
-                    f"取样跳过 {self._sample_skipped_total}"
-                    f"(60s {self._sample_skipped_60s_clean(now)})",
+                    f"(60s {len(self._full_clone_60s_clean(now))})",
                     f"   诊断: log队列 {_log_q}/{_log_ok} | "
                     f"线程 {threading.active_count()} | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
@@ -2390,6 +2395,13 @@ class Collector:
         """
         github_url = f"https://github.com/{repo}"
 
+        # 08161：黑名单命中（404/403/无节点，跳过原因细分监控）——
+        # 已知死仓库直接跳过（原逻辑在 resolve_branch 被动跳过，此处
+        # 显式化并计数）
+        if self._is_repo_dead(repo):
+            self._repos_black_hit_total += 1
+            return (0, 0)
+
         # ── 信息补全（判断前置）：缺字段 → 补查一次 repo info ──
         # 语言过滤/已解析跳过/年龄判断都需完整信息，缺什么补什么（1 次 API）。
         # 查不到（404/网络错误）→ 不跳过：用已有信息继续处理，
@@ -2860,6 +2872,8 @@ class Collector:
             files_to_check.append((path, sha, e.get('size', 0)))
 
         if not files_to_check:
+            # 08161：无候选文件计数（跳过原因细分监控）
+            self._repos_no_cand_total += 1
             self._wlog(f"仓库 https://github.com/{repo} 无候选文件 "
                   f"(总计 {len([e for e in entries if e.get('type')=='blob'])} blob"
                   f", 扩展名过滤 {skipped_by_ext}"

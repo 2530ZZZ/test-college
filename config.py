@@ -812,7 +812,7 @@ SMALL_REPO_CLONE_MB = 500
 # （≤阈值 MB/仓库，git 协议）。
 # 阈值分层：< FULL_CLONE_MB 全量 clone / [FULL_CLONE_MB, SMALL_REPO_CLONE_MB)
 # partial clone（拿列表 + raw 下载候选）/ ≥ SMALL_REPO_CLONE_MB tree。
-FULL_CLONE_MB = 50
+FULL_CLONE_MB = 100
 
 # 全量 clone 磁盘警戒（GB）：工作区可用 < 此值 → 暂停新的全量 clone
 # （GA 磁盘 70GB+，全量 clone 处理完即删，正常不会到警戒线）。
