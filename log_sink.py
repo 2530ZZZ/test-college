@@ -30,9 +30,31 @@ class LogSink:
     def __init__(self, maxsize: int = 20000, hi_maxsize: int = 1000):
         self._q = Queue(maxsize=maxsize)
         self._hi_q = Queue(maxsize=hi_maxsize)
-        threading.Thread(target=self._run, name="LogSink", daemon=True).start()
+        self._thread = threading.Thread(target=self._run,
+                                        name="LogSink", daemon=True)
+        self._thread.start()
+        self._dead_reported = False  # 消费者死亡告警去重（08171）
+
+    def _ensure_consumer(self):
+        """消费者线程看门狗：死亡则重建（08171 静默 3.5 小时根因防护）。
+
+        08171 事故：_run 的 print 抛异常（stdout 管道/编码）→ 消费者线程
+        死亡 → emit/emit_priority 仍 put_nowait（worker 不阻塞）→ 队列无人
+        消费、满后丢弃 → 所有日志（含监控块）静默，程序空转 3.5 小时。
+        """
+        if not self._thread.is_alive():
+            if not self._dead_reported:
+                self._dead_reported = True
+                try:
+                    print(f"[LogSink] 消费者线程死亡，重建中...", flush=True)
+                except Exception:
+                    pass
+            self._thread = threading.Thread(target=self._run,
+                                            name="LogSink", daemon=True)
+            self._thread.start()
 
     def emit(self, msg: str):
+        self._ensure_consumer()  # 看门狗：消费者死 → 先重建再入队
         try:
             self._q.put_nowait(msg)
         except QueueFull:
@@ -43,6 +65,7 @@ class LogSink:
 
         hi 队列满时：先清空普通队列（丢低优先级日志保底），再入队。
         """
+        self._ensure_consumer()
         try:
             self._hi_q.put_nowait(msg)
         except QueueFull:
@@ -66,10 +89,7 @@ class LogSink:
 
     def consumer_alive(self) -> bool:
         """LogSink 消费者线程是否存活（监控健康检查）。"""
-        for t in threading.enumerate():
-            if t.name == "LogSink" and t.is_alive():
-                return True
-        return False
+        return self._thread.is_alive()
 
     def _run(self):
         while True:
@@ -85,7 +105,13 @@ class LogSink:
                 except Exception:
                     continue
                 self._q.task_done()
-            print(msg, flush=True)
+            # 08171：print 包 try/except——stdout 写失败（管道关闭/编码异常）
+            # 只丢弃本条，绝不退出线程（否则全日志静默）。消费循环持续，
+            # stdout 恢复（GA 管道/终端）后日志自然恢复输出。
+            try:
+                print(msg, flush=True)
+            except Exception:
+                pass
 
 
 # 模块级单例（所有模块共享）

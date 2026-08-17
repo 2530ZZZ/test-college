@@ -230,7 +230,12 @@ class HttpClient:
             成功时返回 Response 对象，失败时返回 None。
             返回 None 后调用者应检查 limiter.should_stop() 决定是否继续。
         """
-        is_api_call = "api.github.com" in url
+        # 核心 API：api.github.com 且非 search（08171：search 有独立
+        # 30/min 端点级限速，不消耗 4800/h 核心配额预算——search 占预算
+        # 会让核心预算虚减；按端点类型显式匹配，比 is_search 判断更直白）
+        is_core_api = "api.github.com" in url and "/search/" not in url
+        is_search_api = "api.github.com" in url and "/search/" in url
+        is_api = is_core_api or is_search_api
 
         for attempt in range(1, max_retries + 1):
             # ---- 入口拦截：限流超限则直接放弃 ----
@@ -239,14 +244,17 @@ class HttpClient:
                 return None
 
             # ---- API 速率门：削峰填谷（raw 下载直接放行） ----
-            if is_api_call and self.api_gate is not None:
+            # 所有 api.github.com（core + search）都经速率门；gate 内部
+            # 对 search 只查端点级 30/min、不占 core 共享窗口。
+            if is_api and self.api_gate is not None:
                 while not self.api_gate.acquire(url):
                     time.sleep(random.uniform(0.3, 0.8))  # 自旋重试（抖动防惊群）
 
             # ---- 配额检查：原子预占（防超发）+ 配额耗尽等待恢复 ----
             # acquire() 在单次加锁内完成检查+计数（08105 超发 4806/4800
             # 触发 GitHub 惩罚的根因：check/record 分开有竞态窗口）。
-            if is_api_call and not self.quota.acquire():
+            # 仅核心 API 消耗 4800/h 预算（search 独立 30/min，不占）。
+            if is_core_api and not self.quota.acquire():
                 self._record_call(url, 0)
                 self.quota.wait_for_reset()
                 continue  # 配额恢复，重试本次请求
@@ -257,7 +265,7 @@ class HttpClient:
                 # 记录调用：仅 API 调用消耗配额（acquire 已预占计数）
                 remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
                 remaining = None
-                if remaining_hdr and is_api_call:
+                if remaining_hdr and is_api:
                     remaining = int(remaining_hdr)
                 reset_hdr = resp.headers.get("X-RateLimit-Reset")
                 # 注意：不在此处 set_reset_time——200 响应的 X-RateLimit-Reset
@@ -265,7 +273,7 @@ class HttpClient:
                 # （08081 事故：35 个 worker 被拨闹钟无限推迟）。
                 # 只在 403 核心配额耗尽分支设置（下方 403 处理）。
                 self._record_call(url, resp.status_code, remaining)
-                if is_api_call:
+                if is_api:
                     # 记录响应状态（次级限流观测）
                     if self.api_gate is not None:
                         retry_after = resp.headers.get("Retry-After")
@@ -276,7 +284,7 @@ class HttpClient:
                 # 成功
                 if resp.status_code == 200:
                     # raw 下载统计（滑动窗口 60 秒）
-                    if not is_api_call:
+                    if not is_api:
                         now = time.time()
                         size = len(resp.content)
                         self._raw_window.append((now, size))
@@ -330,9 +338,26 @@ class HttpClient:
                         continue  # 重试
 
                     if remaining_val == 0:
+                        # 08171：非整点 reset = GitHub 次级限流伪装（abuse 403
+                        # 也可能带 remaining=0 + 非整点 reset；PAT 主限流 reset
+                        # 必为 UTC 整点——08131 曾修"非整点=abuse"，08161 绝对
+                        # 窗口重构时回归丢失）。误判为"核心配额耗尽"会死等
+                        # 13-32 分钟（08171 实测 4 批 409 次、等 789s/1917s）。
+                        # 非整点 → 按次级限流短退避重试，不 set_reset_time。
+                        if reset_hdr:
+                            try:
+                                reset_ts = int(reset_hdr)
+                            except (ValueError, TypeError):
+                                reset_ts = 0
+                            if reset_ts and abs(reset_ts % 3600) > 300:
+                                log_sink.emit(f"[{_now()}] ⚠️ 次级限流伪装"
+                                      f"（非整点 reset {reset_hdr}，remaining=0），"
+                                      f"等待 60s 后重试")
+                                time.sleep(60)
+                                continue  # 短退避后重试本次请求
                         # 核心 API 配额耗尽（remaining=0）→ 记录 GitHub 重置时间
                         # （403-only：200 响应带同一 reset 头但语义不同，见上方注释）
-                        if reset_hdr and is_api_call:
+                        if reset_hdr and is_core_api:
                             try:
                                 self.quota.set_reset_time(int(reset_hdr))
                             except Exception:

@@ -9,6 +9,7 @@ API 配额管理器 — 全局追踪、主动限速、停止信号。
 """
 
 import time
+import random
 import threading
 from datetime import datetime, timezone, timedelta
 
@@ -54,6 +55,7 @@ class QuotaManager:
         self.failed_calls = 0         # 失败调用次数（403/网络错误）
         self._reset_wait_logged = False  # 配额等待日志去重（跨线程只打一条）
         self._exhausted_window = 0     # 08161：耗尽时的 UTC 窗口序号（恢复判断基准）
+        self._recovery_done = False    # 08171：本次窗口恢复动作是否已执行（互斥）
 
     @staticmethod
     def _bj_now() -> str:
@@ -244,30 +246,50 @@ class QuotaManager:
             True: 配额已恢复可以继续
             False: 提前终止
         """
-        # 记录耗尽时的 UTC 窗口序号（恢复判断基准，08161）
-        self._exhausted_window = int(time.time() // 3600)
+        # 记录耗尽时的 UTC 窗口序号（恢复判断基准，08161）。
+        # 08171 修正：仅在新窗口的耗尽时更新基准 + 复位互斥——同窗口内
+        # 并发进入/二次耗尽沿用基准（否则后进入线程刷新 exhausted_window=
+        # 当前窗口，且首个恢复线程已清零 _reset_time → 绝对窗口判断永不
+        # 满足 → 死等到下一整点，实测 5 线程并发恢复卡死）。
+        _now_window = int(time.time() // 3600)
+        if self._exhausted_window != _now_window:
+            self._exhausted_window = _now_window
+            self._recovery_done = False
         while True:
             with self._lock:
                 now = time.time()
+                _recovered = False
                 if self._reset_time:
                     # 有 GitHub 真实重置时间 → 严格按它等（不提前恢复，避免 403 风暴）
                     if now >= self._reset_time:
-                        self.calls = 0
                         self._reset_time = 0
-                        self.exceeded = False
-                        if self._reset_wait_logged:
-                            self._reset_wait_logged = False
-                            log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
-                        return True
+                        _recovered = True
                 else:
-                    # 无真实时间 → 绝对窗口变化（整点已过）即恢复
-                    if int(now // 3600) != self._exhausted_window:
+                    # 无真实时间 → 满足其一即恢复：
+                    # a) 绝对窗口变化（整点已过，08161）
+                    # b) 本窗口已恢复过（_recovery_done）且未再次耗尽
+                    #    （calls < max）——并发等待线程的快速恢复路径，
+                    #    首个恢复线程已清零 calls/exceeded，跟随者无需
+                    #    再等整点（08171 修复：原逻辑跟随者死等）
+                    if (int(now // 3600) != self._exhausted_window
+                            or (self._recovery_done
+                                and self.calls < self.max_per_hour)):
+                        _recovered = True
+                if _recovered:
+                    self.exceeded = False
+                    # 08171：恢复动作互斥——只有"首个"满足恢复条件的线程
+                    # 清零 calls（否则后恢复线程把先恢复线程的计数清零 →
+                    # 计数永远到不了 4800 → acquire 永远放行 → 恢复风暴超发，
+                    # 08171 实测 00:53 剩余 245→4446 跳变 + 30s 4523 次）。
+                    # 跨窗口恢复 = 新周期，允许清零；同窗口跟随者不清零。
+                    if (not self._recovery_done
+                            or int(now // 3600) != self._exhausted_window):
+                        self._recovery_done = True
                         self.calls = 0
-                        self.exceeded = False
-                        if self._reset_wait_logged:
-                            self._reset_wait_logged = False
-                            log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
-                        return True
+                    if self._reset_wait_logged:
+                        self._reset_wait_logged = False
+                        log_sink.emit(f"[{self._bj_now()}] 🔄 配额恢复，继续工作")
+                    break
             # 首次等待日志（跨线程去重）
             if not self._reset_wait_logged:
                 self._reset_wait_logged = True
@@ -296,6 +318,11 @@ class QuotaManager:
                 time.sleep(sleep_sec)
             if should_stop and should_stop():
                 return False
+        # 08171：恢复后每线程随机退避 0.5-2s——200 线程同时恢复瞬间冲 API
+        # 是次级限流触发源（08171 实测恢复后 30s 计数 4523 次）。随机错开
+        # 让线程陆续恢复，配合 api_gate core 200/min 限速兜底，杜绝风暴。
+        time.sleep(random.uniform(0.5, 2.0))
+        return True
 
     def reset_window(self):
         """手动重置配额窗口（仅用于测试）。"""

@@ -97,7 +97,7 @@ from config import (
     CHUNK_SIZE, DEDUP_STRATEGY, DEDUP_ENABLED, BATCH_DIR, BATCH_FLUSH_SIZE,
     MAX_RUNTIME_SECONDS,
     GITHUB_SEARCH_ENABLED, QUOTA_MAX_PER_HOUR,
-    SKIP_PROCESSING_AGE_HOURS,
+    SKIP_PROCESSING_AGE_HOURS, LOG_MONITOR_FILE,
     QUEUE_PUT_TIMEOUT_SECONDS,
     LOG_FAILED_CANDIDATES,
     PARALLEL_DOWNLOAD_MB_HIGH, PARALLEL_DOWNLOAD_MB_MED,
@@ -329,7 +329,18 @@ class Collector:
         self._repos_by_result = {"clone_ok": [], "clone_fail": []}  # 结果分类（汇总展示）
         self._quota_exhausted_times = []                # 配额耗尽时间（UTC）
         self._skip_counts = {"lang": 0, "size0": 0, "disabled": 0,
-                             "stale": 0}                # 跳过原因计数（汇总展示）
+                             "stale": 0, "cached": 0}   # 跳过原因计数（汇总展示）
+        # 08171 统计细分：仓库维度 + 文件维度（监控块 + 收尾统计）
+        self._repos_cached_total = 0        # 已处理缓存跳过仓库数（= _skip_counts["cached"] 镜像）
+        self._repos_partial_total = 0       # partial clone 仓库数
+        self._repos_tree_total = 0          # tree API 仓库数
+        self._repos_with_nodes_total = 0    # 提取出节点（≥1）的仓库数
+        self._tag_counts = {}               # 标志位（[种子仓库]/[kw0]/[cd0]/[forkN]...）→ 仓库处理总数
+        self._files_sha_skip_total = 0      # SHA 缓存命中跳过文件数
+        self._files_with_nodes_total = 0    # 解析出节点（≥1）的文件数
+        self._files_no_nodes_total = 0      # 解析无节点的文件数
+        self._files_404_total = 0           # 下载 404 文件数
+        self._files_timeout_total = 0       # 下载超时（timeout/idle/max_total）文件数
         self._backfill_count = 0                        # 信息补查次数（INFO_BACKFILL 统计）
         # 阶段进度（监控/完成日志显示）：种子/关键词/Code 处理到第几个
         self._seed_progress = ""                        # 如 "505/634"
@@ -918,7 +929,12 @@ class Collector:
                     f"节点 60s {sum(c for _t, c in self._nodes_60s)}"
                     f"/累计 {self._total_parsed_nodes} | "
                     f"累计解析 {self._total_parsed_files}文件"
-                    f"/{self._total_parsed_mb/1024:.1f}GB",
+                    f"/{self._total_parsed_mb/1024:.1f}GB"
+                    f" | 文件: sha跳过{self._files_sha_skip_total}"
+                    f"/有节点{self._files_with_nodes_total}"
+                    f"/无节点{self._files_no_nodes_total}"
+                    f"/404:{self._files_404_total}"
+                    f"/超时{self._files_timeout_total}",
                     f"   API: 剩余 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
                     f"clone 成功{self._clone_repos}/失败{self._clone_fail_count}"
@@ -927,16 +943,25 @@ class Collector:
                     f"   仓库: 近60s完成 {self._repos_done_60s_clean(now)} | "
                     f"累计完成 {self._repos_done_total}仓库"
                     f"/{self._repos_done_size_total:.0f}MB | "
-                    f"解析过 {self._repos_parsed_total}仓库 | "
+                    f"解析过 {self._repos_parsed_total}仓库"
+                    f"(有节点{self._repos_with_nodes_total}) | "
                     f"跳过: 取样{self._sample_skipped_total}"
                     f"(60s {self._sample_skipped_60s_clean(now)})/"
                     f"无候选{self._repos_no_cand_total}/"
-                    f"黑名单{self._repos_black_hit_total} | "
-                    f"种子 {self._seed_repos_done_total}仓库"
-                    f"/{self._seed_repos_done_size_total:.0f}MB | "
-                    f"全量 {self._full_clone_total}仓库"
+                    f"黑名单{self._repos_black_hit_total}/"
+                    f"缓存{self._repos_cached_total}/"
+                    f"未更新{self._skip_counts.get('stale', 0)}/"
+                    f"禁用{self._skip_counts.get('disabled', 0)}/"
+                    f"大小0{self._skip_counts.get('size0', 0)} | "
+                    f"分流: 全量{self._full_clone_total}仓库"
                     f"/{self._full_clone_size_total:.0f}MB"
-                    f"(60s {len(self._full_clone_60s_clean(now))})",
+                    f"(60s {len(self._full_clone_60s_clean(now))})/"
+                    f"partial{self._repos_partial_total}/"
+                    f"tree{self._repos_tree_total} | "
+                    f"按标志: " + " ".join(
+                        f"{k[1:-1]}{v}" for k, v in
+                        sorted(self._tag_counts.items(),
+                               key=lambda kv: -kv[1])[:8]),
                     f"   诊断: log队列 {_log_q}/{_log_ok} | "
                     f"线程 {threading.active_count()} | {_lk_txt}",
                     f"   进度: 种子 {self._seed_progress or '-'} | "
@@ -946,8 +971,25 @@ class Collector:
                     f"   Worker: {_w}忙/{_i}闲({_r}%) | " + " | ".join(wc),
                 ]
                 _ts = now_str()
+                _block = f"[{_ts}] " + f"\n[{_ts}] ".join(lines)
                 # 08111：高优先级通道——刷屏日志再多监控块也不丢（盲区根因）
-                log_sink.emit_priority(f"[{_ts}] " + f"\n[{_ts}] ".join(lines))
+                log_sink.emit_priority(_block)
+                # 08171：监控块双通道落盘——stdout 通道死亡（LogSink 消费者
+                # 异常/管道问题）时文件仍有心跳，确认程序存活（启动时清空，
+                # 每轮一份 log/monitor.log）
+                try:
+                    if not getattr(self, '_monitor_file_inited', False):
+                        self._monitor_file_inited = True
+                        os.makedirs(os.path.dirname(LOG_MONITOR_FILE),
+                                    exist_ok=True)
+                        with open(LOG_MONITOR_FILE, "w",
+                                  encoding="utf-8") as _mf:
+                            _mf.write(f"[{_ts}] 监控落盘启动\n")
+                    with open(LOG_MONITOR_FILE, "a",
+                              encoding="utf-8") as _mf:
+                        _mf.write(_block + "\n")
+                except Exception:
+                    pass  # 落盘失败不影响主流程（stdout 正常时不需要它）
             except Exception as e:
                 # 首次异常打印一次（定位监控静默根因），之后静默不影响主流程
                 if not getattr(self, '_monitor_err_logged', False):
@@ -1011,6 +1053,11 @@ class Collector:
                 first = True
         if first:
             self._wlog(f"⏳ 配额耗尽 | {self._qs()}")
+            # 08171：零 API 模式提示——耗尽期间缺信息任务（需 API 补查
+            # repo info）由 _requeue_for_quota 降级队尾，worker 优先处理
+            # 有信息任务（零 API 的 clone/raw 路径），配额恢复后补查。
+            self._wlog(f"🔋 零 API 模式：缺信息任务降级队尾，"
+                  f"优先处理无需核心 API 的仓库（clone/raw 本地解析）")
             self._quota_exhausted_times.append(
                 datetime.now(timezone.utc).strftime('%H:%M'))
         self._set_worker_state("等待配额")
@@ -1047,7 +1094,19 @@ class Collector:
         try:
             _rem = self.quota_mgr.remaining()
             _sec_to_hour = 3600 - (time.time() % 3600)
-            return _rem > 0 and _sec_to_hour < QUOTA_ENDGAME_MINUTES * 60
+            active = _rem > 0 and _sec_to_hour < QUOTA_ENDGAME_MINUTES * 60
+            # 08171：末段状态变化日志（触发/退出各打一次，跨线程去重——
+            # 此函数被 _disc_put/worker 频繁调用，仅在状态翻转时输出）
+            if active != getattr(self, '_endgame_active', False):
+                self._endgame_active = active
+                if active:
+                    self._wlog(f"🔚 末段模式：距整点 {_sec_to_hour/60:.0f}min，"
+                          f"剩余配额 {_rem}——需 API 仓库优先，"
+                          f"允许取主队列消化配额")
+                else:
+                    self._wlog(f"🔚 末段模式结束（整点已过或配额耗尽），"
+                          f"回到常规策略（零 API 优先、disc 优先）")
+            return active
         except Exception:
             return False
 
@@ -1712,13 +1771,21 @@ class Collector:
         self._worker_local.prefix = ""
         self._save_seed_file(SEED_REPOS_FILE, "repos", self._repo_seeds)
 
-    def _try_take_main(self, main_queue: Queue, disc_queue: PriorityQueue):
+    def _try_take_main(self, main_queue: Queue, disc_queue: PriorityQueue,
+                       endgame: bool = False):
         """原子取主队列：互斥锁 + 冷却 + disc 阈值 + 源头并发限制。
 
         锁只保护"取"的动作（毫秒级），不持有到处理完。
         每个 Worker 取完后进入冷却期（MAIN_TAKE_COOLDOWN），
         冷却结束且 disc 低于阈值才补充下一个源头。
         源头并发：Semaphore(MAIN_SOURCE_LIMIT) 限制同时处理的源头仓库数。
+
+        Args:
+            endgame: 配额末段（_quota_endgame）→ 豁免 disc 阈值检查
+                     （08171 bug：外部 1775 允许取主队列，但内部此检查
+                     无末段豁免，disc>DISC_MAIN_OK_AT 时照样拒绝——
+                     末段"打破阈值取主队列消化配额"从未生效，
+                     08171 实测 02:00-02:26 主队列积压 526→1026）。
 
         Returns:
             (item, True, source_held) 取到并持有源头令牌；
@@ -1734,8 +1801,8 @@ class Collector:
             # work 全速取主队列，避免 disc 空 + 冷却导致的 work 空转）
             if disc_queue.qsize() > 0 and time.time() - last < MAIN_TAKE_COOLDOWN:
                 return None, False, False  # 冷却中
-            if disc_queue.qsize() > DISC_MAIN_OK_AT:
-                return None, False, False  # disc 未低于阈值
+            if not endgame and disc_queue.qsize() > DISC_MAIN_OK_AT:
+                return None, False, False  # disc 未低于阈值（末段豁免）
             if not self._source_sem.acquire(blocking=False):
                 return None, False, False  # 源头并发已满
             try:
@@ -1774,7 +1841,8 @@ class Collector:
             # 主队列消化 API 配额（平时 disc≥阈值不取主队列）。
             if disc_queue.qsize() <= DISC_MAIN_OK_AT or self._quota_endgame():
                 item, took, source_held = self._try_take_main(
-                    main_queue, disc_queue)
+                    main_queue, disc_queue,
+                    endgame=self._quota_endgame())
                 if took:
                     from_queue = main_queue
                     if main_queue.qsize() < MAIN_QUEUE_RESUME_AT:
@@ -1909,7 +1977,9 @@ class Collector:
                 if not self._wait_reset():
                     return
             if not self._wait_queue_slot(task_queue): return
-            self._kw_progress = f"{q_idx}/{self._kw_total} 第{page}/{max_p}页"  # 监控显示
+            # 08171：进度格式改"已完成 X/N 词"（原"第N/M页"显示的是当前
+            # 词页码，最后一个词停在页 1 时误导成"没翻页"）
+            self._kw_progress = f"已完成 {q_idx}/{self._kw_total} 词"  # 监控显示
             url = (f"https://api.github.com/search/repositories"
                    f"?q={query}&sort=updated&order=desc"
                    f"&per_page={PER_PAGE}&page={page}")
@@ -1977,7 +2047,8 @@ class Collector:
                     if not self._wait_reset():
                         return
                 if not self._wait_queue_slot(task_queue): return
-                self._cd_progress = f"{idx}/{len(CODE_QUERIES)} 第{page}/{CODE_MAX_PAGES}页"  # 监控显示
+                # 08171：进度格式改"已完成 X/N 词"（同关键词，见 _kw_progress）
+                self._cd_progress = f"已完成 {idx}/{len(CODE_QUERIES)} 词"  # 监控显示
 
                 url = (f"https://api.github.com/search/code"
                        f"?q={quote(full_query)}&sort=indexed&order=desc"
@@ -2230,6 +2301,63 @@ class Collector:
             print(f"    ... 其余 {len(cfail)-50} 个略", flush=True)
         print(f"{'='*60}", flush=True)
 
+        # 08171：收尾统计落盘 stats/run_stats.txt——stdout 通道死亡
+        # （LogSink 消费者异常/GA 取消日志进 devnull）时统计不丢
+        # （数据统计兜底，复用 stats_distribution.txt 的"文件不丢"模式）
+        try:
+            self._write_run_stats(elapsed_seconds)
+        except Exception:
+            pass
+
+    def _write_run_stats(self, elapsed_seconds: float = 0):
+        """08171：运行统计落盘（_finalize 末尾调用，stdout 兜底）。"""
+        sk = self._skip_counts
+        _tags = " ".join(f"{k[1:-1]}={v}" for k, v in
+                         sorted(self._tag_counts.items(),
+                                key=lambda kv: -kv[1]))
+        _lines = [
+            f"运行统计 {now_str()}",
+            f"总耗时: {elapsed_seconds:.0f}s",
+            f"节点: 唯一{self._final_node_count} 提取{self._total_parsed_nodes}"
+            f" 批次{len(self.batch_file_paths)}",
+            f"仓库: 累计{self._repos_done_total}"
+            f" 解析过{self._repos_parsed_total}"
+            f" 有节点{self._repos_with_nodes_total}",
+            f"分流: 全量{self._full_clone_total}"
+            f"({self._full_clone_size_total:.0f}MB)"
+            f" partial{self._repos_partial_total}"
+            f" tree{self._repos_tree_total}",
+            f"跳过: 取样{self._sample_skipped_total}"
+            f" 无候选{self._repos_no_cand_total}"
+            f" 黑名单{self._repos_black_hit_total}"
+            f" 缓存{self._repos_cached_total}"
+            f" 未更新{sk.get('stale', 0)}"
+            f" 禁用{sk.get('disabled', 0)}"
+            f" 大小0{sk.get('size0', 0)}"
+            f" 语言{sk.get('lang', 0)}",
+            f"文件: 解析{self._total_parsed_files}"
+            f"({self._total_parsed_mb/1024:.1f}GB)"
+            f" sha跳过{self._files_sha_skip_total}"
+            f" 有节点{self._files_with_nodes_total}"
+            f" 无节点{self._files_no_nodes_total}"
+            f" 404:{self._files_404_total}"
+            f" 超时{self._files_timeout_total}",
+            f"按标志: {_tags}",
+            f"API: 总{self.quota_mgr.total_calls}"
+            f" 剩余{self.quota_mgr.remaining()}"
+            f" 失败{self.quota_mgr.failed_calls}"
+            f" 限速{self.quota_mgr.throttle_count}",
+            f"配额耗尽: {len(self._quota_exhausted_times)} 次"
+            f" ({', '.join(self._quota_exhausted_times)}) UTC"
+            if self._quota_exhausted_times else "配额耗尽: 0 次",
+        ]
+        try:
+            os.makedirs("stats", exist_ok=True)
+            with open("stats/run_stats.txt", "w", encoding="utf-8") as f:
+                f.write("\n".join(_lines) + "\n")
+        except Exception:
+            pass
+
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
 
@@ -2395,6 +2523,9 @@ class Collector:
         """
         github_url = f"https://github.com/{repo}"
 
+        # 08171：按标志位统计仓库处理总数（种子/关键词/Code/fork/用户/raw）
+        self._tag_counts[tag] = self._tag_counts.get(tag, 0) + 1
+
         # 08161：黑名单命中（404/403/无节点，跳过原因细分监控）——
         # 已知死仓库直接跳过（原逻辑在 resolve_branch 被动跳过，此处
         # 显式化并计数）
@@ -2443,6 +2574,8 @@ class Collector:
 
         # 已处理仓库缓存检查（已解析 → 跳过解析，但按需追踪）
         if self._check_seen_cache(repo, pushed_at):
+            self._skip_counts["cached"] += 1
+            self._repos_cached_total += 1
             trace_txt = "（需追踪）" if (self._should_trace(tag)
                                          and not self._is_traced(
                                              repo, pushed_at,
@@ -2530,6 +2663,10 @@ class Collector:
                               nodes_extracted=repo_stats[0],
                               nodes_added=repo_stats[1],
                               language=language)
+
+        # 08171：有节点仓库数（提取出 ≥1 节点的仓库）
+        if repo_stats[0] > 0:
+            self._repos_with_nodes_total += 1
 
         # 种子自动收录：唯一标准 = 提取出节点（extracted 含重复）。
         # 隐含 24h 内更新条件——超龄仓库在年龄分支已跳过解析（extracted=0）。
@@ -2836,6 +2973,7 @@ class Collector:
         entries = data.get('tree', [])
         if not entries:
             return True
+        self._repos_tree_total += 1  # 08171：tree API 仓库数
         return self._process_file_list(repo, branch, entries, has_nodes,
                                        raw_depth, stats, tag)
 
@@ -2868,6 +3006,7 @@ class Collector:
             # SHA 缓存检查
             if self._sha_in_cache(sha):
                 skipped_by_cache += 1
+                self._files_sha_skip_total += 1  # 08171：SHA 跳过文件数
                 continue
             files_to_check.append((path, sha, e.get('size', 0)))
 
@@ -3253,6 +3392,8 @@ class Collector:
             self._full_clone_60s.append((_now, _size_mb))
             self._full_clone_total += 1
             self._full_clone_size_total += _size_mb
+            if _has[0]:
+                self._repos_with_nodes_total += 1  # 08171：全量 clone 有节点仓库
             self._wlog(f"📦 全量下载: {repo} ({_size_mb:.1f}MB, "
                   f"解析 {_n} 候选文件/{_dl_total/1024/1024:.1f}MB)")
             return True
@@ -3372,6 +3513,7 @@ class Collector:
             self._record_clone(repo, _size_kb, time.time() - _t0,
                                len(entries), True, "", "",
                                self._dir_size_bytes(tmp))
+            self._repos_partial_total += 1  # 08171：partial clone 仓库数
             self._wlog(f"📦 Partial Clone: {len(entries)} 个文件（零 API 配额）"
                   f" | 耗时 {time.time()-_t0:.0f}s"
                   f"{f' | 大仓库 {_size_kb/1024/1024:.1f}GB' if _size_kb > 1024*1024 else ''}")
@@ -3714,6 +3856,11 @@ class Collector:
             # 触发不再单独打日志——监控块"下载"行显示降级状态（剩 Ns）。
             _now = time.time()
             self._raw_fail_times.append((_now, dl_fail_reason))
+            # 08171：文件下载失败细分计数（收尾统计）
+            if dl_fail_reason.startswith("404"):
+                self._files_404_total += 1
+            elif dl_fail_reason in ("timeout", "idle", "max_total"):
+                self._files_timeout_total += 1
             while self._raw_fail_times and \
                     _now - self._raw_fail_times[0][0] > 60:
                 self._raw_fail_times.popleft()
@@ -3832,6 +3979,12 @@ class Collector:
         # 运行时只做"批次内去重"（≤5000 条小 set），批次间重复靠收尾
         # 全量去重（_finalize 读 batches → 去重 → 写 no/）。
         raw_count = len(proxies)
+        # 08171：文件级有节点/无节点计数（解析出口统一统计——取样/全量/
+        # clone/process_repo 四路径共用 _handle_one_file）
+        if raw_count > 0:
+            self._files_with_nodes_total += 1
+        else:
+            self._files_no_nodes_total += 1
         valid_count = 0
         new_count = 0
         for proxy in proxies:
