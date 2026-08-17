@@ -722,6 +722,12 @@ API_RESUME_AT_RATE = 100
 # 监控块双通道：除 stdout 外追加写此文件，日志通道死了也能确认程序存活）。
 LOG_MONITOR_FILE = "log/monitor.log"
 
+# API 速率门自旋超时（秒）：http_client 在 api_gate.acquire 拒绝时自旋等待，
+# 连续超过此值未放行 → 视为异常强制放行（08172：gate 计数 bug 曾致无限
+# 自旋 → 主线程卡死空转 3.5 小时；宁可慢不可死，下一轮 acquire 重新评估）。
+# 正常场景：core 200/min 下最长等 ~30s（3.3/s 放行），30s 兜底不误伤。
+GATE_SPIN_TIMEOUT_SECONDS = 30
+
 # ==================== API 配额管理 ====================
 
 # 每小时最大 API 调用次数（留 200 余量给非关键调用）

@@ -69,6 +69,12 @@ class ApiRateGate:
         # （08171：仅 core 类型入窗——search 有独立 30/min 端点级限制，
         # raw 免费；混算会让 core 突发被 search 挤掉余量或反之）
         self._core_window = deque()
+        # 08172：search 独立滑动窗口——search 不入 core 窗口（不占 core
+        # 速率），但必须有独立窗口记录时间戳供 _prune 清理 _by_type 计数；
+        # 否则 search 计数只增不减（_prune 只从 core 窗口弹出时同步减），
+        # 30 次后 acquire 永久拒绝 → http_client 自旋无限 → 主线程卡死
+        # （08172 实测：Code 搜索 20/97 后主线程永久卡死，空转 3 小时 21 分）
+        self._search_window = deque()
         self._by_type = {}        # etype → 窗口内计数
         self._paused = False      # Worker 暂停标志
         self._warned = set()      # 已发预警的端点（节流）
@@ -142,20 +148,30 @@ class ApiRateGate:
             # 放行
             if etype in self.CORE_TYPES:
                 self._core_window.append((now, etype))
+            elif etype == "search":
+                # 08172：search 也记录时间戳到独立窗口（供 _prune 清理
+                # _by_type 计数——否则 30 次后永久拒绝，http_client 自旋
+                # 无限 → 主线程卡死，08172 实测空转 3 小时 21 分）
+                self._search_window.append((now, etype))
             self._by_type[etype] = count + 1
             self.stats["total"] += 1
             self.stats["by_type"][etype] = self.stats["by_type"].get(etype, 0) + 1
             return True
 
     def _prune(self, now: float):
-        """弹出 60 秒前的 core 记录（O(1) 摊销）。
+        """弹出 60 秒前的记录（O(1) 摊销）。
 
-        双计数结构：_core_window（core 时间序列，用于 core 速率）与
-        _by_type（端点计数，用于端点级限速）必须同步增删；
+        双窗口结构：_core_window（core 时间序列）与 _search_window（search
+        时间序列）分别供 _prune 同步清理 _by_type（端点级限速计数）——
+        08172：search 曾只入 _by_type 不入任何窗口 → 计数只增不减 → 30 次
+        后永久拒绝 → 调用方无限自旋卡死主线程。
         max(0, ...) 防负数——防御性写法，正常流程不会为负。
         """
         while self._core_window and self._core_window[0][0] < now - 60:
             _, etype = self._core_window.popleft()
+            self._by_type[etype] = max(0, self._by_type.get(etype, 0) - 1)
+        while self._search_window and self._search_window[0][0] < now - 60:
+            _, etype = self._search_window.popleft()
             self._by_type[etype] = max(0, self._by_type.get(etype, 0) - 1)
 
     # ── 速率滞回 ──

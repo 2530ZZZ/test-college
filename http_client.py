@@ -19,7 +19,7 @@ from typing import Optional, Dict, Tuple
 
 from rate_limiter import RateLimiter
 from quota_manager import QuotaManager
-from config import GITHUB_TOKEN
+from config import GITHUB_TOKEN, GATE_SPIN_TIMEOUT_SECONDS
 from log_sink import log_sink
 
 
@@ -247,7 +247,17 @@ class HttpClient:
             # 所有 api.github.com（core + search）都经速率门；gate 内部
             # 对 search 只查端点级 30/min、不占 core 共享窗口。
             if is_api and self.api_gate is not None:
+                _gate_wait_t0 = time.time()
                 while not self.api_gate.acquire(url):
+                    # 08172：自旋超时兜底——gate 计数 bug（search 计数泄漏）
+                    # 曾导致 acquire 永久拒绝 → 无限自旋 → 主线程卡死空转
+                    # 3.5 小时。连续 30s 未放行视为异常：打日志 + 放行一次
+                    # （宁可慢不可死，下一轮 acquire 会重新评估）。
+                    if time.time() - _gate_wait_t0 > GATE_SPIN_TIMEOUT_SECONDS:
+                        log_sink.emit(f"[{_now()}] ⚠️ API 速率门自旋超时"
+                              f"（>{GATE_SPIN_TIMEOUT_SECONDS}s 未放行），"
+                              f"强制放行 {operation_name}")
+                        break
                     time.sleep(random.uniform(0.3, 0.8))  # 自旋重试（抖动防惊群）
 
             # ---- 配额检查：原子预占（防超发）+ 配额耗尽等待恢复 ----
