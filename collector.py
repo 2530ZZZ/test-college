@@ -80,6 +80,7 @@ from config import (
     MAIN_QUEUE_SIZE, DISCOVERY_QUEUE_SIZE,
     DISC_FORCE_CONSUME_AT, DISC_MAIN_OK_AT, DISC_PUT_BACKPRESSURE,
     API_MAX_PER_MINUTE, API_PAUSE_AT_RATE, API_RESUME_AT_RATE,
+    API_MAX_CONCURRENCY,
     SECONDARY_RATE_LIMIT_DEGRADE, DEGRADE_WORKERS,
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS,
     PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT, PARTIAL_CLONE_CONCURRENCY,
@@ -239,10 +240,11 @@ class Collector:
         # 全局配额管理器（所有 HttpClient 共享，消除统计盲区）
         self.quota_mgr = QuotaManager(max_per_hour=QUOTA_MAX_PER_HOUR)
 
-        # API 速率门（所有 HttpClient 共享，削峰填谷 + 端点限速）
+        # API 速率门（所有 HttpClient 共享，削峰填谷 + 端点限速 + 在途并发）
         self.api_gate = ApiRateGate(max_per_minute=API_MAX_PER_MINUTE,
                                     pause_at_rate=API_PAUSE_AT_RATE,
-                                    resume_at_rate=API_RESUME_AT_RATE)
+                                    resume_at_rate=API_RESUME_AT_RATE,
+                                    max_concurrency=API_MAX_CONCURRENCY)
 
         # 主 HTTP 客户端 + 线程局部存储（并行 fork/用户仓库用）
         self._main_http = HttpClient(token=token, quota_manager=self.quota_mgr,

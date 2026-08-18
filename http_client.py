@@ -82,6 +82,9 @@ class HttpClient:
         # 调用方 get_json 返回 None 后查此集合决定 404 处理）
         self.last_404 = set()
 
+        # 08173：自旋超时日志去重（每端点每分钟一条，防刷屏）
+        self._gate_spin_log = {}
+
         # 08131：下载失败分类统计移到 collector 层（本类多实例共享监控
         # 块不便）；本类只通过返回值 reason 上报，不再自行汇总打印。
 
@@ -246,25 +249,40 @@ class HttpClient:
             # ---- API 速率门：削峰填谷（raw 下载直接放行） ----
             # 所有 api.github.com（core + search）都经速率门；gate 内部
             # 对 search 只查端点级 30/min、不占 core 共享窗口。
+            # 08173：acquire 成功持有并发许可（_gate_held），请求结束
+            # finally 严格配对 release（08112 信号量泄漏教训）。
+            _gate_held = False
             if is_api and self.api_gate is not None:
                 _gate_wait_t0 = time.time()
                 while not self.api_gate.acquire(url):
-                    # 08172：自旋超时兜底——gate 计数 bug（search 计数泄漏）
-                    # 曾导致 acquire 永久拒绝 → 无限自旋 → 主线程卡死空转
-                    # 3.5 小时。连续 30s 未放行视为异常：打日志 + 放行一次
-                    # （宁可慢不可死，下一轮 acquire 会重新评估）。
+                    # 08172/08173：自旋超时兜底——gate 计数 bug（search
+                    # 计数泄漏）曾致 acquire 永久拒绝 → 无限自旋 → 主线程
+                    # 卡死空转 3.5 小时。08173 修正：
+                    # a) 超时 30→90s（>60s 窗口 + 余量，总量限速的正常排队
+                    #    就超 30s，08173 实测 30s 误伤 50 次）
+                    # b) 超时后**放弃本次请求**（return None，不强制放行
+                    #    ——08173 实证强制放行绕过限速）
+                    # c) 日志去重：每端点每分钟一条（08173 1 秒 50 条刷屏）
                     if time.time() - _gate_wait_t0 > GATE_SPIN_TIMEOUT_SECONDS:
-                        log_sink.emit(f"[{_now()}] ⚠️ API 速率门自旋超时"
-                              f"（>{GATE_SPIN_TIMEOUT_SECONDS}s 未放行），"
-                              f"强制放行 {operation_name}")
-                        break
+                        _et = self._classify_url(url)
+                        _now_ts = time.time()
+                        if _now_ts - self._gate_spin_log.get(_et, 0) > 60:
+                            self._gate_spin_log[_et] = _now_ts
+                            log_sink.emit(f"[{_now()}] ⚠️ API 速率门自旋超时"
+                                  f"（>{GATE_SPIN_TIMEOUT_SECONDS}s 未放行），"
+                                  f"放弃请求 {operation_name}")
+                        self._record_call(url, 0)
+                        return None
                     time.sleep(random.uniform(0.3, 0.8))  # 自旋重试（抖动防惊群）
+                _gate_held = True
 
             # ---- 配额检查：原子预占（防超发）+ 配额耗尽等待恢复 ----
             # acquire() 在单次加锁内完成检查+计数（08105 超发 4806/4800
             # 触发 GitHub 惩罚的根因：check/record 分开有竞态窗口）。
             # 仅核心 API 消耗 4800/h 预算（search 独立 30/min，不占）。
             if is_core_api and not self.quota.acquire():
+                if _gate_held:
+                    self.api_gate.release(url)  # 08173：配额失败也释放许可
                 self._record_call(url, 0)
                 self.quota.wait_for_reset()
                 continue  # 配额恢复，重试本次请求
@@ -404,6 +422,13 @@ class HttpClient:
             except Exception as e:
                 log_sink.emit(f"[{_now()}] {operation_name} 异常: {e} (尝试 {attempt}/{max_retries})")
                 time.sleep(3 * attempt)
+            finally:
+                # 08173：并发许可严格配对（08112 信号量泄漏教训）——无论
+                # 成功/403 重试/异常/返回，acquire 后必 release；否则 50 个
+                # 许可耗尽 → 所有 API 请求永久排队（下一轮尝试重新 acquire）
+                if _gate_held:
+                    self.api_gate.release(url)
+                    _gate_held = False
 
         log_sink.emit(f"[{_now()}] {operation_name} 多次失败，已跳过")
         return None

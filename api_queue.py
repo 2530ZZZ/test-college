@@ -47,23 +47,30 @@ class ApiRateGate:
     # core 核心 API 端点类型（计入 core 共享窗口；search/raw 独立）
     CORE_TYPES = ("repos", "tree", "contents", "commits", "forks", "users")
 
-    def __init__(self, max_per_minute: int = 200,
-                 pause_at_rate: int = 160,
-                 resume_at_rate: int = 100):
+    def __init__(self, max_per_minute: int = 300,
+                 pause_at_rate: int = 240,
+                 resume_at_rate: int = 150,
+                 max_concurrency: int = 50):
         """初始化 API 速率门。
 
         Args:
             max_per_minute: core 核心 API 速率上限（次/分钟）。
-                            默认 200（均值 83/min 的 2.4 倍余量，
-                            08171：600 形同虚设，突发 12.8/s 触发次级限流）。
+                            默认 300（5/s 持续，08171 触发线 12.8/s 的 40%，
+                            08173：200 太紧导致启动排队 60s+ 误伤）。
             pause_at_rate: 速率 ≥ 此值 → 暂停 Worker 取新任务。
-                           默认 160（200 的 80%，接近上限前提前收手）。
+                           默认 240（300 的 80%，接近上限前提前收手）。
             resume_at_rate: 速率 ≤ 此值 → 恢复 Worker。
-                           默认 100（200 的 50%，滞回防抖）。
+                           默认 150（300 的 50%，滞回防抖）。
+            max_concurrency: 在途 API 请求并发上限（已发出未收到响应，
+                           含 core+search，raw 不计）。默认 50——GitHub
+                           次级限流 REST+GraphQL 并发 ≤100，官方建议 50；
+                           CPU 90s/60s（总响应时间）约束：50×1.5s=75s<90
+                           （08173 讨论确认，08171 的 202 并发 403 根因）。
         """
         self.max_per_minute = max_per_minute
         self.pause_at_rate = pause_at_rate
         self.resume_at_rate = resume_at_rate
+        self.max_concurrency = max_concurrency
 
         # core 滑动窗口：[(timestamp, etype), ...] 最近 60s core 放行记录
         # （08171：仅 core 类型入窗——search 有独立 30/min 端点级限制，
@@ -79,6 +86,10 @@ class ApiRateGate:
         self._paused = False      # Worker 暂停标志
         self._warned = set()      # 已发预警的端点（节流）
         self._lock = threading.Lock()
+        # 08173：在途 API 请求数（已发出未收到响应，含 core+search；
+        # raw 不计）。acquire 放行 +1、http_client 请求完成 release -1，
+        # 必须严格配对（08112 信号量泄漏教训：release 放 finally）。
+        self._inflight = 0
 
         # 观测统计
         self.stats = {
@@ -127,6 +138,10 @@ class ApiRateGate:
             now = time.time()
             self._prune(now)
 
+            # 08173：在途并发上限（防 08171 的 200 并发超 GitHub 100 上限）
+            if self._inflight >= self.max_concurrency:
+                return False
+
             limit = self.ENDPOINT_LIMITS.get(etype, 900)
             count = self._by_type.get(etype, 0)
 
@@ -153,10 +168,27 @@ class ApiRateGate:
                 # _by_type 计数——否则 30 次后永久拒绝，http_client 自旋
                 # 无限 → 主线程卡死，08172 实测空转 3 小时 21 分）
                 self._search_window.append((now, etype))
+            self._inflight += 1  # 08173：在途请求 +1（调用方请求完成后 release）
             self._by_type[etype] = count + 1
             self.stats["total"] += 1
             self.stats["by_type"][etype] = self.stats["by_type"].get(etype, 0) + 1
             return True
+
+    def release(self, url: str = ""):
+        """请求完成释放在途并发许可（08173）。
+
+        与 acquire 严格配对（08112 信号量泄漏教训）：http_client 在
+        acquire 成功后 try/finally 中调用——无论成功/403/异常/重试
+        都释放，否则 50 个许可耗尽后所有 API 请求永久排队。
+        raw 请求不 acquire（不计入），无需 release。
+        """
+        with self._lock:
+            self._inflight = max(0, self._inflight - 1)
+
+    def inflight(self) -> int:
+        """当前在途 API 请求数（监控显示）。"""
+        with self._lock:
+            return self._inflight
 
     def _prune(self, now: float):
         """弹出 60 秒前的记录（O(1) 摊销）。
