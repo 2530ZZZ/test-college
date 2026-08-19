@@ -406,29 +406,7 @@ class Collector:
         # worker 解耦：worker 不再阻塞在下载/解析（08181 实测 worker 卡
         # 1300s 的根因之一），下载并发从"96 信号量+每仓库 4-8 线程叠加
         # 无上限"变成固定 48 线程。
-        self._dl_queue = queue.Queue(maxsize=DOWNLOAD_QUEUE_SIZE)
-        self._dl_enqueue_lock = threading.Lock()   # 入队锁：同仓库文件连成一段
-        self._dl_stop = threading.Event()          # 收尾停止信号
-        self._dl_workers = []                      # 下载线程列表
-        # 解析共享线程池（08174）：小文件解析不再每文件临时开 1 线程
-        # （08181 峰值 87 并发、无上限是隐患），改固定 32 线程池，积压排队。
-        self._parse_pool = ThreadPoolExecutor(
-            max_workers=PARSE_THREAD_POOL_SIZE,
-            thread_name_prefix="ParsePool")
-        # 解析看门狗（08174）：{任务key: 解析开始时间}——超
-        # PARSE_WATCHDOG_SECONDS 未完成 → 信号转储线程栈（只打印不取消）。
-        self._parse_watchdog = {}
-        self._parse_watchdog_lock = threading.Lock()
-        self._watchdog_dumped = set()              # 已转储过的任务（去重）
-        # 批次缓冲写盘锁（异步后多个下载线程可同时触发 _flush_batch）
-        self._batch_flush_lock = threading.Lock()
-
-        # worker 把确认要下载的 raw 链接丢进队列（放链接不占内存），
-        # 固定数量下载线程消费（DOWNLOAD_WORKER_THREADS=48）——下载与
-        # worker 解耦：worker 不再阻塞在下载/解析（08181 实测 worker 卡
-        # 1300s 的根因之一），下载并发从"96 信号量+每仓库 4-8 线程叠加
-        # 无上限"变成固定 48 线程。
-        self._dl_queue = queue.Queue(maxsize=DOWNLOAD_QUEUE_SIZE)
+        self._dl_queue = Queue(maxsize=DOWNLOAD_QUEUE_SIZE)
         self._dl_enqueue_lock = threading.Lock()   # 入队锁：同仓库文件连成一段
         self._dl_stop = threading.Event()          # 收尾停止信号
         self._dl_workers = []                      # 下载线程列表
