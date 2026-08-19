@@ -5726,3 +5726,12 @@ lookastarik/moav69
 qwert123321a/nova-server
 princetech747/nova-server
 barry-far/free-v2ray-confi
+xiaobei08/v
+g4384631-cmyk/v2rayaggregator
+sagernet/quic-g
+tailscale/tailscal
+spf13/cobr
+your-username/huntx.git
+apernet/quic-g
+ceo1st/v2rayn
+sedik-bes/goida-vpn-config
