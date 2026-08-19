@@ -7,10 +7,11 @@ API 速率门 — core 核心 API 滑动窗口限速 + 端点分级 + 速率滞�
   真正的削峰依据是"最近 60s 放行速率"，用滑动窗口统计。
 
 职责：
-  - core 核心 API 限速（API_MAX_PER_MINUTE=200/分钟，仅 repos/tree/
+  - core 核心 API 限速（API_MAX_PER_MINUTE=300/分钟，仅 repos/tree/
     contents/commits/forks/users 共享窗口，08171：防突发触发次级限流）
-  - 端点分级限速（search 30/分钟独立，不占 core 窗口；其他 900/分钟）
-  - 速率滞回（≥160 暂停 Worker 取新任务，≤100 恢复）
+  - 端点分级限速（search_code 10/min、search_repos 30/min 独立窗口，
+    不占 core 窗口；其他 900/分钟）
+  - 速率滞回（≥240 暂停 Worker 取新任务，≤150 恢复）
   - 观测统计（端点分布、HTTP 状态、Retry-After 样本）
 
 使用：
@@ -23,6 +24,7 @@ API 速率门 — core 核心 API 滑动窗口限速 + 端点分级 + 速率滞�
 import time
 import threading
 from collections import deque
+import config
 
 
 class ApiRateGate:
@@ -34,7 +36,8 @@ class ApiRateGate:
 
     # GitHub 端点级限速（官方规则，请求/分钟）
     ENDPOINT_LIMITS = {
-        "search": 30,     # ⚠️ Search API 特殊限制：30/分钟（认证）
+        "search_code": config.SEARCH_CODE_PER_MINUTE,   # 10/min（官方硬限制）
+        "search_repos": config.SEARCH_OTHER_PER_MINUTE, # 30/min（官方硬限制）
         "tree": 900,
         "contents": 900,
         "commits": 900,
@@ -73,15 +76,13 @@ class ApiRateGate:
         self.max_concurrency = max_concurrency
 
         # core 滑动窗口：[(timestamp, etype), ...] 最近 60s core 放行记录
-        # （08171：仅 core 类型入窗——search 有独立 30/min 端点级限制，
-        # raw 免费；混算会让 core 突发被 search 挤掉余量或反之）
+        # （08171：仅 core 类型入窗——search 有独立端点级限制，raw 免费；
+        # 混算会让 core 突发被 search 挤掉余量或反之）
         self._core_window = deque()
-        # 08172：search 独立滑动窗口——search 不入 core 窗口（不占 core
-        # 速率），但必须有独立窗口记录时间戳供 _prune 清理 _by_type 计数；
-        # 否则 search 计数只增不减（_prune 只从 core 窗口弹出时同步减），
-        # 30 次后 acquire 永久拒绝 → http_client 自旋无限 → 主线程卡死
-        # （08172 实测：Code 搜索 20/97 后主线程永久卡死，空转 3 小时 21 分）
-        self._search_window = deque()
+        # Search 子端点独立窗口（08174：search_code 10/min、search_repos 30/min
+        # 官方限制不同，必须分开统计；也供 _prune 清理 _by_type 计数）
+        self._search_code_window = deque()
+        self._search_repos_window = deque()
         self._by_type = {}        # etype → 窗口内计数
         self._paused = False      # Worker 暂停标志
         self._warned = set()      # 已发预警的端点（节流）
@@ -103,11 +104,19 @@ class ApiRateGate:
 
     @staticmethod
     def classify(url: str) -> str:
-        """将 URL 分类为端点类型。"""
+        """将 URL 分类为端点类型。
+
+        Search 子端点区分（08174）：
+          - /search/code = 10/min（官方硬限制）
+          - 其他 /search/（repositories/issues/commits）= 30/min
+        """
         if "raw.githubusercontent.com" in url or "raw." in url:
             return "raw"
+        # Search 子端点优先匹配（code 限制更严）
+        if "/search/code" in url:
+            return "search_code"
         if "/search/" in url:
-            return "search"
+            return "search_repos"
         elif "/git/trees/" in url:
             return "tree"
         elif "/contents/" in url or "/contents" in url:
@@ -163,11 +172,10 @@ class ApiRateGate:
             # 放行
             if etype in self.CORE_TYPES:
                 self._core_window.append((now, etype))
-            elif etype == "search":
-                # 08172：search 也记录时间戳到独立窗口（供 _prune 清理
-                # _by_type 计数——否则 30 次后永久拒绝，http_client 自旋
-                # 无限 → 主线程卡死，08172 实测空转 3 小时 21 分）
-                self._search_window.append((now, etype))
+            elif etype == "search_code":
+                self._search_code_window.append((now, etype))
+            elif etype == "search_repos":
+                self._search_repos_window.append((now, etype))
             self._inflight += 1  # 08173：在途请求 +1（调用方请求完成后 release）
             self._by_type[etype] = count + 1
             self.stats["total"] += 1
@@ -193,17 +201,18 @@ class ApiRateGate:
     def _prune(self, now: float):
         """弹出 60 秒前的记录（O(1) 摊销）。
 
-        双窗口结构：_core_window（core 时间序列）与 _search_window（search
-        时间序列）分别供 _prune 同步清理 _by_type（端点级限速计数）——
-        08172：search 曾只入 _by_type 不入任何窗口 → 计数只增不减 → 30 次
-        后永久拒绝 → 调用方无限自旋卡死主线程。
+        三窗口结构：_core_window、_search_code_window、_search_repos_window
+        分别供 _prune 同步清理 _by_type（端点级限速计数）。
         max(0, ...) 防负数——防御性写法，正常流程不会为负。
         """
         while self._core_window and self._core_window[0][0] < now - 60:
             _, etype = self._core_window.popleft()
             self._by_type[etype] = max(0, self._by_type.get(etype, 0) - 1)
-        while self._search_window and self._search_window[0][0] < now - 60:
-            _, etype = self._search_window.popleft()
+        while self._search_code_window and self._search_code_window[0][0] < now - 60:
+            _, etype = self._search_code_window.popleft()
+            self._by_type[etype] = max(0, self._by_type.get(etype, 0) - 1)
+        while self._search_repos_window and self._search_repos_window[0][0] < now - 60:
+            _, etype = self._search_repos_window.popleft()
             self._by_type[etype] = max(0, self._by_type.get(etype, 0) - 1)
 
     # ── 速率滞回 ──
@@ -244,7 +253,7 @@ class ApiRateGate:
     def get_stats_report(self) -> str:
         """格式化统计报告。"""
         with self._lock:
-            rate = len(self._window)
+            rate = len(self._core_window)
             lines = [
                 "API 速率门统计 (ApiRateGate)",
                 "=" * 40,

@@ -339,6 +339,12 @@ class HttpClient:
                 log_sink.emit(f"[{_now()}] {operation_name} 返回 {resp.status_code} "
                       f"(尝试 {attempt}/{max_retries})")
 
+                # ---- 401 处理（PAT 过期/无效） ----
+                if resp.status_code == 401:
+                    log_sink.emit(f"[{_now()}] ❌ PAT 可能已过期或无效（401），"
+                          f"请检查 GH_PAT 环境变量")
+                    # 不退出，继续重试（用户要求仅日志）
+
                 # ---- 403 处理（区分限流类型） ----
                 if resp.status_code == 403:
                     remaining_hdr = resp.headers.get("X-RateLimit-Remaining")
@@ -346,6 +352,26 @@ class HttpClient:
                     body = (resp.text or "").lower()
                     remaining_val = (int(remaining_hdr)
                                      if remaining_hdr is not None else -1)
+                    # 08174 A3：403 等待期间释放 in-flight 名额——否则睡觉的
+                    # 请求占住 50 个并发名额，其他 worker 干等 90s 白弃
+                    # （08181 实测 1625 次自旋超时）。睡醒重试前重新获取；
+                    # 30s 内获取不到 → 放弃本次请求（不绕过限速）。
+                    def _gate_release_for_wait():
+                        nonlocal _gate_held
+                        if _gate_held:
+                            self.api_gate.release(url)
+                            _gate_held = False
+
+                    def _gate_reacquire_after_wait() -> bool:
+                        nonlocal _gate_held
+                        _g0 = time.time()
+                        while not self.api_gate.acquire(url):
+                            if time.time() - _g0 > 30:
+                                return False
+                            time.sleep(0.5)
+                        _gate_held = True
+                        return True
+
                     # 次级限流特征：Retry-After 头 或 body 含 secondary
                     # （速率过快/超发惩罚——短等待重试，不设 _reset_time，
                     #  不当核心配额等整点；08105 超发触发惩罚的教训）
@@ -361,11 +387,38 @@ class HttpClient:
                               f"{f'（Retry-After {retry_after}s）' if retry_after is not None else ''}"
                               f"，等待 {wait_s}s 后重试（remaining={remaining_val}）")
                         self.quota.secondary_limited = True
+                        _gate_release_for_wait()  # 08174 A3：睡觉前还名额
                         time.sleep(wait_s)
                         self.quota.secondary_limited = False
+                        if not _gate_reacquire_after_wait():  # 醒后重新要名额
+                            log_sink.emit(f"[{_now()}] {operation_name} "
+                                  f"403 等待后名额获取超时，放弃")
+                            return None
                         continue  # 重试
 
                     if remaining_val == 0:
+                        # 08174 A2：搜索 API 403 专用分支——Search 有独立配额
+                        # 池 + 滚动窗口（reset 非整点），按窗口剩余时间等（≤60s），
+                        # 不套核心配额逻辑。08181 实测：Code 搜索 403 被误判
+                        # "核心配额耗尽"死等 64s（02:00:56 两次）。
+                        if is_search_api:
+                            _wait_s = 60
+                            if reset_hdr:
+                                try:
+                                    _rs = int(reset_hdr)
+                                    _wait_s = min(max(
+                                        int(_rs - time.time()), 1), 60)
+                                except (ValueError, TypeError):
+                                    pass
+                            log_sink.emit(f"[{_now()}] ⚠️ 搜索 API 限流"
+                                  f"（remaining=0），等待 {_wait_s}s 后重试")
+                            _gate_release_for_wait()
+                            time.sleep(_wait_s)
+                            if not _gate_reacquire_after_wait():
+                                log_sink.emit(f"[{_now()}] {operation_name} "
+                                      f"搜索限流等待后名额获取超时，放弃")
+                                return None
+                            continue
                         # 08171：非整点 reset = GitHub 次级限流伪装（abuse 403
                         # 也可能带 remaining=0 + 非整点 reset；PAT 主限流 reset
                         # 必为 UTC 整点——08131 曾修"非整点=abuse"，08161 绝对
@@ -377,11 +430,21 @@ class HttpClient:
                                 reset_ts = int(reset_hdr)
                             except (ValueError, TypeError):
                                 reset_ts = 0
-                            if reset_ts and abs(reset_ts % 3600) > 300:
+                            # 08174 A1：距整点 5 分钟内都算整点——原判断
+                            # abs(offset)>300 只查"距小时起点"，04:56:30
+                            # （offset=3390，距整点仅 210s）被误判非整点 →
+                            # 08181 实测 189 次伪装死等。offset 在 300~3300
+                            # 之外（距整点 ≤5min）都按整点处理。
+                            if reset_ts and 300 < (reset_ts % 3600) < 3300:
                                 log_sink.emit(f"[{_now()}] ⚠️ 次级限流伪装"
                                       f"（非整点 reset {reset_hdr}，remaining=0），"
                                       f"等待 60s 后重试")
+                                _gate_release_for_wait()  # 08174 A3
                                 time.sleep(60)
+                                if not _gate_reacquire_after_wait():
+                                    log_sink.emit(f"[{_now()}] {operation_name} "
+                                          f"伪装等待后名额获取超时，放弃")
+                                    return None
                                 continue  # 短退避后重试本次请求
                         # 核心 API 配额耗尽（remaining=0）→ 记录 GitHub 重置时间
                         # （403-only：200 响应带同一 reset 头但语义不同，见上方注释）
@@ -400,8 +463,13 @@ class HttpClient:
                                   f"（累计 {self.limiter.total_wait:.0f}s），放弃后续请求")
                             self.limiter.exceeded = True
                             return None
+                        _gate_release_for_wait()  # 08174 A3：record_wait 内 sleep 前还名额
                         ok = self.limiter.record_wait(wait_seconds)
                         if not ok:
+                            return None
+                        if not _gate_reacquire_after_wait():  # 睡醒重新要名额
+                            log_sink.emit(f"[{_now()}] {operation_name} "
+                                  f"配额等待后名额获取超时，放弃")
                             return None
                         continue  # 等待结束，重试本次请求
 

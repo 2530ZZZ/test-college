@@ -41,7 +41,8 @@ import gc
 import pickle
 import subprocess
 import threading
-from queue import Queue, PriorityQueue, Empty
+import signal
+from queue import Queue, PriorityQueue, Empty, Full
 from collections import deque
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
@@ -85,6 +86,8 @@ from config import (
     ENABLE_RAW_RECURSIVE, MAX_RECURSIVE_REPOS,
     PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT, PARTIAL_CLONE_CONCURRENCY,
     CLONE_FIRST_MODE,
+    DOWNLOAD_QUEUE_SIZE, DOWNLOAD_WORKER_THREADS,
+    PARSE_THREAD_POOL_SIZE, PARSE_WATCHDOG_SECONDS,
     CONTENTS_API_FALLBACK_ENABLED, MONITOR_INTERVAL,
     MAIN_SOURCE_LIMIT, TRACE_RETRY_DAYS,
     KEYWORD_TRACE_DEPTH, CODE_TRACE_DEPTH, INFO_BACKFILL_ENABLED,
@@ -396,6 +399,51 @@ class Collector:
 
         # 递归发现计数
         self.recursive_count = 0
+
+        # ── 08174 异步下载管道 ──
+        # worker 把确认要下载的 raw 链接丢进队列（放链接不占内存），
+        # 固定数量下载线程消费（DOWNLOAD_WORKER_THREADS=48）——下载与
+        # worker 解耦：worker 不再阻塞在下载/解析（08181 实测 worker 卡
+        # 1300s 的根因之一），下载并发从"96 信号量+每仓库 4-8 线程叠加
+        # 无上限"变成固定 48 线程。
+        self._dl_queue = queue.Queue(maxsize=DOWNLOAD_QUEUE_SIZE)
+        self._dl_enqueue_lock = threading.Lock()   # 入队锁：同仓库文件连成一段
+        self._dl_stop = threading.Event()          # 收尾停止信号
+        self._dl_workers = []                      # 下载线程列表
+        # 解析共享线程池（08174）：小文件解析不再每文件临时开 1 线程
+        # （08181 峰值 87 并发、无上限是隐患），改固定 32 线程池，积压排队。
+        self._parse_pool = ThreadPoolExecutor(
+            max_workers=PARSE_THREAD_POOL_SIZE,
+            thread_name_prefix="ParsePool")
+        # 解析看门狗（08174）：{任务key: 解析开始时间}——超
+        # PARSE_WATCHDOG_SECONDS 未完成 → 信号转储线程栈（只打印不取消）。
+        self._parse_watchdog = {}
+        self._parse_watchdog_lock = threading.Lock()
+        self._watchdog_dumped = set()              # 已转储过的任务（去重）
+        # 批次缓冲写盘锁（异步后多个下载线程可同时触发 _flush_batch）
+        self._batch_flush_lock = threading.Lock()
+
+        # worker 把确认要下载的 raw 链接丢进队列（放链接不占内存），
+        # 固定数量下载线程消费（DOWNLOAD_WORKER_THREADS=48）——下载与
+        # worker 解耦：worker 不再阻塞在下载/解析（08181 实测 worker 卡
+        # 1300s 的根因之一），下载并发从"96 信号量+每仓库 4-8 线程叠加
+        # 无上限"变成固定 48 线程。
+        self._dl_queue = queue.Queue(maxsize=DOWNLOAD_QUEUE_SIZE)
+        self._dl_enqueue_lock = threading.Lock()   # 入队锁：同仓库文件连成一段
+        self._dl_stop = threading.Event()          # 收尾停止信号
+        self._dl_workers = []                      # 下载线程列表
+        # 解析共享线程池（08174）：小文件解析不再每文件临时开 1 线程
+        # （08181 峰值 87 并发、无上限是隐患），改固定 32 线程池，积压排队。
+        self._parse_pool = ThreadPoolExecutor(
+            max_workers=PARSE_THREAD_POOL_SIZE,
+            thread_name_prefix="ParsePool")
+        # 解析看门狗（08174）：{任务key: 解析开始时间}——超
+        # PARSE_WATCHDOG_SECONDS 未完成 → 信号转储线程栈（只打印不取消）。
+        self._parse_watchdog = {}
+        self._parse_watchdog_lock = threading.Lock()
+        self._watchdog_dumped = set()              # 已转储过的任务（去重）
+        # 批次缓冲写盘锁（异步后多个下载线程可同时触发 _flush_batch）
+        self._batch_flush_lock = threading.Lock()
 
         # ── 独立组件（每线程一份） ──
         self.limiter = RateLimiter()  # 仅 GitHub 线程使用
@@ -819,6 +867,28 @@ class Collector:
                 # work 恢复活动（新日志刷新 _last_activity）→ 下一轮立即
                 # 回 60 秒，last_out 已过期 → 立刻输出第一条，及时恢复分钟级。
                 _w, _i, _r = self._worker_stats()
+                # 08174 解析看门狗：每 5s 检查解析任务是否超时（进入 CPU
+                # 解析开始计时）——超 PARSE_WATCHDOG_SECONDS 未完成 → 打印
+                # 任务信息 + 触发 SIGUSR1 信号转储线程栈（只打印不取消；
+                # 大文件解析几分钟正常，faulthandler 转储可定位卡死的正则）。
+                try:
+                    _wd_now = time.time()
+                    _wd_overdue = []
+                    with self._parse_watchdog_lock:
+                        for _k, _t0 in list(self._parse_watchdog.items()):
+                            if _wd_now - _t0 > PARSE_WATCHDOG_SECONDS \
+                                    and _k not in self._watchdog_dumped:
+                                _wd_overdue.append((_k, _wd_now - _t0))
+                    for _k, _age in _wd_overdue:
+                        self._watchdog_dumped.add(_k)
+                        self._wlog(f"🚨 解析超时 {_age:.0f}s 未完成：{_k}"
+                              f"（触发线程转储，仅打印不取消）")
+                        try:
+                            os.kill(os.getpid(), signal.SIGUSR1)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
                 if self.quota_mgr.exceeded and now - self._last_activity > 60:
                     interval = MONITOR_INTERVAL * 10
                 else:
@@ -917,6 +987,7 @@ class Collector:
                     f"待下载 {self._pending_downloads}文件"
                     f"/{self._pending_download_bytes/1024/1024:.0f}MB"
                     f"(等连接配额{_dl_waiting}) | "
+                    f"队列 {self._dl_queue.qsize()}/{DOWNLOAD_QUEUE_SIZE} | "
                     f"60s成功 {_raw_ok_n}文件/{_raw_ok_mb:.1f}MB | "
                     f"60s连接 {_raw_ok_n + _raw_fail_n} | {_dl_fail_txt}",
                     f"   解析: 进行中 {self._parsing_active}文件"
@@ -1584,6 +1655,14 @@ class Collector:
                                     name=f"W-{i}", daemon=True)
                    for i in range(SHARED_POOL_WORKERS)]
         for w in workers: w.start()
+        # 08174：下载线程启动（异步下载管道——worker 只入队，下载线程消费）
+        self._start_download_workers()
+        # 08174：解析看门狗信号注册（SIGUSR1 → faulthandler 转储线程栈；
+        # 内核信号直达，即使 GIL 被正则卡死也能抓现场）
+        try:
+            faulthandler.register(signal.SIGUSR1, all_threads=True)
+        except Exception:
+            pass
         # 监控线程（系统状态观测）
         threading.Thread(target=self._monitor_loop, name="Monitor",
                          daemon=True).start()
@@ -1662,6 +1741,14 @@ class Collector:
                 break
             w.join(timeout=remaining)
         self._task_queue = None
+
+        # ── 08174 异步管道收尾：停下载线程（等队列清空不丢任务）→
+        # 等解析池完成（已在池里的任务跑完；卡死的任务由看门狗转储定位）──
+        self._stop_download_workers()
+        try:
+            self._parse_pool.shutdown(wait=True)
+        except Exception:
+            pass
 
         # ── 保存所有状态（Worker 已停，内存空出） ──
         with self._state_lock:
@@ -1816,6 +1903,89 @@ class Collector:
                 return None, False, False  # 主队列空
         finally:
             self._main_take_lock.release()
+
+    # ═══════════════ 08174 异步下载管道 ═══════════════
+
+    def _start_download_workers(self):
+        """启动固定数量下载线程（DOWNLOAD_WORKER_THREADS=48）。
+
+        下载线程从待下载队列取 raw 链接执行下载+解析提交，worker 不再
+        阻塞在下载/解析（08181 实测 worker 卡 1300s 的根因之一）。
+        """
+        self._dl_workers = [
+            threading.Thread(target=self._download_worker_loop,
+                             name=f"Dl-{i}", daemon=True)
+            for i in range(DOWNLOAD_WORKER_THREADS)]
+        for w in self._dl_workers:
+            w.start()
+
+    def _download_worker_loop(self):
+        """下载线程主循环：取任务 → 下载 → 提交解析（不阻塞继续取下一个）。
+
+        任务元组: (repo, branch, path, sha, has_nodes, raw_depth, stats, tag, size)
+        结束条件：收到停止信号且队列清空（收尾时不丢任务）。
+        """
+        while True:
+            if self._dl_stop.is_set() and self._dl_queue.empty():
+                break
+            # 限流超限（累计等待超上限）→ 停止下载（不空转抛异常）
+            if self.limiter.should_stop():
+                break
+            try:
+                task = self._dl_queue.get(timeout=1)
+            except Empty:
+                continue
+            if task is None:  # 哨兵（保留，未使用）
+                self._dl_queue.task_done()
+                break
+            try:
+                # async_mode=True：解析提交共享池后立即返回（不阻塞下载线程）
+                self._handle_one_file(*task, async_mode=True)
+            except Exception as e:
+                log_sink.emit(f"[{now_str()}] [Dl] ⚠️ 下载线程异常: {e}")
+            finally:
+                self._dl_queue.task_done()
+
+    def _enqueue_downloads(self, repo, branch, files_to_check, has_nodes,
+                           raw_depth, stats, tag) -> bool:
+        """把取样通过后的剩余文件全部入待下载队列（08174）。
+
+        入队锁：同仓库文件连成一段（防不同仓库交错、某仓库文件被挤散）。
+        队列满 → 阻塞等待（可中断：收尾/限流超限时放弃，不死等）。
+        Returns: True=全部入队；False=放弃（收尾中）。
+        """
+        with self._dl_enqueue_lock:
+            for file_path, sha, _size in files_to_check:
+                while True:
+                    try:
+                        self._dl_queue.put_nowait(
+                            (repo, branch, file_path, sha, has_nodes,
+                             raw_depth, stats, tag, _size))
+                        break
+                    except Full:
+                        if self._dl_stop.is_set() or self.limiter.should_stop():
+                            return False
+                        time.sleep(0.5)
+        return True
+
+    def _stop_download_workers(self):
+        """收尾：停止下载线程并等队列清空（不丢任务）。
+
+        流程：置停止信号 → 等队列空（下载线程持续消费）→ join。
+        """
+        self._dl_stop.set()
+        # 等队列清空（下载线程消费完剩余任务自然退出）
+        try:
+            self._dl_queue.join()
+        except Exception:
+            pass
+        # 下载线程处理完在途任务后退出（30s 上限——下载中任务大多 <30s；
+        # 超时则后台继续（daemon），主流程收尾不阻塞）
+        for w in self._dl_workers:
+            try:
+                w.join(timeout=30)
+            except Exception:
+                pass
 
     def _pool_worker(self, main_queue: Queue, disc_queue: PriorityQueue):
         """共用线程池 Worker — 阈值调度模式。
@@ -3076,39 +3246,12 @@ class Collector:
             has_nodes[0] = True  # 视为处理完成（不误入 404 黑名单）
             return True
 
-        # ---- 并行下载处理 ----
-        # 小量文件串行（省线程开销），大量文件用线程池并发下载
-        if len(files_to_check) <= PARALLEL_DOWNLOAD_THRESHOLD:
-            for file_path, sha, _size in files_to_check:
-                if self.limiter.should_stop():
-                    raise RuntimeError("限流超限")
-                self._handle_one_file(repo, branch, file_path, sha, has_nodes,
-                                      raw_depth, stats, tag, size=_size)
-        else:
-            # 按文件大小升序 → 小文件先跑完释放内存
-            files_to_check.sort(key=lambda x: x[2])
-            total_mb = sum(x[2] for x in files_to_check) / 1024 / 1024
-            if PARALLEL_DOWNLOAD_MB_HIGH > 0 and total_mb > PARALLEL_DOWNLOAD_MB_HIGH:
-                workers = 4
-            elif PARALLEL_DOWNLOAD_MB_MED > 0 and total_mb > PARALLEL_DOWNLOAD_MB_MED:
-                workers = 8
-            else:
-                workers = PARALLEL_DOWNLOAD_WORKERS
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                futures = {executor.submit(
-                    self._handle_one_file, repo, branch, fp, s, has_nodes,
-                    raw_depth, stats, tag, size=_sz
-                ): fp for fp, s, _sz in files_to_check}
-                for future in as_completed(futures):
-                    if self.limiter.should_stop():
-                        executor.shutdown(wait=False, cancel_futures=True)
-                        raise RuntimeError("限流超限")
-                    try:
-                        future.result()
-                    except Exception as e:
-                        self._wlog(f"⚠️ 并行下载异常: "
-                              f"{futures[future]}: {e}")
-
+        # ---- 08174 异步下载管道 ----
+        # 取样已通过（有节点）→ 剩余文件全部入待下载队列（下载线程消费）。
+        # worker 不再阻塞在下载/解析（08181 实测 worker 卡 1300s 的根因
+        # 之一）；入队失败（收尾中断）视为处理完成，不重试不阻塞。
+        self._enqueue_downloads(repo, branch, files_to_check, has_nodes,
+                                raw_depth, stats, tag)
         return True
 
     def _record_clone(self, repo: str, size_kb: int, time_s: float,
@@ -3787,7 +3930,8 @@ class Collector:
                          sha: str, has_nodes: List[bool], raw_depth: int,
                          stats: List[int] = None, tag: str = "[种子仓库]",
                          size: int = 0,
-                         content_bytes_preloaded: bytes = None):
+                         content_bytes_preloaded: bytes = None,
+                         async_mode: bool = False):
         """处理单个文件：下载（或本地预载）→ 提取节点 → 去重 → 入 buffer。
 
         使用 uri_parser 协议解析层提取 StandardProxy，
@@ -3796,6 +3940,10 @@ class Collector:
         content_bytes_preloaded（08141 全量 clone）：非 None 时跳过
         网络下载（文件已从本地工作区读出），直接走解析管线——零 API、
         不占 raw 连接配额。本地全量 clone 场景专用。
+
+        async_mode（08174 异步下载管道）：True = 下载线程调用——解析
+        提交共享线程池后立即返回（不阻塞下载线程）；False = 取样/全量
+        clone 门禁——同步等待解析结果（需要 has_nodes 判断）。
 
         Args:
             stats: [extracted, added] 累加数组（本仓库级统计）。
@@ -3911,6 +4059,53 @@ class Collector:
             # 08111：实时集合替代历史峰值——监控"最大"不再误导
             self._parsing_sizes.add(content_size_mb)
 
+        # 08174：解析 + 后续处理统一走 _submit_parse_task（提交共享解析
+        # 线程池/进程池；wait=True 同步等结果（取样门禁），wait=False
+        # 回调处理不阻塞（下载线程异步管道）。看门狗在提交时开始计时。
+        self._submit_parse_task(
+            repo, branch, file_path, sha, has_nodes, raw_depth, stats, tag,
+            content, raw_url, _dl_s, size,
+            content_bytes_preloaded=content_bytes_preloaded,
+            wait=not async_mode)
+
+        # （解析 + 后续处理已移至 _submit_parse_task，08174）
+
+    def _submit_parse_task(self, repo, branch, file_path, sha, has_nodes,
+                           raw_depth, stats, tag, content, raw_url,
+                           _dl_s, size, content_bytes_preloaded=None,
+                           wait: bool = True):
+        """解析 + 后续处理（过滤/去重/入buffer/递归发现/订阅嗅探）。
+
+        08174 异步管道改造：
+          - 小文件解析提交共享线程池（PARSE_THREAD_POOL_SIZE=32）——
+            原"每文件临时开 1 线程"无并发上限（08181 峰值 87），固定池
+            积压排队，杜绝线程爆炸。
+          - 大文件（>1MB）仍走进程池（绕 GIL 用多核）。
+          - wait=True（取样/全量 clone 门禁）：等待结果后处理；
+            wait=False（下载线程）：add_done_callback 处理，不阻塞。
+          - 看门狗：提交即登记（进入 CPU 解析开始计时），超
+            PARSE_WATCHDOG_SECONDS 未完成 → 监控线程信号转储线程栈
+            （只打印不取消——大文件解析几分钟正常）。
+        """
+        content_size_mb = len(content) / 1024 / 1024
+        # 累计解析文件统计（监控显示）
+        self._total_parsed_files += 1
+        self._total_parsed_mb += content_size_mb
+        # 08133：近 60s 解析窗口（监控读取时清理，防旧数据残留）
+        self._parsed_60s.append((time.time(), content_size_mb))
+        if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
+            self._wlog(f"📄 {raw_url} ⚠️ 文件过大 "
+                  f"({content_size_mb:.1f}MB)，跳过")
+            return  # 跳过但可能是间歇性问题 → 不标记
+
+        # 提取节点（使用新的协议解析层）
+        # OOM 诊断：记录正在解析的文件数与最大大小（监控显示，
+        # 08084 内存 100% 时需确认是否解析线程持有大文件）。
+        self._parsing_active += 1
+        with self._state_lock:
+            # 08111：实时集合替代历史峰值——监控"最大"不再误导
+            self._parsing_sizes.add(content_size_mb)
+
         # 内存预算控制（08104：64-120 文件并发解析，content 占满 11GB）：
         # 解析前检查"解析中"的 content 总大小，超预算则等待
         # （不发起新解析，下载线程被占住 → 自然不再下载新文件，
@@ -3928,11 +4123,185 @@ class Collector:
                     self._parsing_waiting -= 1
                     self._parsing_waiting_bytes -= len(content)
                     break
+            # 08174：收尾中放弃等预算（异步路径下下载线程不被死等）
+            if self._dl_stop.is_set() and not wait:
+                self._parsing_active -= 1
+                self._parsing_waiting -= 1
+                self._parsing_waiting_bytes -= len(content)
+                return
             self._budget_wait_count += 1
             time.sleep(0.5)
 
         def extract():
             return extract_all_strategies(content)
+
+        # 08174：看门狗登记（进入 CPU 解析开始计时；只打印不取消）
+        _wd_key = f"{repo}|{file_path}"
+        with self._parse_watchdog_lock:
+            self._parse_watchdog[_wd_key] = time.time()
+
+        def _release_parse_state(_ex_t0):
+            """解析任务收尾：释放计数/预算/看门狗/耗时记录（两种路径共用）。"""
+            self._parsing_active -= 1
+            with self._state_lock:
+                self._parsing_bytes -= len(content)  # 释放预算
+                self._parsing_sizes.discard(content_size_mb)  # 08111 实时最大
+            with self._parse_watchdog_lock:
+                self._parse_watchdog.pop(_wd_key, None)
+            # 08103 监测：记录每文件耗时（下载/解析/大小），定位慢在哪一步
+            self._file_times.append((round(_dl_s, 1),
+                                     round(time.time() - _ex_t0, 1),
+                                     round(content_size_mb, 1)))
+            self._file_times_total += 1
+
+        def _postprocess(proxies, _ex_t0):
+            """解析完成后的后续处理（原 _handle_one_file 尾段）。"""
+            _release_parse_state(_ex_t0)
+
+            # ---- 过滤 + 批次内去重 + 入 buffer（线程安全） ----
+            # 内存优化（08103：24.8 万节点/h × 2 个全局 set = 内存大头）：
+            # 运行时只做"批次内去重"（≤5000 条小 set），批次间重复靠收尾
+            # 全量去重（_finalize 读 batches → 去重 → 写 no/）。
+            raw_count = len(proxies)
+            # 08171：文件级有节点/无节点计数（解析出口统一统计——取样/全量/
+            # clone/process_repo 四路径共用 _handle_one_file）
+            if raw_count > 0:
+                self._files_with_nodes_total += 1
+            else:
+                self._files_no_nodes_total += 1
+            valid_count = 0
+            new_count = 0
+            for proxy in proxies:
+                if not proxy.is_valid():
+                    continue
+                valid_count += 1
+
+                with self._state_lock:
+                    node_uri = proxy.to_uri()
+                    if node_uri in self._batch_dedup:
+                        continue
+                    self._batch_dedup.add(node_uri)
+                    self.batch_buffer.append(node_uri)
+                    new_count += 1
+                    ch = threading.current_thread().name
+                    self._channel_new_nodes[ch] = self._channel_new_nodes.get(ch, 0) + 1
+
+            # 监控：累计/近60秒提取节点数（valid_count = 有效节点）
+            if valid_count > 0:
+                self._total_parsed_nodes += valid_count
+                _nw = time.time()
+                self._nodes_60s.append((_nw, valid_count))
+                while self._nodes_60s and self._nodes_60s[0][0] < _nw - 60:
+                    self._nodes_60s.popleft()
+
+            with self._state_lock:
+                if valid_count > 0:
+                    self.all_links.append(raw_url)
+                    has_nodes[0] = True
+                # 08141：全量 clone（preloaded）本地文件无 SHA，跳过缓存写入
+                # （空 sha 会污染 processed_file_shas/sha_cache）
+                if content_bytes_preloaded is None:
+                    self.processed_file_shas.add(sha)
+                    self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
+                if VERBOSE_LOG:
+                    self._wlog(f"📄 SHA 缓存: {sha[:8]}... ({len(content)}B)")
+
+            # 解析失败记录：有候选但全验证失败 → 可能是新格式/变体，值得复盘
+            if LOG_FAILED_CANDIDATES and raw_count > 0 and valid_count == 0:
+                strategies_hit = []
+                for _name, _func in [
+                    ("uri", extract_embedded_uris),
+                    ("clash", extract_clash_yaml),
+                    ("singbox", extract_singbox_json),
+                    ("surge", extract_surge_format),
+                ]:
+                    try:
+                        _r = _func(content)
+                        if _r:
+                            strategies_hit.append(f"{_name}({len(_r)})")
+                    except Exception:
+                        pass
+                # 样本：取第一个候选的字符串表示（截断 300 字符）
+                sample = str(proxies[0])[:300] if proxies else ""
+                self.failed_candidates_buffer.append(
+                    f"{raw_url}|{repo}|{raw_count}|"
+                    f"{','.join(strategies_hit) if strategies_hit else '?'}|"
+                    f"{sample}")
+
+            if VERBOSE_LOG:
+                if valid_count == 0:
+                    self._wlog(f"📄 {raw_url} ❌ 未提取出节点 "
+                          f"(原始 {raw_count} 个候选全部验证失败)")
+                elif new_count > 0:
+                    self._wlog(f"📄 {raw_url} ✅ 解析 {raw_count} 候选 → "
+                          f"{valid_count} 个有效节点 → 去重后新增 {new_count} 个")
+                else:
+                    self._wlog(f"📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
+                          f"{valid_count} 个有效节点，全部重复")
+
+            # 累加本仓库级统计（提取出 / 新增）——08174：异步多线程并发
+            # 改同一 stats，state_lock 保护（+= 非原子）
+            if stats is not None:
+                with self._state_lock:
+                    stats[0] += valid_count
+                    stats[1] += new_count
+
+            # ---- 自动刷盘（08174：异步多线程可同时触发，锁保护） ----
+            if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:
+                with self._batch_flush_lock:
+                    self._flush_batch()
+
+            # ---- raw 链接递归发现 ----
+            # 深度由 MAX_TRACE_DEPTH 统一控制（_should_trace），
+            # 防止 [raw2]/[raw3] 继续发现产生 [user3]/[raw4] 等超层条目。
+            if ENABLE_RAW_RECURSIVE and self._should_trace(tag) \
+                    and self.recursive_count < MAX_RECURSIVE_REPOS:
+                self._discover_recursive(raw_url, content, raw_depth, tag)
+
+            # ---- 订阅链接自动发现（零 API 配额：raw HTTP，非 GitHub） ----
+            # 从已下载文件中嗅探第三方订阅链接（域名含 sub/subscribe/token
+            # 等关键词，路径特征匹配），拉取后同样提取节点。
+            # _black 黑名单：排除知名站点（google/apple/facebook...）——它们的
+            # 链接里常出现这些词但绝不是订阅源，白跑一趟浪费连接。
+            _sub_urls = set()
+            for _m in re.finditer(
+                r'(?:https?://)'
+                r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}'
+                r'(?:/\S*)?\b(?:sub|subscribe|link|token|node|proxy|v2ray|clash'
+                r'|ssr|vless|trojan|hysteria|tuic|singbox|shadowrocket'
+                r'|quantumult|surge|loon|stash)\b[^\s"\']{0,200}',
+                content, re.IGNORECASE):
+                _url = _m.group(0).rstrip('.,;:!?)"\']')
+                _black = ('google.com', 'star-history.com', 'play.google.com',
+                           'apple.com', 'microsoft.com', 'facebook.com', 'twitter.com',
+                           'youtube.com', 'reddit.com', 'wikipedia.org')
+                if ('github.com' not in _url and 'raw.githubusercontent.com' not in _url
+                        and not any(d in _url for d in _black)):
+                    _sub_urls.add(_url)
+            for _url in list(_sub_urls):
+                if _url in self._sub_urls_seen:
+                    continue
+                self._sub_urls_seen.add(_url)
+            _new_urls = [u for u in _sub_urls if u not in self._sub_urls_seen][:SUB_URL_MAX_PER_FILE]
+            for _url in _new_urls:
+                self._sub_urls_seen.add(_url)
+                try:
+                    _resp = self.http.get(_url, timeout=(8, 15),
+                                          operation_name=f"订阅链接 {_url[:60]}")
+                    if _resp and _resp.text:
+                        _sub_proxies = extract_all_strategies(_resp.text)
+                        for _p in _sub_proxies:
+                            if _p.is_valid():
+                                with self._state_lock:
+                                    _uri = _p.to_uri()
+                                    if _uri in self._batch_dedup:
+                                        continue
+                                    self._batch_dedup.add(_uri)
+                                    self.batch_buffer.append(_uri)
+                                    self.all_links.append(_url)
+                                    has_nodes[0] = True
+                except Exception:
+                    pass
 
         _ex_t0 = time.time()
         try:
@@ -3946,177 +4315,44 @@ class Collector:
                 # 只占 EXTRACT_PROCESSES - 大文件数的空位，不抢大文件位置。
                 future = self._pool_submit(
                     extract, content_size_mb > EXTRACT_PROCESS_MIN_MB)
-                proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
             elif FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
-                # 小文件 → 线程解析（pickle 开销占比大，进程池反而慢）
-                # 不用 with（with 退出时 shutdown(wait=True) 会等卡死的
-                # extract 线程结束 → worker 被阻塞 + 线程持有 content 不释放，
-                # 08084 OOM 前 30 分钟 worker 全停的嫌疑点之一）。
-                # 手动管理：超时即放弃，worker 立即继续，不阻塞不累积。
-                executor = ThreadPoolExecutor(max_workers=1)
-                try:
-                    future = executor.submit(extract)
-                    proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
-                finally:
-                    executor.shutdown(wait=False, cancel_futures=True)
+                # 小文件 → 共享解析线程池（08174：原"每文件临时开 1 线程"
+                # 无并发上限——08181 峰值 87 并发是隐患；固定
+                # PARSE_THREAD_POOL_SIZE=32 池，积压排队，杜绝线程爆炸）
+                future = self._parse_pool.submit(extract)
             else:
+                # 无池可用 → 直接执行（同线程）
                 proxies = extract()
-        except FutureTimeoutError:
-            self._wlog(f"⚠️ 文件处理超时，跳过 {raw_url}")
-            return
+                _postprocess(proxies, _ex_t0)
+                return
         except Exception:
+            _release_parse_state(_ex_t0)
             return
-        finally:
-            self._parsing_active -= 1
-            with self._state_lock:
-                self._parsing_bytes -= len(content)  # 释放预算
-                self._parsing_sizes.discard(content_size_mb)  # 08111 实时最大
-            # 08103 监测：记录每文件耗时（下载/解析/大小），定位慢在哪一步
-            self._file_times.append((round(_dl_s, 1), round(time.time() - _ex_t0, 1),
-                                     round(content_size_mb, 1)))
-            self._file_times_total += 1
 
-        # ---- 过滤 + 批次内去重 + 入 buffer（线程安全） ----
-        # 内存优化（08103：24.8 万节点/h × 2 个全局 set = 内存大头）：
-        # 运行时只做"批次内去重"（≤5000 条小 set），批次间重复靠收尾
-        # 全量去重（_finalize 读 batches → 去重 → 写 no/）。
-        raw_count = len(proxies)
-        # 08171：文件级有节点/无节点计数（解析出口统一统计——取样/全量/
-        # clone/process_repo 四路径共用 _handle_one_file）
-        if raw_count > 0:
-            self._files_with_nodes_total += 1
-        else:
-            self._files_no_nodes_total += 1
-        valid_count = 0
-        new_count = 0
-        for proxy in proxies:
-            if not proxy.is_valid():
-                continue
-            valid_count += 1
-
-            with self._state_lock:
-                node_uri = proxy.to_uri()
-                if node_uri in self._batch_dedup:
-                    continue
-                self._batch_dedup.add(node_uri)
-                self.batch_buffer.append(node_uri)
-                new_count += 1
-                ch = threading.current_thread().name
-                self._channel_new_nodes[ch] = self._channel_new_nodes.get(ch, 0) + 1
-
-        # 监控：累计/近60秒提取节点数（valid_count = 有效节点）
-        if valid_count > 0:
-            self._total_parsed_nodes += valid_count
-            _nw = time.time()
-            self._nodes_60s.append((_nw, valid_count))
-            while self._nodes_60s and self._nodes_60s[0][0] < _nw - 60:
-                self._nodes_60s.popleft()
-
-        with self._state_lock:
-            if valid_count > 0:
-                self.all_links.append(raw_url)
-                has_nodes[0] = True
-            # 08141：全量 clone（preloaded）本地文件无 SHA，跳过缓存写入
-            # （空 sha 会污染 processed_file_shas/sha_cache）
-            if content_bytes_preloaded is None:
-                self.processed_file_shas.add(sha)
-                self.sha_cache[sha] = datetime.now(timezone.utc)  # 持久化：下载成功后才标记
-            if VERBOSE_LOG:
-                self._wlog(f"📄 SHA 缓存: {sha[:8]}... ({len(content)}B)")
-
-        # 解析失败记录：有候选但全验证失败 → 可能是新格式/变体，值得复盘
-        if LOG_FAILED_CANDIDATES and raw_count > 0 and valid_count == 0:
-            strategies_hit = []
-            for _name, _func in [
-                ("uri", extract_embedded_uris),
-                ("clash", extract_clash_yaml),
-                ("singbox", extract_singbox_json),
-                ("surge", extract_surge_format),
-            ]:
-                try:
-                    _r = _func(content)
-                    if _r:
-                        strategies_hit.append(f"{_name}({len(_r)})")
-                except Exception:
-                    pass
-            # 样本：取第一个候选的字符串表示（截断 300 字符）
-            sample = str(proxies[0])[:300] if proxies else ""
-            self.failed_candidates_buffer.append(
-                f"{raw_url}|{repo}|{raw_count}|"
-                f"{','.join(strategies_hit) if strategies_hit else '?'}|"
-                f"{sample}")
-
-        if VERBOSE_LOG:
-            if valid_count == 0:
-                self._wlog(f"📄 {raw_url} ❌ 未提取出节点 "
-                      f"(原始 {raw_count} 个候选全部验证失败)")
-            elif new_count > 0:
-                self._wlog(f"📄 {raw_url} ✅ 解析 {raw_count} 候选 → "
-                      f"{valid_count} 个有效节点 → 去重后新增 {new_count} 个")
-            else:
-                self._wlog(f"📄 {raw_url} ⚪ 解析 {raw_count} 候选 → "
-                      f"{valid_count} 个有效节点，全部重复")
-
-        # 累加本仓库级统计（提取出 / 新增）
-        if stats is not None:
-            stats[0] += valid_count
-            stats[1] += new_count
-
-        # ---- 自动刷盘 ----
-        if len(self.batch_buffer) >= BATCH_FLUSH_SIZE:
-            self._flush_batch()
-
-        # ---- raw 链接递归发现 ----
-        # 深度由 MAX_TRACE_DEPTH 统一控制（_should_trace），
-        # 防止 [raw2]/[raw3] 继续发现产生 [user3]/[raw4] 等超层条目。
-        if ENABLE_RAW_RECURSIVE and self._should_trace(tag) \
-                and self.recursive_count < MAX_RECURSIVE_REPOS:
-            self._discover_recursive(raw_url, content, raw_depth, tag)
-
-        # ---- 订阅链接自动发现（零 API 配额：raw HTTP，非 GitHub） ----
-        # 从已下载文件中嗅探第三方订阅链接（域名含 sub/subscribe/token
-        # 等关键词，路径特征匹配），拉取后同样提取节点。
-        # _black 黑名单：排除知名站点（google/apple/facebook...）——它们的
-        # 链接里常出现这些词但绝不是订阅源，白跑一趟浪费连接。
-        _sub_urls = set()
-        for _m in re.finditer(
-            r'(?:https?://)'
-            r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}'
-            r'(?:/\S*)?\b(?:sub|subscribe|link|token|node|proxy|v2ray|clash'
-            r'|ssr|vless|trojan|hysteria|tuic|singbox|shadowrocket'
-            r'|quantumult|surge|loon|stash)\b[^\s"\']{0,200}',
-            content, re.IGNORECASE):
-            _url = _m.group(0).rstrip('.,;:!?)"\']')
-            _black = ('google.com', 'star-history.com', 'play.google.com',
-                       'apple.com', 'microsoft.com', 'facebook.com', 'twitter.com',
-                       'youtube.com', 'reddit.com', 'wikipedia.org')
-            if ('github.com' not in _url and 'raw.githubusercontent.com' not in _url
-                    and not any(d in _url for d in _black)):
-                _sub_urls.add(_url)
-        for _url in list(_sub_urls):
-            if _url in self._sub_urls_seen:
-                continue
-            self._sub_urls_seen.add(_url)
-        _new_urls = [u for u in _sub_urls if u not in self._sub_urls_seen][:SUB_URL_MAX_PER_FILE]
-        for _url in _new_urls:
-            self._sub_urls_seen.add(_url)
+        if wait:
+            # 同步路径（取样/全量 clone 门禁）：等待结果再后续处理
             try:
-                _resp = self.http.get(_url, timeout=(8, 15),
-                                      operation_name=f"订阅链接 {_url[:60]}")
-                if _resp and _resp.text:
-                    _sub_proxies = extract_all_strategies(_resp.text)
-                    for _p in _sub_proxies:
-                        if _p.is_valid():
-                            with self._state_lock:
-                                _uri = _p.to_uri()
-                                if _uri in self._batch_dedup:
-                                    continue
-                                self._batch_dedup.add(_uri)
-                                self.batch_buffer.append(_uri)
-                                self.all_links.append(_url)
-                                has_nodes[0] = True
+                proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
+            except FutureTimeoutError:
+                self._wlog(f"⚠️ 文件处理超时，跳过 {raw_url}")
+                _release_parse_state(_ex_t0)
+                return
             except Exception:
-                pass
+                _release_parse_state(_ex_t0)
+                return
+            _postprocess(proxies, _ex_t0)
+        else:
+            # 异步路径（下载线程）：回调处理，不阻塞下载线程
+            def _done(fut):
+                try:
+                    _proxies = fut.result(timeout=0)
+                except Exception:
+                    _proxies = []
+                _postprocess(_proxies, _ex_t0)
+            try:
+                future.add_done_callback(_done)
+            except Exception:
+                _release_parse_state(_ex_t0)
 
     def _discover_recursive(self, source_url: str, content: str, raw_depth: int,
                             tag: str = "[种子仓库]"):

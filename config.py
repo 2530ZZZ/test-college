@@ -730,6 +730,14 @@ API_RESUME_AT_RATE = 150
 # 默认值：50。取值范围 30-80。
 API_MAX_CONCURRENCY = 50
 
+# Search API 子端点限速（官方文档明确区分）：
+# - search/code = 10/min（认证）——代码搜索限制更严
+# - 其他 search（repositories/issues/commits）= 30/min（认证）
+# 来源：https://docs.github.com/en/rest/search/search
+# 当前值：search_code 10、search_other 30（官方硬限制，不可调高）。
+SEARCH_CODE_PER_MINUTE = 10
+SEARCH_OTHER_PER_MINUTE = 30
+
 # 监控块落盘文件（08171：LogSink 消费者 print 崩溃 → stdout 静默 3.5 小时，
 # 监控块双通道：除 stdout 外追加写此文件，日志通道死了也能确认程序存活）。
 LOG_MONITOR_FILE = "log/monitor.log"
@@ -796,6 +804,30 @@ DOWNLOAD_IDLE_TIMEOUT = 30
 # MAX_RAW_DOWNLOAD_CONNECTS_PER_SEC（§2）。acquire 必须带超时——08112
 # 退避逻辑泄漏许可导致 36 worker 全部永久阻塞 2h。
 MAX_DOWNLOAD_CONCURRENCY = 96
+
+# 待下载队列容量（08174 异步下载管道）：worker 把确认要下载的 raw 链接
+# 丢进队列，下载线程从队列取。队列放链接不占内存（10 万条 ≈ 几 MB）。
+# 队列满 → worker 阻塞等待（可中断，收尾能退出）——背压反推，防止
+# 无限积压。先进先出（旧文件先下载，防旧数据滞留）。
+DOWNLOAD_QUEUE_SIZE = 100000
+
+# 下载线程数（08174 异步下载管道）：从待下载队列取链接执行 raw 下载。
+# 下载是 IO 等待（不占 CPU），2 核机器上 48 线程足够喂饱 30/s 连接节流；
+# 原结构（96 信号量 + 每仓库 4-8 线程叠加）实测并发上限 259 触发 CDN
+# 限流（08111），固定 48 线程从源头锁死并发。
+DOWNLOAD_WORKER_THREADS = 48
+
+# 解析共享线程池大小（08174）：小文件（<EXTRACT_PROCESS_MIN_MB）解析
+# 不再"每文件临时开 1 线程"（无上限隐患），改为共享固定线程池。
+# 依据 08181 数据：解析瞬时并发峰值 87（启动高峰）、单文件 0.02-0.05s
+# ——32 线程足够覆盖（GIL 下线程解析不并行，再多不加速只增调度开销）。
+PARSE_THREAD_POOL_SIZE = 32
+
+# 解析看门狗超时（秒，08174）：文件内容进入 CPU 解析后开始计时，超过
+# 此值未完成 → 触发线程转储（只打印不取消）。依据 08181 数据：小文件
+# 解析 0.02-0.05s（近 60s 3171 文件/290MB），大文件（>1MB 进程池）几分钟
+# 正常——300s 小文件必是卡死、大文件可能未完（打印等它自己完成）。
+PARSE_WATCHDOG_SECONDS = 300
 
 # 限流检测：近 60 秒内下载失败（0 字节/连接错误/超时/HTTP 错误）总数
 # 达到此值 → 触发退避。退避窗口（DOWNLOAD_THROTTLE_SECONDS）内下载并发
