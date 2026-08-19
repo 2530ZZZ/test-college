@@ -5725,3 +5725,4 @@ mafiiiiuw/nova-server
 lookastarik/moav69
 qwert123321a/nova-server
 princetech747/nova-server
+barry-far/free-v2ray-confi
