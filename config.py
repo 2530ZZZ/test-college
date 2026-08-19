@@ -847,13 +847,31 @@ DOWNLOAD_THROTTLE_SECONDS = 60
 # 进程独立 GIL，真正用满多核。2 核机器建议 2；content 经 pickle 传递
 # （内存×2，~186MB/93MB 文件），配合 DOWNLOAD_MEMORY_BUDGET_MB 封顶。
 # 影响：只影响解析速度与内存峰值，不影响正确性。可随时调整。
-EXTRACT_PROCESSES = 2
+EXTRACT_PROCESSES = 4
 
-# 下载/解析内存预算（MB）：正在解析 + 等待解析的文件 content 总大小上限。
+# 进程池排队降级阈值（08174）：进程池排队任务数 > 此值 → 新大文件改
+# 线程解析（进程池被大文件占死、小文件进不去时，让池轮转起来）。
+# 08191 实测：进程池 2/2 满、排队 305 个——大文件 pickle 传输慢（96MB
+# content 传给进程），池被占死 → 小文件只能线程（GIL 1 核）→ CPU 51%。
+# 排队 > 此值 → 新大文件走线程解析（慢但保证轮转）。
+# 当前值 20；取值范围 5-100。
+PROCESS_QUEUE_MAX = 20
+
+# 下载/解析内存预算（MB）：下载中 + 正在解析 + 等待解析的文件 content
+# 总字节上限（08174 修正：按字节计数——旧版用 len(str) 字符数当字节，
+# 中文 1 字符占 3 字节，预算 2048 实际对应 4-6GB 内存）。
 # 08104：64-120 个文件并发解析，content(93MB×N) 占满 11GB → 内存爆。
-# 超预算时下载线程等待（不发起新下载，URL 排队，不占内存）。
+# 超预算时下载线程在"取链接前"检查（背压，见 DOWNLOAD_MEMORY_BACKPRESSURE_MB），
+# 不够就不取（不发起新下载，链接留在队列，不占内存）。
 # 影响：只限制内存峰值，不影响正确性。可随时调整。
 DOWNLOAD_MEMORY_BUDGET_MB = 2048
+
+# 内存背压余量（MB，08174）：下载线程取链接时的检查阈值 =
+# DOWNLOAD_MEMORY_BUDGET_MB - 此值。留余量给"刚下载完还没提交解析"、
+# "下载中 size 预估不准（partial clone size=0）"的浮动——避免实际内存
+# 刚好顶在 2GB 上反复抖动（下载-释放-下载的振荡）。
+# 当前值 256（预算的 12.5%）；取值范围 64-512。
+DOWNLOAD_MEMORY_BACKPRESSURE_MB = 256
 
 # 走进程池解析的最小文件大小（MB）。小于此值直接线程解析（pickle 开销
 # 占比大，小文件进程池反而慢）；大于此值提交进程池（绕 GIL 用多核）。
@@ -1238,5 +1256,9 @@ LOG_FAILED_CANDIDATES = True
 # 仓库候选文件总大小 > HIGH → 4 Worker，> MED → 8 Worker，≤ MED → 全速。
 # 设为 0 关闭动态降级（始终全速并行下载）。
 # 默认值：HIGH=500, MED=200。
+# ⚠️ 08174 异步管道后已失效：原"按仓库大小降并行下载线程"的代码被
+# 待下载队列取代（worker 只入队不下载）。该职责现由全局内存预算承担
+# （DOWNLOAD_MEMORY_BUDGET_MB + 背压检查，下载线程取链接时判断）——
+# 保留此配置仅为历史说明，不再被代码读取。
 PARALLEL_DOWNLOAD_MB_HIGH = 500
 PARALLEL_DOWNLOAD_MB_MED = 200

@@ -88,6 +88,7 @@ from config import (
     CLONE_FIRST_MODE,
     DOWNLOAD_QUEUE_SIZE, DOWNLOAD_WORKER_THREADS,
     PARSE_THREAD_POOL_SIZE, PARSE_WATCHDOG_SECONDS,
+    DOWNLOAD_MEMORY_BACKPRESSURE_MB, PROCESS_QUEUE_MAX,
     CONTENTS_API_FALLBACK_ENABLED, MONITOR_INTERVAL,
     MAIN_SOURCE_LIMIT, TRACE_RETRY_DAYS,
     KEYWORD_TRACE_DEPTH, CODE_TRACE_DEPTH, INFO_BACKFILL_ENABLED,
@@ -410,6 +411,11 @@ class Collector:
         self._dl_enqueue_lock = threading.Lock()   # 入队锁：同仓库文件连成一段
         self._dl_stop = threading.Event()          # 收尾停止信号
         self._dl_workers = []                      # 下载线程列表
+        # 08174：下载中 content 预估字节（背压检查用——取链接时预留、
+        # 下载完成释放；实际内存由解析预算 _parsing_bytes 接管）。
+        # 旧版下载中 content 不计入预算 → 48 线程 × 大文件无上限
+        # （08191 实测 6 分钟 11GB 内存的根因）。
+        self._downloading_bytes = 0
         # 解析共享线程池（08174）：小文件解析不再每文件临时开 1 线程
         # （08181 峰值 87 并发、无上限是隐患），改固定 32 线程池，积压排队。
         self._parse_pool = ThreadPoolExecutor(
@@ -966,12 +972,13 @@ class Collector:
                     f"/{self._pending_download_bytes/1024/1024:.0f}MB"
                     f"(等连接配额{_dl_waiting}) | "
                     f"队列 {self._dl_queue.qsize()}/{DOWNLOAD_QUEUE_SIZE} | "
+                    f"下载中内存 {self._downloading_bytes/1024/1024:.0f}MB | "
                     f"60s成功 {_raw_ok_n}文件/{_raw_ok_mb:.1f}MB | "
                     f"60s连接 {_raw_ok_n + _raw_fail_n} | {_dl_fail_txt}",
-                    f"   解析: 进行中 {self._parsing_active}文件"
-                    f"(最大{self._parsing_cur_max_mb():.0f}MB) | "
+                    f"   解析: 队列 {self._parsing_active}文件"
+                    f"(含排队/最大{self._parsing_cur_max_mb():.0f}MB) | "
                     f"近60s解析 {_parsed_60s_n}文件/{_parsed_60s_mb:.1f}MB | "
-                    f"等解析名额 {self._parsing_waiting}文件"
+                    f"等内存预算 {self._parsing_waiting}文件"
                     f"/{self._parsing_waiting_bytes/1024/1024:.0f}MB | "
                     f"内存占用 {self._parsing_bytes/1024/1024:.0f}"
                     f"/{DOWNLOAD_MEMORY_BUDGET_MB}MB | "
@@ -1636,9 +1643,13 @@ class Collector:
         # 08174：下载线程启动（异步下载管道——worker 只入队，下载线程消费）
         self._start_download_workers()
         # 08174：解析看门狗信号注册（SIGUSR1 → faulthandler 转储线程栈；
-        # 内核信号直达，即使 GIL 被正则卡死也能抓现场）
+        # 内核信号直达，即使 GIL 被正则卡死也能抓现场）。
+        # 08191 事故修复：faulthandler 转储后会"重抛信号"→ SIGUSR1 默认
+        # 动作终止进程（exit 138，程序被自己的看门狗杀死）。先设忽略再
+        # chain=True 注册——转储后链到"忽略"，只转储不终止。
         try:
-            faulthandler.register(signal.SIGUSR1, all_threads=True)
+            signal.signal(signal.SIGUSR1, signal.SIG_IGN)
+            faulthandler.register(signal.SIGUSR1, all_threads=True, chain=True)
         except Exception:
             pass
         # 监控线程（系统状态观测）
@@ -1916,12 +1927,38 @@ class Collector:
             if task is None:  # 哨兵（保留，未使用）
                 self._dl_queue.task_done()
                 break
+            # 08174 背压：取到任务后检查内存预算（下载中+解析中+本文件预估
+            # ≤ 预算-余量）——不够则等待（content 还没进内存就拦住，不会
+            # 出现"下载完才发现超了"的延迟）。size=0（partial clone）不
+            # 预估（_est=0），下载完成后由解析预算按实际接管。
+            _est = (task[8] or 0) * 3  # size 字节 → 解码 str 约 ×3（UTF-8）
+            _mem_limit = ((DOWNLOAD_MEMORY_BUDGET_MB
+                           - DOWNLOAD_MEMORY_BACKPRESSURE_MB)
+                          * 1024 * 1024)
+            _skip = False
+            while True:
+                with self._state_lock:
+                    if self._downloading_bytes + self._parsing_bytes + _est \
+                            <= _mem_limit:
+                        self._downloading_bytes += _est
+                        break
+                # 收尾中放弃（不无限等预算）
+                if self._dl_stop.is_set():
+                    _skip = True
+                    break
+                time.sleep(0.5)
+            if _skip:
+                self._dl_queue.task_done()
+                continue  # 放弃本任务（收尾中）
             try:
                 # async_mode=True：解析提交共享池后立即返回（不阻塞下载线程）
                 self._handle_one_file(*task, async_mode=True)
             except Exception as e:
                 log_sink.emit(f"[{now_str()}] [Dl] ⚠️ 下载线程异常: {e}")
             finally:
+                with self._state_lock:
+                    self._downloading_bytes = max(
+                        0, self._downloading_bytes - _est)  # 释放预估
                 self._dl_queue.task_done()
 
     def _enqueue_downloads(self, repo, branch, files_to_check, has_nodes,
@@ -4084,6 +4121,11 @@ class Collector:
             # 08111：实时集合替代历史峰值——监控"最大"不再误导
             self._parsing_sizes.add(content_size_mb)
 
+        # 08174：内存预算按字节估算——旧版用 len(str) 字符数当字节（中文
+        # 1 字符占 3 字节，预算 2048 实际对应 4-6GB 内存，08191 实测 11GB
+        # 的推手之一）。UTF-8 最坏 3 字节/字符，×3 保守估算（宁多算不少算）。
+        _content_bytes = len(content) * 3
+
         # 内存预算控制（08104：64-120 文件并发解析，content 占满 11GB）：
         # 解析前检查"解析中"的 content 总大小，超预算则等待
         # （不发起新解析，下载线程被占住 → 自然不再下载新文件，
@@ -4092,37 +4134,39 @@ class Collector:
         # "等待解析/预算已用"显示，此日志曾因计数 bug 刷屏 98 万次）
         # 等待计数（监控显示：等待解析的文件数与大小）
         self._parsing_waiting += 1
-        self._parsing_waiting_bytes += len(content)
+        self._parsing_waiting_bytes += _content_bytes
         while True:
             with self._state_lock:
-                if (self._parsing_bytes + len(content)
+                if (self._parsing_bytes + _content_bytes
                         <= DOWNLOAD_MEMORY_BUDGET_MB * 1024 * 1024):
-                    self._parsing_bytes += len(content)
+                    self._parsing_bytes += _content_bytes
                     self._parsing_waiting -= 1
-                    self._parsing_waiting_bytes -= len(content)
+                    self._parsing_waiting_bytes -= _content_bytes
                     break
             # 08174：收尾中放弃等预算（异步路径下下载线程不被死等）
             if self._dl_stop.is_set() and not wait:
                 self._parsing_active -= 1
                 self._parsing_waiting -= 1
-                self._parsing_waiting_bytes -= len(content)
+                self._parsing_waiting_bytes -= _content_bytes
                 return
             self._budget_wait_count += 1
             time.sleep(0.5)
 
-        def extract():
-            return extract_all_strategies(content)
-
-        # 08174：看门狗登记（进入 CPU 解析开始计时；只打印不取消）
+        # 08174：看门狗登记移到 extract 内部——进入 CPU 解析才开始计时
+        # （排队等待不算卡死；08191 积压 3249 任务排队 >300s 误触发的修复，
+        # 你早就要求"文件进入 CPU 后开始计时"）
         _wd_key = f"{repo}|{file_path}"
-        with self._parse_watchdog_lock:
-            self._parse_watchdog[_wd_key] = time.time()
+
+        def extract():
+            with self._parse_watchdog_lock:
+                self._parse_watchdog[_wd_key] = time.time()
+            return extract_all_strategies(content)
 
         def _release_parse_state(_ex_t0):
             """解析任务收尾：释放计数/预算/看门狗/耗时记录（两种路径共用）。"""
             self._parsing_active -= 1
             with self._state_lock:
-                self._parsing_bytes -= len(content)  # 释放预算
+                self._parsing_bytes -= _content_bytes  # 释放预算
                 self._parsing_sizes.discard(content_size_mb)  # 08111 实时最大
             with self._parse_watchdog_lock:
                 self._parse_watchdog.pop(_wd_key, None)
@@ -4291,8 +4335,16 @@ class Collector:
                 # 08111：小文件在池有空位时也进池——纯小文件时段进程池
                 # 空转只用了 1 核；大文件永远优先（无条件进池），小文件
                 # 只占 EXTRACT_PROCESSES - 大文件数的空位，不抢大文件位置。
-                future = self._pool_submit(
-                    extract, content_size_mb > EXTRACT_PROCESS_MIN_MB)
+                # 08174：排队降级——进程池排队任务 > PROCESS_QUEUE_MAX 时，
+                # 新大文件改线程解析（进程池被大文件占死、小文件进不去时
+                # 让池轮转；08191 实测进程池 2/2 满、排队 305 个 → CPU 51%）。
+                if (content_size_mb > EXTRACT_PROCESS_MIN_MB
+                        and (self._pool_big_running + self._pool_small_running
+                             >= EXTRACT_PROCESSES + PROCESS_QUEUE_MAX)):
+                    future = self._parse_pool.submit(extract)
+                else:
+                    future = self._pool_submit(
+                        extract, content_size_mb > EXTRACT_PROCESS_MIN_MB)
             elif FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
                 # 小文件 → 共享解析线程池（08174：原"每文件临时开 1 线程"
                 # 无并发上限——08181 峰值 87 并发是隐患；固定
