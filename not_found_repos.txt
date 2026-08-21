@@ -5801,3 +5801,17 @@ crustymozarella/clash4docker
 nitronitro1/netra-panel
 salhymohammad9880-glitch/netra-panel
 kenan1983/urlclash-converter
+sub-store-org/sub-stor
+15831944/exploitdb
+amirrezafarnamtaheri/huntx.git
+miladshahhi/v2ray-and-clash-subscription-links
+5l1v3r1/dnsleaktest
+vacryptogodfather45/dnsleaktest
+cryptogodfatherva2/dnsleaktest
+hkwpc/adblock-acceleration
+fastonecanada/getsomefries
+1857112/adblock-acceleration
+yks2021/getsomefries
+yks2022/getsomefries
+rjcm19888888/awesome-mac
+ctowl/aethersailor-custom_openclash_rules
