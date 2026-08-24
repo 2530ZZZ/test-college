@@ -236,6 +236,22 @@ class ApiRateGate:
         with self._lock:
             return len(self._core_window)
 
+    def window_moving(self, within: float = 30.0) -> bool:
+        """速率门窗口是否在滚动（最近 within 秒内有请求被放行）。
+
+        供 http_client 自旋等待区分"正常排队 vs 异常卡死"（081XX）：
+        - 窗口一直在滚动 = 请求正常消耗，排队是暂时的，继续等
+        - 窗口完全停摆 = gate 计数异常（08172 事故），等下去只会空转
+        任一窗口（core/search_code/search_repos）有放行即视为滚动。
+        """
+        with self._lock:
+            now = time.time()
+            for w in (self._core_window, self._search_code_window,
+                      self._search_repos_window):
+                if w and now - w[-1][0] <= within:
+                    return True
+            return False
+
     # ── 响应记录（供 HttpClient 调用，次级限流观测） ──
 
     def record_response(self, url: str, status_code: int,

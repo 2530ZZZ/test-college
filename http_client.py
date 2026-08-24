@@ -19,7 +19,7 @@ from typing import Optional, Dict, Tuple
 
 from rate_limiter import RateLimiter
 from quota_manager import QuotaManager
-from config import GITHUB_TOKEN, GATE_SPIN_TIMEOUT_SECONDS
+from config import GITHUB_TOKEN, GATE_STALL_TIMEOUT_SECONDS
 from log_sink import log_sink
 
 
@@ -254,23 +254,33 @@ class HttpClient:
             _gate_held = False
             if is_api and self.api_gate is not None:
                 _gate_wait_t0 = time.time()
+                # 081XX：放弃条件从"总等待 90s"改为"窗口停摆 90s"——
+                # 08241 实测 200 worker 并发时请求积压是正常排队（速率门
+                # 300/min 每 0.2s 滚动放行一个，排队深但窗口在动），
+                # 90s 总等待误杀 1578 次（user repos 追踪全失效）。
+                # 现在每 10s 采样窗口是否在滚动：滚动 = 正常排队继续等；
+                # 窗口完全停摆（计数泄漏/真 bug，08172 事故）持续 90s
+                # 才放弃。日志去重：每端点每分钟一条（08173 1 秒 50 条）。
+                _gate_stall_t0 = None
+                _gate_move_check = 0.0
                 while not self.api_gate.acquire(url):
-                    # 08172/08173：自旋超时兜底——gate 计数 bug（search
-                    # 计数泄漏）曾致 acquire 永久拒绝 → 无限自旋 → 主线程
-                    # 卡死空转 3.5 小时。08173 修正：
-                    # a) 超时 30→90s（>60s 窗口 + 余量，总量限速的正常排队
-                    #    就超 30s，08173 实测 30s 误伤 50 次）
-                    # b) 超时后**放弃本次请求**（return None，不强制放行
-                    #    ——08173 实证强制放行绕过限速）
-                    # c) 日志去重：每端点每分钟一条（08173 1 秒 50 条刷屏）
-                    if time.time() - _gate_wait_t0 > GATE_SPIN_TIMEOUT_SECONDS:
+                    _now_t = time.time()
+                    if _now_t - _gate_move_check >= 10:
+                        _gate_move_check = _now_t
+                        if self.api_gate.window_moving():
+                            _gate_stall_t0 = None
+                        elif _gate_stall_t0 is None:
+                            _gate_stall_t0 = _now_t
+                    if _gate_stall_t0 is not None \
+                            and _now_t - _gate_stall_t0 \
+                            > GATE_STALL_TIMEOUT_SECONDS:
                         _et = self._classify_url(url)
                         _now_ts = time.time()
                         if _now_ts - self._gate_spin_log.get(_et, 0) > 60:
                             self._gate_spin_log[_et] = _now_ts
-                            log_sink.emit(f"[{_now()}] ⚠️ API 速率门自旋超时"
-                                  f"（>{GATE_SPIN_TIMEOUT_SECONDS}s 未放行），"
-                                  f"放弃请求 {operation_name}")
+                            log_sink.emit(f"[{_now()}] ⚠️ API 速率门停摆"
+                                  f"（>{GATE_STALL_TIMEOUT_SECONDS}s"
+                                  f" 无放行），放弃请求 {operation_name}")
                         self._record_call(url, 0)
                         return None
                     time.sleep(random.uniform(0.3, 0.8))  # 自旋重试（抖动防惊群）

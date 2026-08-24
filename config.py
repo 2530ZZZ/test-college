@@ -742,13 +742,51 @@ SEARCH_OTHER_PER_MINUTE = 30
 # 监控块双通道：除 stdout 外追加写此文件，日志通道死了也能确认程序存活）。
 LOG_MONITOR_FILE = "log/monitor.log"
 
-# API 速率门自旋超时（秒）：http_client 在 api_gate.acquire 拒绝时自旋等待，
-# 连续超过此值未放行 → 放弃本次请求（return None，不强制放行——08173
-# 实证强制放行绕过限速；08172 的 gate 计数 bug 曾致无限自旋 → 主线程
-# 卡死空转 3.5 小时）。
-# 08173 修正：30→90——正常排队（总量窗口满后等 60s 过期）就超 30s，
-# 30s 误伤 50 次；90s > 60s 窗口 + 余量，只有真 bug 才触发。
-GATE_SPIN_TIMEOUT_SECONDS = 90
+# API 速率门停摆超时（秒）：http_client 在 api_gate.acquire 拒绝时自旋等待，
+# 只有当"速率门窗口完全停摆"（最近 10s 内零放行）持续超过此值 →
+# 放弃本次请求（return None，不强制放行——08173 实证强制放行绕过限速；
+# 08172 的 gate 计数 bug 曾致无限自旋 → 主线程卡死空转 3.5 小时）。
+# 08241 修正语义：不再按"总等待 90s"放弃——200 worker 并发时请求积压
+# 是正常排队（窗口 300/min 每 0.2s 滚动放行一个，排队深但窗口在动），
+# 08241 实测 90s 等待误杀 1578 次（user repos 追踪全失效）。改成只盯
+# "窗口是否在滚动"：滚动 = 正常排队，继续等；停摆 90s = 真异常（计数
+# 泄漏），才放弃。GATE_STALL_TIMEOUT_SECONDS = 90（沿用原值，语义不同）。
+GATE_STALL_TIMEOUT_SECONDS = 90
+
+# 收尾时等下载队列清空的超时（秒）：_stop_download_workers 等队列空。
+# 08241 实测：积压 5.5 万文件，join() 无超时 → 收尾卡 ~25 分钟，
+# 拖到 GA 6h 上限被杀，_finalize 的统计/缓存（最后步骤）被截断。
+# 60s 超时后放弃剩余任务：已解析分片已落盘（不丢），未解析文件
+# SHA 未写缓存（下次运行重抓），数据安全。
+DOWNLOAD_DRAIN_TIMEOUT_SECONDS = 60
+
+# 收尾时 join worker 的超时（秒）：5.5h 自动终止后等 worker 退出。
+# 终止时 worker 可能卡在当前仓库（future.result 300s / clone / 下载），
+# 死等会拖到 GA 上限。60s 超时后直接进 _finalize——worker 是 daemon
+# 线程，main.py 最后 os._exit(0) 兜底强杀残留。
+WORKER_JOIN_TIMEOUT_SECONDS = 60
+
+# 看门狗/OOM 线程栈转储落盘文件：faulthandler 转储写 stderr 会被 GA
+# 日志管道丢弃（08192 的 44 次看门狗转储全丢失，看不到卡在哪个正则）。
+# 落盘后每轮都能拿到完整线程栈，定位卡死/慢解析的直接证据。
+WATCHDOG_DUMP_FILE = "watchdog_dump.log"
+
+# ── 源头背压（081XX 第 3 批）：下载 >> 解析时停止 worker 取新仓库 ──
+# 背景：08241/08242/08243 实测下载队列积压 5.5 万-10 万（冲破 10 万上限），
+# 下载 >> 解析吞吐（线程池 GIL 1 核），worker 卡在入队重试 → 后期 CPU
+# 3-5% 空转、积压到 6h 都消化不完。
+# 触发（任一）即背压：下载队列待处理 ≥ 5000 或 下载中+解析中内存 ≥ 2000MB
+# 恢复（任一）即解除：队列 < 1000 或 内存 < 500MB
+# 滞回：触发值 > 恢复值（5000→1000、2000→500），防临界点反复横跳。
+# 背压只停"取新仓库"，结果队列照常消费（仓库完成事件不积压）。
+DOWNLOAD_BACKPRESSURE_QUEUE = 5000          # 触发：下载队列文件数 ≥ 此值
+DOWNLOAD_BACKPRESSURE_MEM_MB = 2000         # 触发：下载中+解析中内存 ≥ 此值(MB)
+DOWNLOAD_BACKPRESSURE_RESUME_QUEUE = 1000   # 恢复：队列 < 此值
+DOWNLOAD_BACKPRESSURE_RESUME_MEM_MB = 500   # 恢复：内存 < 此值(MB)
+
+# 仓库级结果队列容量（081XX 第 3 批）：每仓库一条"处理完成"事件（量小，
+# 一个仓库一条），2000 足够——事件积压说明 work 消费不过来，容量留余量。
+RESULT_QUEUE_SIZE = 2000
 
 # ==================== API 配额管理 ====================
 
@@ -828,6 +866,13 @@ PARSE_THREAD_POOL_SIZE = 32
 # 解析 0.02-0.05s（近 60s 3171 文件/290MB），大文件（>1MB 进程池）几分钟
 # 正常——300s 小文件必是卡死、大文件可能未完（打印等它自己完成）。
 PARSE_WATCHDOG_SECONDS = 300
+
+# 解析耗时分布的分位区间数（081XX）：每 (100/此值)% 文件一个区间。
+# 目的：发现解析慢的文件——08241 实测 45MB 文件解析 21s+ 被"平均/最大"
+# 统计掩盖（大量快文件拉低平均），分位分布能看到最慢 5% 的耗时区间；
+# 最慢 10 个明细可直接复现改进解析算法（配合 watchdog_dump.log 线程栈）。
+# 当前值：20 = 每 5% 一个区间。
+PARSE_TIME_PERCENTILES = 20
 
 # 限流检测：近 60 秒内下载失败（0 字节/连接错误/超时/HTTP 错误）总数
 # 达到此值 → 触发退避。退避窗口（DOWNLOAD_THROTTLE_SECONDS）内下载并发

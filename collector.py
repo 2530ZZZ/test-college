@@ -42,6 +42,7 @@ import pickle
 import subprocess
 import threading
 import signal
+import multiprocessing
 from queue import Queue, PriorityQueue, Empty, Full
 from collections import deque
 from urllib.parse import quote
@@ -87,7 +88,7 @@ from config import (
     PARTIAL_CLONE_ENABLED, PARTIAL_CLONE_TIMEOUT, PARTIAL_CLONE_CONCURRENCY,
     CLONE_FIRST_MODE,
     DOWNLOAD_QUEUE_SIZE, DOWNLOAD_WORKER_THREADS,
-    PARSE_THREAD_POOL_SIZE, PARSE_WATCHDOG_SECONDS,
+    PARSE_THREAD_POOL_SIZE, PARSE_WATCHDOG_SECONDS, PARSE_TIME_PERCENTILES,
     DOWNLOAD_MEMORY_BACKPRESSURE_MB, PROCESS_QUEUE_MAX,
     CONTENTS_API_FALLBACK_ENABLED, MONITOR_INTERVAL,
     MAIN_SOURCE_LIMIT, TRACE_RETRY_DAYS,
@@ -106,6 +107,11 @@ from config import (
     QUEUE_PUT_TIMEOUT_SECONDS,
     LOG_FAILED_CANDIDATES,
     PARALLEL_DOWNLOAD_MB_HIGH, PARALLEL_DOWNLOAD_MB_MED,
+    DOWNLOAD_DRAIN_TIMEOUT_SECONDS, WORKER_JOIN_TIMEOUT_SECONDS,
+    WATCHDOG_DUMP_FILE,
+    DOWNLOAD_BACKPRESSURE_QUEUE, DOWNLOAD_BACKPRESSURE_MEM_MB,
+    DOWNLOAD_BACKPRESSURE_RESUME_QUEUE, DOWNLOAD_BACKPRESSURE_RESUME_MEM_MB,
+    RESULT_QUEUE_SIZE,
 )
 from http_client import HttpClient, RateLimiter
 from api_queue import ApiRateGate
@@ -264,8 +270,24 @@ class Collector:
         self._total_batch_nodes = 0                    # 批次累计节点数（含重复，统计展示）
         self._final_node_count = 0                     # 收尾去重后唯一节点数（统计展示）
         # ── 多进程解析池 + 内存预算（08104：GIL 1 核 + content 占满 11GB）──
-        self._extract_pool = (ProcessPoolExecutor(max_workers=EXTRACT_PROCESSES)
-                              if EXTRACT_PROCESSES > 0 else None)
+        # 081XX：强制 fork context——进程池任务闭包引用 self（Collector
+        # 含锁/会话/队列，spawn 下 pickle 必炸）；fork 靠内存继承工作。
+        # Windows 本地无 fork → 降级线程池（_extract_pool=None）。
+        # _pool_wd_queue：进程池看门狗回报队列——子进程把"开始/完成解析"
+        # 时间戳报给主进程（fork 继承同一 pipe 连接），解决进程池路径
+        # 看门狗盲区（子进程写 self._parse_watchdog 是内存副本，主进程
+        # 读不到——08192 诊断确认，08241 大文件卡 21s 完全不可见）。
+        self._extract_pool = None
+        self._pool_wd_queue = None
+        if EXTRACT_PROCESSES > 0:
+            try:
+                _mp_ctx = multiprocessing.get_context("fork")
+                self._extract_pool = ProcessPoolExecutor(
+                    max_workers=EXTRACT_PROCESSES, mp_context=_mp_ctx)
+                self._pool_wd_queue = _mp_ctx.Queue()
+            except Exception:
+                self._extract_pool = None
+                self._pool_wd_queue = None
         self._parsing_bytes = 0                        # 解析中+等待解析的 content 总字节（预算控制）
         self._budget_wait_count = 0                    # 预算等待次数（统计）
         # ── 08111：进程池调度（大文件优先，小文件补位）──
@@ -373,8 +395,11 @@ class Collector:
         # 08111：_parsing_max_mb（历史峰值）已废弃，改 _parsing_sizes 实时集合
         # ── 08103 监测（定位卡死与内存增长）：下载中计数 / 文件耗时 ──
         self._downloading_active = 0                    # 当前正在下载的文件数
-        self._file_times = deque(maxlen=500)            # 每文件耗时: (下载s, 解析s, 大小MB) 近500条
+        self._file_times = []                           # 每文件耗时: (下载s, 解析s, 大小MB)
         self._file_times_total = 0                      # 累计记录数（统计平均）
+        # 081XX：_file_times 由 deque(500) 改为无上限 list——08241 分析
+        # 需要全量耗时分布（每 5% 区间 + 最慢文件明细）定位慢解析；
+        # 内存量：数万条 × 80B ≈ 几 MB，可控。
         self._last_activity = 0.0                       # 最近一次 _wlog 时间（监控降频信号）
         self._reset_waiting = False                     # 配额等待去重标志
         self._monitor_start = time.time()               # 监控基准
@@ -428,6 +453,19 @@ class Collector:
         self._watchdog_dumped = set()              # 已转储过的任务（去重）
         # 批次缓冲写盘锁（异步后多个下载线程可同时触发 _flush_batch）
         self._batch_flush_lock = threading.Lock()
+
+        # ── 081XX 第 3 批：仓库记账器 + 结果队列 + 源头背压 ──
+        # 记账器：repo -> RepoState dict（total/done/has_node/extracted/
+        # added/mode/tmp_dir/stats/tag/branch/raw_links/repo_links/sub_urls）。
+        # 作用：集中汇总"仓库全部文件是否处理完"（文件完成时间不一，由
+        # 记账器自动聚合），done==total → 发"仓库完成"事件进结果队列，
+        # work 消费后做后续（黑名单/统计/删 tmp/递归入队/订阅嗅探）。
+        # 文件列表不驻留（worker 同步段持有，入队后释放）；tmp_dir 只存
+        # 路径字符串——目录列表不会在内存堆积。
+        self._trackers = {}
+        self._trackers_lock = threading.Lock()
+        self._result_queue = Queue(maxsize=RESULT_QUEUE_SIZE)
+        self._backpressure_active = False   # 源头背压标志（滞回，见 _backpressure）
 
         # ── 独立组件（每线程一份） ──
         self.limiter = RateLimiter()  # 仅 GitHub 线程使用
@@ -857,6 +895,24 @@ class Collector:
                 # 大文件解析几分钟正常，faulthandler 转储可定位卡死的正则）。
                 try:
                     _wd_now = time.time()
+                    # 081XX：先收进程池看门狗回报（子进程 start/done 事件
+                    # 经 Queue 送达，主进程据此维护进程池路径的计时字典——
+                    # 之前子进程写字典主进程读不到，进程池路径完全盲区）
+                    _pq = self._pool_wd_queue
+                    if _pq is not None:
+                        while True:
+                            try:
+                                _ev = _pq.get_nowait()
+                            except Exception:
+                                break
+                            if _ev is None or len(_ev) < 2:
+                                continue
+                            if _ev[0] == "start" and len(_ev) >= 3:
+                                with self._parse_watchdog_lock:
+                                    self._parse_watchdog[_ev[1]] = _ev[2]
+                            elif _ev[0] == "done":
+                                with self._parse_watchdog_lock:
+                                    self._parse_watchdog.pop(_ev[1], None)
                     _wd_overdue = []
                     with self._parse_watchdog_lock:
                         for _k, _t0 in list(self._parse_watchdog.items()):
@@ -912,7 +968,9 @@ class Collector:
                     self._dump_done = True
                     self._wlog(f"🚨 内存 {mem_pct:.0f}% 超过 85%，"
                           f"触发线程转储（仅一次，定位静默卡死）")
-                    faulthandler.dump_traceback()
+                    # 081XX：与看门狗同文件落盘（stderr 会被 GA 丢弃）
+                    faulthandler.dump_traceback(
+                        file=getattr(self, "_wd_dump_f", None))
                 net = self._net_status()
                 # 08131：raw 下载失败分类（60s 窗口清理，先于 _raw_fail_n
                 # 统计执行——保证下方失败数/连接数不含过期条目）
@@ -1649,9 +1707,18 @@ class Collector:
         # chain=True 注册——转储后链到"忽略"，只转储不终止。
         try:
             signal.signal(signal.SIGUSR1, signal.SIG_IGN)
-            faulthandler.register(signal.SIGUSR1, all_threads=True, chain=True)
+            # 081XX：转储落盘——stderr 被 GA 日志管道丢弃（08192 的 44 次
+            # 看门狗转储全丢，看不到卡在哪个正则）。落盘每轮可复盘。
+            try:
+                self._wd_dump_f = open(WATCHDOG_DUMP_FILE, "a",
+                                       encoding="utf-8")
+            except Exception:
+                self._wd_dump_f = None
+            faulthandler.register(signal.SIGUSR1,
+                                  file=self._wd_dump_f,
+                                  all_threads=True, chain=True)
         except Exception:
-            pass
+            self._wd_dump_f = None
         # 监控线程（系统状态观测）
         threading.Thread(target=self._monitor_loop, name="Monitor",
                          daemon=True).start()
@@ -1720,10 +1787,11 @@ class Collector:
         for _ in workers: main_queue.put((float('inf'), -1, None))
         for _ in workers: disc_queue.put((float('inf'), float('inf'), -1, None))
 
-        # ── 内存优化（两阶段持久化）收尾顺序：先等 Worker 停（300s 上限，
-        # 处理完当前任务即退；卡死的任务超时后放弃）→ 内存空出 →
-        # 收尾全量去重（读 batches 写 no/，需空余内存）→ 保存状态 ──
-        deadline = time.time() + 300
+        # ── 内存优化（两阶段持久化）收尾顺序：先等 Worker 停（60s 上限，
+        # 处理完当前任务即退；卡死的任务（future.result/clone/下载）超时
+        # 后放弃不等——081XX：08241 实测 300s join 拖到 GA 6h 上限被杀，
+        # worker 是 daemon 线程，_finalize 后 os._exit(0) 兜底强杀）──
+        deadline = time.time() + WORKER_JOIN_TIMEOUT_SECONDS
         for w in workers:
             remaining = deadline - time.time()
             if remaining <= 0:
@@ -1951,8 +2019,24 @@ class Collector:
                 self._dl_queue.task_done()
                 continue  # 放弃本任务（收尾中）
             try:
-                # async_mode=True：解析提交共享池后立即返回（不阻塞下载线程）
-                self._handle_one_file(*task, async_mode=True)
+                # 081XX：任务第 10 位 local_path——非 None = fclone 本地文件，
+                # 读盘预载走解析（不走网络下载；读盘 IO 本地磁盘，不占 raw
+                # 连接配额）
+                _lp = task[9] if len(task) > 9 else None
+                if _lp:
+                    try:
+                        with open(_lp, "rb") as _fh:
+                            _data = _fh.read()
+                    except OSError:
+                        self._dl_queue.task_done()
+                        continue
+                    self._handle_one_file(
+                        task[0], task[1], task[2], task[3], task[4],
+                        task[5], task[6], task[7], size=task[8],
+                        content_bytes_preloaded=_data, async_mode=True)
+                else:
+                    # async_mode=True：解析提交共享池后立即返回（不阻塞下载线程）
+                    self._handle_one_file(*task[:9], async_mode=True)
             except Exception as e:
                 log_sink.emit(f"[{now_str()}] [Dl] ⚠️ 下载线程异常: {e}")
             finally:
@@ -1961,37 +2045,327 @@ class Collector:
                         0, self._downloading_bytes - _est)  # 释放预估
                 self._dl_queue.task_done()
 
+    # ═══════════════ 081XX 第 3 批：仓库记账器 + 结果队列 ═══════════════
+
+    def _tracker_register(self, repo: str, n_files: int, mode: str = "raw",
+                          tmp_dir: str = None, stats: List[int] = None,
+                          tag: str = "", branch: str = ""):
+        """仓库文件入队时登记（total 累加；同 repo 多来源入队合并）。
+
+        文件列表不驻留：total 是数字，列表在 worker 同步段（取样→入队）
+        后释放——目录列表不会在内存堆积（几千仓库 × 几 MB 会 OOM）。
+        """
+        if n_files <= 0:
+            return
+        with self._trackers_lock:
+            t = self._trackers.get(repo)
+            if t is None:
+                t = {"total": 0, "done": 0, "has_node": False,
+                     "extracted": 0, "added": 0, "mode": mode,
+                     "tmp_dir": tmp_dir, "stats": stats, "tag": tag,
+                     "branch": branch,
+                     "raw_links": set(), "repo_links": set(),
+                     "sub_urls": set()}
+                self._trackers[repo] = t
+            t["total"] += n_files
+
+    def _tracker_file_done(self, repo: str, has_node: bool = False,
+                           extracted: int = 0, added: int = 0):
+        """单个文件终结（解析完成/下载失败/超时跳过都算）。
+
+        done==total → 发"仓库完成"事件进结果队列（work 消费后做后续）。
+        同步路径（取样）的文件不注册过 tracker → 直接返回（不误统计）。
+        """
+        ev = None
+        with self._trackers_lock:
+            t = self._trackers.get(repo)
+            if t is None:
+                return
+            t["done"] += 1
+            t["has_node"] = t["has_node"] or has_node
+            t["extracted"] += extracted
+            t["added"] += added
+            if t["done"] >= t["total"]:
+                self._trackers.pop(repo, None)
+                ev = ("repo_done", repo, dict(t))
+        if ev is not None:
+            try:
+                self._result_queue.put_nowait(ev)
+            except Full:
+                # 结果队列满：阻塞放（仓库完成事件量小，几乎不会满；
+                # 即使满也不能丢——丢了 tmp 不会被删、仓库不统计）
+                self._result_queue.put(ev)
+
+    def _backpressure(self) -> bool:
+        """源头背压（081XX）：worker 取仓库前检查。
+
+        触发（任一）：下载队列待处理 ≥ DOWNLOAD_BACKPRESSURE_QUEUE 或
+                     下载中+解析中内存 ≥ DOWNLOAD_BACKPRESSURE_MEM_MB
+        恢复（两个都满足）：队列 < RESUME_QUEUE 且 内存 < RESUME_MEM_MB
+        ——081XX 修正：恢复条件必须"且"。若用"或"，内存本来就低
+        （<500MB）时 OR 恒真 → 背压触发后立即恢复，背压形同虚设
+        （测试 _test_batch3 抓到的真实逻辑缺陷）。
+        滞回：触发值 > 恢复值，防临界点反复横跳（worker 停/启有开销）。
+        只停"取新仓库"，结果队列照常消费（仓库完成事件不积压）。
+        """
+        q = self._dl_queue.qsize()
+        mem = (self._downloading_bytes + self._parsing_bytes) / 1024 / 1024
+        if self._backpressure_active:
+            if q < DOWNLOAD_BACKPRESSURE_RESUME_QUEUE \
+                    and mem < DOWNLOAD_BACKPRESSURE_RESUME_MEM_MB:
+                self._backpressure_active = False
+                self._wlog(f"🟢 背压解除（队列 {q} / 内存 {mem:.0f}MB）")
+            # 081XX：返回"是否处于背压"（_backpressure_active）——
+            # 此前误写 not active，背压中恒返回 False（恢复分支逻辑反转，
+            # 测试 _test_batch3 抓到的真实 bug）
+            return self._backpressure_active
+        else:
+            if q >= DOWNLOAD_BACKPRESSURE_QUEUE \
+                    or mem >= DOWNLOAD_BACKPRESSURE_MEM_MB:
+                self._backpressure_active = True
+                self._wlog(f"🔴 背压触发：下载队列 {q} 个 / 内存 {mem:.0f}MB，"
+                      f"暂停取新仓库（恢复：队列<{DOWNLOAD_BACKPRESSURE_RESUME_QUEUE}"
+                      f" 且 内存<{DOWNLOAD_BACKPRESSURE_RESUME_MEM_MB}MB）")
+            return self._backpressure_active
+
+    def _handle_repo_result(self, ev: tuple):
+        """work 处理"仓库完成"事件（081XX 第 3 批）。
+
+        分类动作（按仓库模式）：
+          - fclone（全量下载）：tmp 目录在磁盘，done==total 后删除；
+            文件内容从不在内存堆积（逐文件读入解析后释放）
+          - partial/tree：文件内容在远端（blob:none 未下载），本地无
+            数据可清理，只做黑名单/统计
+          有节点 → 更新统计 + 递归发现 + 订阅嗅探（慢操作全在此，
+          解析回调只做提取——解析回调瘦身）
+        """
+        try:
+            _, repo, t = ev
+            # 1. fclone tmp 清理（仓库全部文件处理完才能删）
+            if t.get("mode") == "fclone" and t.get("tmp_dir"):
+                try:
+                    shutil.rmtree(t["tmp_dir"], ignore_errors=True)
+                except Exception:
+                    pass
+            # 2. 统计：fclone 有节点仓库数（raw/partial/tree 由 process_repo
+            #    的 repo_stats[0]>0 统计——fclone 取样节点不进 repo_stats，
+            #    只在此计，两处不重复）
+            #    黑名单不在本处做：取样失败的黑名单已在同步路径
+            #    （_process_file_list / _full_clone_local_parse），取样通过
+            #    的仓库不黑名单；候选 ≤ 阈值未取样的仓库全无节点也不黑名单
+            #    （保持原行为：黑名单只针对取样失败）
+            if t.get("mode") == "fclone" and t.get("has_node"):
+                self._repos_with_nodes_total += 1
+            # 3. 递归发现（原 _discover_recursive 的入队执行部分，work 做）
+            _tag = t.get("tag", "")
+            for url in list(t.get("raw_links", set())):
+                self._discover_url(url, _tag, is_raw=True)
+            for url in list(t.get("repo_links", set())):
+                self._discover_url(url, _tag, is_raw=False)
+            # 4. 订阅嗅探（原 _postprocess 的 HTTP 部分，work 做，限流）
+            for url in list(t.get("sub_urls", set()))[:SUB_URL_MAX_PER_FILE]:
+                if url in self._sub_urls_seen:
+                    continue
+                self._sub_urls_seen.add(url)
+                try:
+                    _resp = self.http.get(url, timeout=(8, 15),
+                                          operation_name=f"订阅链接 {url[:60]}")
+                    if _resp and _resp.text:
+                        _sub_proxies = extract_all_strategies(_resp.text)
+                        for _p in _sub_proxies:
+                            if _p.is_valid():
+                                with self._state_lock:
+                                    _uri = _p.to_uri()
+                                    if _uri in self._batch_dedup:
+                                        continue
+                                    self._batch_dedup.add(_uri)
+                                    self.batch_buffer.append(_uri)
+                                    self.all_links.append(url)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _extract_links(self, content: str) -> tuple:
+        """从解析内容提取 raw 链接/仓库链接/订阅 URL（081XX 第 3 批）。
+
+        解析回调只做提取（纯 regex，快）；入队/HTTP 由 work 在仓库完成
+        事件时做（_handle_repo_result）——原在 _postprocess 里入队/拉取
+        占解析资源（订阅嗅探 HTTP 8-15s 占解析回调线程）。
+        """
+        raw_links, repo_links, sub_urls = set(), set(), set()
+        try:
+            for m in re.finditer(
+                    r'https://raw\.githubusercontent\.com/'
+                    r'([^/]+/[^/]+)/([^/]+)/([^\s"\'`#]+)', content):
+                raw_links.add(m.group(0).rstrip('.,;:!?)\'"]'))
+        except Exception:
+            pass
+        try:
+            for m in re.finditer(
+                    r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
+                    r'(?!/blob/|/tree/|/raw/|/issues|/pull|/releases|/wiki)',
+                    content):
+                repo_links.add(m.group(0).rstrip('.,;:!?)\'"]'))
+        except Exception:
+            pass
+        try:
+            for m in re.finditer(
+                    r'(?:https?://)'
+                    r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}'
+                    r'(?:/\S*)?\b(?:sub|subscribe|link|token|node|proxy|v2ray|clash'
+                    r'|ssr|vless|trojan|hysteria|tuic|singbox|shadowrocket'
+                    r'|quantumult|surge|loon|stash)\b[^\s"\']{0,200}',
+                    content, re.IGNORECASE):
+                _url = m.group(0).rstrip('.,;:!?)"\']')
+                _black = ('google.com', 'star-history.com', 'play.google.com',
+                          'apple.com', 'microsoft.com', 'facebook.com', 'twitter.com',
+                          'youtube.com', 'reddit.com', 'wikipedia.org')
+                if ('github.com' not in _url
+                        and 'raw.githubusercontent.com' not in _url
+                        and not any(d in _url for d in _black)):
+                    sub_urls.add(_url)
+        except Exception:
+            pass
+        return raw_links, repo_links, sub_urls
+
+    def _discover_url(self, url: str, tag: str = "[种子仓库]",
+                      is_raw: bool = True):
+        """递归发现单个链接（081XX：从 _discover_recursive 拆出的执行部分）。
+
+        原 _discover_recursive 在解析回调里对 content 全量匹配 + 入队，
+        第 3 批改为：解析回调只提取链接（_extract_links），work 在仓库
+        完成事件时逐个调用本方法（repo info → 入队发现队列）。
+        """
+        try:
+            if self.recursive_count >= MAX_RECURSIVE_REPOS:
+                return
+            if is_raw:
+                m = re.match(
+                    r'https://raw\.githubusercontent\.com/'
+                    r'([^/]+/[^/]+)/([^/]+)/([^\s"\'`#]+)', url)
+                if not m:
+                    return
+                full_name = m.group(1)
+                path = m.group(3)
+                if os.path.splitext(path)[1].lower() not in ALLOWED_EXTENSIONS:
+                    return
+            else:
+                m = re.match(r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)', url)
+                if not m:
+                    return
+                full_name = m.group(1)
+            if not self._check_and_add_seen(full_name) \
+                    or self._is_repo_dead(full_name):
+                return
+            self._wlog(f"🔗 {tag} 递归发现仓库 {full_name} (来源 {url[:80]})")
+            self.recursive_count += 1
+            time.sleep(REPO_SLEEP_SECONDS)
+            rl = full_name.lower()
+            if rl in self._repo_checking:
+                time.sleep(0.3)
+                if self._is_repo_dead(full_name):
+                    return
+            self._repo_checking.add(rl)
+            try:
+                if self.quota_mgr.exceeded:
+                    link_tag_q = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
+                    if getattr(self, '_disc_queue', None):
+                        self._disc_put(("GitHub", full_name,
+                                        {"branch": "main", "size": -1,
+                                         "disabled": False, "pushed_at": "",
+                                         "raw_depth": 0, "language": "",
+                                         "tag": link_tag_q}),
+                                       label="链接")
+                    return
+                repo_info = self.http.get_json(
+                    f"https://api.github.com/repos/{full_name}",
+                    timeout=FILE_DOWNLOAD_TIMEOUT,
+                    operation_name=f"repo info ({full_name})")
+                if not repo_info or repo_info.get('disabled', False):
+                    if not repo_info:
+                        if f"repo info ({full_name})" in self.http.last_404:
+                            self._mark_repo_not_found(full_name)
+                            if USER_REPOS_ENABLED \
+                                    and self._tag_kind(tag) not in ("user", "404user"):
+                                self._trace_user_repos(full_name, "main", tag,
+                                                       depth_offset=0)
+                    return
+                branch = repo_info.get("default_branch", "main")
+                self._branch_cache[full_name] = branch
+                raw_tag = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
+                if self._is_traced(full_name, repo_info.get("pushed_at", ""),
+                                   self._tag_depth(raw_tag)):
+                    return
+                if getattr(self, '_disc_queue', None):
+                    self._disc_put(("GitHub", full_name,
+                                    {"branch": branch,
+                                     "size": repo_info.get("size", -1),
+                                     "disabled": False,
+                                     "pushed_at": repo_info.get("pushed_at", ""),
+                                     "raw_depth": 0, "language":
+                                         repo_info.get("language", ""),
+                                     "tag": raw_tag}),
+                                   label="raw 递归")
+            finally:
+                self._repo_checking.discard(rl)
+        except Exception:
+            pass
+
     def _enqueue_downloads(self, repo, branch, files_to_check, has_nodes,
-                           raw_depth, stats, tag) -> bool:
+                           raw_depth, stats, tag,
+                           local_paths: List[str] = None,
+                           mode: str = "raw", tmp_dir: str = None) -> bool:
         """把取样通过后的剩余文件全部入待下载队列（08174）。
 
+        local_paths（081XX 第 3 批）：fclone 本地文件路径列表——任务带
+        本地路径标记，下载线程读盘解析（不走网络下载）。
+        任务元组第 10 位 local_path：None=raw 网络下载；str=本地文件。
         入队锁：同仓库文件连成一段（防不同仓库交错、某仓库文件被挤散）。
         队列满 → 阻塞等待（可中断：收尾/限流超限时放弃，不死等）。
+        入库前注册记账器（total）——文件列表只在这里用一次，随后释放
+        （列表不驻留内存；done==total 由 _tracker_file_done 聚合）。
         Returns: True=全部入队；False=放弃（收尾中）。
         """
+        n_ok = 0
         with self._dl_enqueue_lock:
-            for file_path, sha, _size in files_to_check:
+            for _i, (file_path, sha, _size) in enumerate(files_to_check):
+                _lp = local_paths[_i] if local_paths else None
                 while True:
                     try:
                         self._dl_queue.put_nowait(
                             (repo, branch, file_path, sha, has_nodes,
-                             raw_depth, stats, tag, _size))
+                             raw_depth, stats, tag, _size, _lp))
                         break
                     except Full:
                         if self._dl_stop.is_set() or self.limiter.should_stop():
+                            # 部分入队也算登记（已入队的会走 done 计数）
+                            self._tracker_register(
+                                repo, n_ok, mode=mode, tmp_dir=tmp_dir,
+                                stats=stats, tag=tag, branch=branch)
                             return False
                         time.sleep(0.5)
+                n_ok += 1
+        self._tracker_register(repo, n_ok, mode=mode, tmp_dir=tmp_dir,
+                               stats=stats, tag=tag, branch=branch)
         return True
 
     def _stop_download_workers(self):
         """收尾：停止下载线程并等队列清空（不丢任务）。
 
         流程：置停止信号 → 等队列空（下载线程持续消费）→ join。
+        081XX：等队列空加超时——08241 积压 5.5 万时 join() 无超时，
+        收尾卡 ~25 分钟拖到 GA 6h 上限被杀，统计/缓存被截断。
+        超时后放弃剩余任务：已解析分片已落盘（不丢），未解析文件
+        SHA 未写缓存（下次重抓）。
         """
         self._dl_stop.set()
-        # 等队列清空（下载线程消费完剩余任务自然退出）
+        # 等队列清空（下载线程消费完剩余任务自然退出），超时兜底
         try:
-            self._dl_queue.join()
+            _deadline = time.time() + DOWNLOAD_DRAIN_TIMEOUT_SECONDS
+            while self._dl_queue.unfinished_tasks > 0 \
+                    and time.time() < _deadline:
+                time.sleep(0.5)
         except Exception:
             pass
         # 下载线程处理完在途任务后退出（30s 上限——下载中任务大多 <30s；
@@ -2020,6 +2394,25 @@ class Collector:
             # ═══ 阶段 0: 停止检查（运行时超时/限流 → 退出） ═══
             if self._runtime_exceeded() or self.limiter.should_stop():
                 break
+
+            # ═══ 阶段 0.1: 处理仓库完成事件（081XX 第 3 批） ═══
+            # 非阻塞轮询结果队列——仓库全部文件处理完的事件（黑名单/
+            # 统计/删 tmp/递归入队/订阅嗅探全在此做；解析回调只提取，
+            # 慢操作不占解析资源）。每轮最多 8 条防单 worker 积压。
+            try:
+                for _ in range(8):
+                    _ev = self._result_queue.get_nowait()
+                    self._handle_repo_result(_ev)
+            except Empty:
+                pass
+
+            # ═══ 阶段 0.2: 源头背压（081XX） ═══
+            # 下载 >> 解析（08241 队列积压 5.5 万-10 万、后期 CPU 3-5%
+            # 空转的根因）→ 暂停取新仓库，让积压消化；滞回恢复防抖。
+            # 背压期间继续轮询结果队列（上一步已处理），不阻塞。
+            if self._backpressure():
+                time.sleep(1)
+                continue
 
             # ═══ 阶段 0.5: 阈值+冷却 → 强制取主队列（优先补充源头） ═══
             # disc 低于阈值且冷却结束 → 先尝试取主队列（原子+源头并发），
@@ -2351,6 +2744,13 @@ class Collector:
             self._dedup_batches_write_no()
         except Exception as e:
             self._wlog(f"⚠️ 收尾去重写 no/ 异常: {e}")
+        # 081XX：统计落盘提前到收尾去重后立即写——08241 的 _finalize 被
+        # GA 6h 上限杀进程时，统计（原最后一步）从没成功落盘过。收尾去重
+        # 后数据已定，提前写保证 GA 杀进程前统计不丢。
+        try:
+            self._write_run_stats(elapsed_seconds)
+        except Exception:
+            pass
         try:
             self.save_results()
         except Exception as e:
@@ -2489,12 +2889,9 @@ class Collector:
         print(f"{'='*60}", flush=True)
 
         # 08171：收尾统计落盘 stats/run_stats.txt——stdout 通道死亡
-        # （LogSink 消费者异常/GA 取消日志进 devnull）时统计不丢
-        # （数据统计兜底，复用 stats_distribution.txt 的"文件不丢"模式）
-        try:
-            self._write_run_stats(elapsed_seconds)
-        except Exception:
-            pass
+        # （LogSink 消费者异常/GA 取消日志进 devnull）时统计不丢。
+        # 081XX：调用已提前到 _dedup_batches_write_no 之后（GA 杀进程时
+        # 统计不再丢失），此处保留注释说明位置变更。
 
     def _write_run_stats(self, elapsed_seconds: float = 0):
         """08171：运行统计落盘（_finalize 末尾调用，stdout 兜底）。"""
@@ -2544,6 +2941,43 @@ class Collector:
                 f.write("\n".join(_lines) + "\n")
         except Exception:
             pass
+        # 081XX：解析耗时分布追加写（5% 区间 + 最慢 10 个明细）——定位
+        # 慢解析的直接依据（08241 的 45MB 文件 21s 全被平均掩盖）
+        try:
+            with open("stats/run_stats.txt", "a", encoding="utf-8") as f:
+                f.write("\n" + self._parse_time_distribution() + "\n")
+        except Exception:
+            pass
+
+    def _parse_time_distribution(self) -> str:
+        """解析耗时分布（081XX）：按耗时排序分 5% 区间 + 最慢 10 个明细。
+
+        目的：发现解析慢的文件——08241 实测 45MB 文件解析 21s+ 被
+        "平均/最大"统计掩盖（大量快文件拉低平均），分位分布能看到
+        最慢 5% 的耗时区间；最慢 10 个明细可直接复现改进解析算法。
+        数据源 _file_times（081XX 改为无上限 list，收尾时有全部记录）。
+        """
+        ft = self._file_times
+        if not ft:
+            return "解析耗时分布: 无数据"
+        exs = sorted((t[1], t[2]) for t in ft)  # (解析耗时s, 大小MB)
+        n = len(exs)
+        n_pct = max(1, PARSE_TIME_PERCENTILES)
+        step = max(1, n // n_pct)
+        lines = [f"解析耗时分布（{n} 条，每 {100 / n_pct:.0f}% 一个区间）:"]
+        for i in range(0, n, step):
+            seg = exs[i:i + step]
+            lo, hi = seg[0][0], seg[-1][0]
+            sizes = sorted(s for _, s in seg)
+            lines.append(
+                f"  {i * 100 // n:3d}% - "
+                f"{min(n, i + step) * 100 // n:3d}%: "
+                f"{lo:.1f}s - {hi:.1f}s"
+                f"（{len(seg)} 个，中位 {sizes[len(sizes) // 2]:.0f}MB）")
+        lines.append("最慢 10 个解析文件（耗时/大小）:")
+        for ex_s, mb in reversed(exs[-10:]):
+            lines.append(f"  {ex_s:.1f}s / {mb:.1f}MB")
+        return "\n".join(lines)
 
     def search_query(self, query: str):
         """搜索单个关键词，遍历结果页。
@@ -3252,7 +3686,9 @@ class Collector:
         self._repos_parsed_total += 1
         # 08142 取样判断：候选 > SAMPLE_THRESHOLD 时先取样（raw 下载解析），
         # 全无节点 → 跳过仓库 + 无节点黑名单（不浪费剩余文件下载/解析）
-        if not self._sample_judge_remote(repo, branch, files_to_check):
+        _cont, _sampled_ok = self._sample_judge_remote(
+            repo, branch, files_to_check)
+        if not _cont:
             self._mark_repo_no_node(repo)
             self._sample_skipped_60s.append(time.time())
             self._sample_skipped_total += 1
@@ -3265,6 +3701,10 @@ class Collector:
         # 取样已通过（有节点）→ 剩余文件全部入待下载队列（下载线程消费）。
         # worker 不再阻塞在下载/解析（08181 实测 worker 卡 1300s 的根因
         # 之一）；入队失败（收尾中断）视为处理完成，不重试不阻塞。
+        # 081XX：取样确认有节点 → 仓库整体有节点（取样文件用独立 has_node，
+        # 异步文件的 has_node 聚合会漏掉取样节点，置 True 防误判）
+        if _sampled_ok:
+            has_nodes[0] = True
         self._enqueue_downloads(repo, branch, files_to_check, has_nodes,
                                 raw_depth, stats, tag)
         return True
@@ -3388,16 +3828,21 @@ class Collector:
         return samples
 
     def _sample_judge_remote(self, repo: str, branch: str,
-                             files_to_check) -> bool:
+                             files_to_check) -> tuple:
         """远程取样判断（clone/tree 路径）：取样文件走 raw 下载解析。
 
-        Returns: True = 取样有节点（继续处理）；False = 全无节点（跳过）。
+        Returns: (是否继续处理, 取样是否确认有节点)。
+        - (False, False)：取样全无节点（调用方跳过仓库 + 黑名单）
+        - (True, True)：取样确认有节点（继续处理，仓库整体有节点）
+        - (True, False)：候选 ≤ 阈值未取样（继续处理，有无节点未知）
+        081XX：第二元素供调用方置外层 has_nodes——取样文件用独立
+        has_node，异步文件的 has_node 聚合会漏掉取样节点。
         取样文件解析后 SHA 已标记（_handle_one_file 内），剩余处理时
         按 sha 排除避免重复下载。
         """
         samples = self._pick_samples(files_to_check)
         if not samples:
-            return True  # 候选 ≤ 阈值 → 不取样，直接处理
+            return True, False  # 候选 ≤ 阈值 → 不取样，直接处理
         has_node = [False]
         _s_set = set(s[1] for s in samples)
         for path, sha, _sz in samples:
@@ -3407,19 +3852,22 @@ class Collector:
                                   raw_depth=0, stats=[0, 0],
                                   tag="[取样]", size=_sz)
         if not has_node[0]:
-            return False
+            return False, False
         # 取样有节点：剩余处理时排除已解析的取样文件（sha 已标记）
         files_to_check[:] = [x for x in files_to_check if x[1] not in _s_set]
-        return True
+        return True, True
 
-    def _sample_judge_local(self, repo: str, local_files) -> bool:
+    def _sample_judge_local(self, repo: str, local_files) -> tuple:
         """本地取样判断（全量 clone 路径）：取样文件磁盘直读（不走 raw）。
 
         local_files: [绝对路径] 工作区候选文件。
-        Returns: True = 取样有节点；False = 全无节点（调用方删仓库）。
+        Returns: (是否继续处理, 取样是否确认有节点)。
+        - (False, False)：取样全无节点（调用方删仓库 + 黑名单）
+        - (True, True)：取样确认有节点（继续处理，仓库整体有节点）
+        - (True, False)：候选 ≤ 阈值未取样（继续处理，有无节点未知）
         """
         if len(local_files) <= SAMPLE_THRESHOLD:
-            return True
+            return True, False
         # 按后缀目录分层取样（同 _pick_samples，但输入是路径列表）
         by_ext = {}
         for p in local_files:
@@ -3453,7 +3901,7 @@ class Collector:
                                   raw_depth=0, stats=[0, 0],
                                   tag="[取样]", size=len(data),
                                   content_bytes_preloaded=data)
-        return has_node[0]
+        return has_node[0], has_node[0]
 
     def _full_clone_local_parse(self, repo: str, size_kb: int = -1) -> bool:
         """08141：<FULL_CLONE_MB 仓库全量 clone → 本地遍历候选文件解析。
@@ -3483,6 +3931,7 @@ class Collector:
             return True
         _prev_state = self._worker_state.get(
             threading.current_thread().name, {}).get("what", "")
+        _async_kept = False  # 081XX：取样通过入队后 tmp 交给仓库完成事件删
         try:
             token = self.token or GITHUB_TOKEN
             if not token:
@@ -3523,39 +3972,47 @@ class Collector:
                     _cands.append(os.path.join(root, fn))
             # 08142 取样判断：候选 > SAMPLE_THRESHOLD 时先取样（磁盘直读），
             # 全无节点 → 删仓库 + 无节点黑名单（不浪费剩余文件的读取/解析）
-            if not self._sample_judge_local(repo, _cands):
+            _cont, _sampled_ok = self._sample_judge_local(repo, _cands)
+            if not _cont:
                 self._mark_repo_no_node(repo)
                 self._sample_skipped_60s.append(time.time())
                 self._sample_skipped_total += 1
                 self._wlog(f"⏭️ 取样全无节点，跳过并加入黑名单（{repo}，"
                       f"候选 {len(_cands)} 个）")
                 return True  # finally 删 tmp
-            # 取样有节点（或候选 ≤ 阈值）→ 逐个读入解析（串行）
-            _n = 0
-            _dl_total = 0
-            _has = [False]
-            for fpath in _cands:
-                if self.limiter.should_stop():
-                    break
+            # 取样有节点（或候选 ≤ 阈值）→ 剩余文件入待下载队列（081XX
+            # 第 3 批：fclone 也走异步管道——本地文件带 local_path 标记
+            # 入队，下载线程读盘解析，worker 不再逐个同步解析（08181
+            # worker 卡 1300s 的根因之一）。文件内容读入后立即释放，
+            # 不驻留内存。tmp 目录由仓库完成事件删除（_handle_repo_result
+            # 的 mode=fclone 分支）——此处不能删，文件还没处理完。
+            _files = []
+            _lps = []
+            for _fpath in _cands:
                 try:
-                    with open(fpath, "rb") as fh:
-                        data = fh.read()
+                    _sz = os.path.getsize(_fpath)
                 except OSError:
-                    continue
-                _dl_total += len(data)
-                self._handle_one_file(
-                    repo, "HEAD", fpath, "", _has,
-                    raw_depth=0, stats=[0, 0], tag="[全量]",
-                    size=len(data), content_bytes_preloaded=data)
-                _n += 1
+                    _sz = 0
+                _files.append((os.path.basename(_fpath), "", _sz))
+                _lps.append(_fpath)
+            _has = [False]
+            # 081XX：取样确认有节点 → 仓库整体有节点（取样文件用独立
+            # has_node，异步文件的聚合会漏掉取样节点）
+            if _sampled_ok:
+                _has[0] = True
+            _n = len(_lps)
+            _dl_total = sum(f[2] for f in _files)
+            self._enqueue_downloads(
+                repo, "HEAD", _files, _has, raw_depth=0, stats=[0, 0],
+                tag="[全量]", local_paths=_lps, mode="fclone", tmp_dir=tmp)
+            _async_kept = True  # tmp 交给仓库完成事件删除
             _now = time.time()
             self._full_clone_60s.append((_now, _size_mb))
             self._full_clone_total += 1
             self._full_clone_size_total += _size_mb
-            if _has[0]:
-                self._repos_with_nodes_total += 1  # 08171：全量 clone 有节点仓库
             self._wlog(f"📦 全量下载: {repo} ({_size_mb:.1f}MB, "
-                  f"解析 {_n} 候选文件/{_dl_total/1024/1024:.1f}MB)")
+                  f"入队 {_n} 候选文件/{_dl_total/1024/1024:.1f}MB，"
+                  f"异步解析，tmp 由仓库完成事件删除)")
             return True
         except Exception:
             return True
@@ -3563,10 +4020,13 @@ class Collector:
             self._clone_sem.release()
             self._clone_active -= 1
             self._set_worker_state(_prev_state)
-            try:
-                _shutil.rmtree(tmp, ignore_errors=True)
-            except Exception:
-                pass
+            # 081XX：取样通过且入队成功 → tmp 由仓库完成事件删除（等全部
+            # 文件处理完）；取样失败/异常路径 → 这里立即删（防残留）
+            if not _async_kept:
+                try:
+                    _shutil.rmtree(tmp, ignore_errors=True)
+                except Exception:
+                    pass
 
     def _partial_clone_file_list(self, repo: str, branch: str,
                                  size_kb: int = -1):
@@ -3821,11 +4281,6 @@ class Collector:
     # 因此小文件永远不会挡在大文件前面（最多让大文件等一个几秒的
     # 小文件周期，FIFO 队列）。卡死进程的任务计数保持挂着不释放，
     # 与进程池真实状态一致（此时小文件全部回落线程解析，行为同旧版）。
-    def _pool_small_can_enter(self) -> bool:
-        """小文件能否补位进程池：池中还有空位（总进程数 - 大文件数）。"""
-        with self._state_lock:
-            return self._pool_small_running < EXTRACT_PROCESSES - self._pool_big_running
-
     def _pool_submit(self, fn, is_big: bool):
         """提交进程池并维护占用计数。"""
         with self._state_lock:
@@ -4036,6 +4491,9 @@ class Collector:
             if (self._download_throttled_until <= _now
                     and _net_fails >= DOWNLOAD_STALL_THRESHOLD):
                 self._download_throttled_until = _now + DOWNLOAD_THROTTLE_SECONDS
+            # 081XX：下载失败也算仓库文件终结（done 计数，防仓库完成事件
+            # 永远不发导致 tmp 不删/仓库不统计）
+            self._tracker_file_done(repo, False, 0, 0)
             return  # 下载失败 → 不标记（下次重试）
 
         # 读取内容（surrogate 字符兼容）
@@ -4160,6 +4618,14 @@ class Collector:
         def extract():
             with self._parse_watchdog_lock:
                 self._parse_watchdog[_wd_key] = time.time()
+            # 081XX：进程池看门狗回报——子进程写 self._parse_watchdog 是
+            # fork 内存副本，主进程读不到（进程池路径盲区）。通过 Queue
+            # 把开始时间报给主进程监控线程（fork 继承同一 pipe 连接）。
+            if self._pool_wd_queue is not None:
+                try:
+                    self._pool_wd_queue.put(("start", _wd_key, time.time()))
+                except Exception:
+                    pass
             return extract_all_strategies(content)
 
         def _release_parse_state(_ex_t0):
@@ -4170,6 +4636,13 @@ class Collector:
                 self._parsing_sizes.discard(content_size_mb)  # 08111 实时最大
             with self._parse_watchdog_lock:
                 self._parse_watchdog.pop(_wd_key, None)
+            # 081XX：进程池 done 回报（主进程监控据此清除该 key 的计时；
+            # 线程池路径的 pop 已在上面生效，此回报对进程池路径必要）
+            if self._pool_wd_queue is not None:
+                try:
+                    self._pool_wd_queue.put(("done", _wd_key))
+                except Exception:
+                    pass
             # 08103 监测：记录每文件耗时（下载/解析/大小），定位慢在哪一步
             self._file_times.append((round(_dl_s, 1),
                                      round(time.time() - _ex_t0, 1),
@@ -4273,71 +4746,37 @@ class Collector:
                 with self._batch_flush_lock:
                     self._flush_batch()
 
-            # ---- raw 链接递归发现 ----
-            # 深度由 MAX_TRACE_DEPTH 统一控制（_should_trace），
-            # 防止 [raw2]/[raw3] 继续发现产生 [user3]/[raw4] 等超层条目。
+            # ---- 081XX 第 3 批：递归发现/订阅嗅探改"提取到记账器" ----
+            # 原在此处直接入队递归仓库 + HTTP 拉取订阅（占解析回调资源；
+            # 嗅探 HTTP 8-15s 阻塞解析线程）。现只提取链接（纯 regex，
+            # 毫秒级）到仓库记账器 set，入队/拉取由 work 在仓库完成事件
+            # 时执行（_handle_repo_result）——解析回调瘦身。
             if ENABLE_RAW_RECURSIVE and self._should_trace(tag) \
                     and self.recursive_count < MAX_RECURSIVE_REPOS:
-                self._discover_recursive(raw_url, content, raw_depth, tag)
-
-            # ---- 订阅链接自动发现（零 API 配额：raw HTTP，非 GitHub） ----
-            # 从已下载文件中嗅探第三方订阅链接（域名含 sub/subscribe/token
-            # 等关键词，路径特征匹配），拉取后同样提取节点。
-            # _black 黑名单：排除知名站点（google/apple/facebook...）——它们的
-            # 链接里常出现这些词但绝不是订阅源，白跑一趟浪费连接。
-            _sub_urls = set()
-            for _m in re.finditer(
-                r'(?:https?://)'
-                r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}'
-                r'(?:/\S*)?\b(?:sub|subscribe|link|token|node|proxy|v2ray|clash'
-                r'|ssr|vless|trojan|hysteria|tuic|singbox|shadowrocket'
-                r'|quantumult|surge|loon|stash)\b[^\s"\']{0,200}',
-                content, re.IGNORECASE):
-                _url = _m.group(0).rstrip('.,;:!?)"\']')
-                _black = ('google.com', 'star-history.com', 'play.google.com',
-                           'apple.com', 'microsoft.com', 'facebook.com', 'twitter.com',
-                           'youtube.com', 'reddit.com', 'wikipedia.org')
-                if ('github.com' not in _url and 'raw.githubusercontent.com' not in _url
-                        and not any(d in _url for d in _black)):
-                    _sub_urls.add(_url)
-            for _url in list(_sub_urls):
-                if _url in self._sub_urls_seen:
-                    continue
-                self._sub_urls_seen.add(_url)
-            _new_urls = [u for u in _sub_urls if u not in self._sub_urls_seen][:SUB_URL_MAX_PER_FILE]
-            for _url in _new_urls:
-                self._sub_urls_seen.add(_url)
-                try:
-                    _resp = self.http.get(_url, timeout=(8, 15),
-                                          operation_name=f"订阅链接 {_url[:60]}")
-                    if _resp and _resp.text:
-                        _sub_proxies = extract_all_strategies(_resp.text)
-                        for _p in _sub_proxies:
-                            if _p.is_valid():
-                                with self._state_lock:
-                                    _uri = _p.to_uri()
-                                    if _uri in self._batch_dedup:
-                                        continue
-                                    self._batch_dedup.add(_uri)
-                                    self.batch_buffer.append(_uri)
-                                    self.all_links.append(_url)
-                                    has_nodes[0] = True
-                except Exception:
-                    pass
+                _rl, _rpl, _sul = self._extract_links(content)
+                with self._trackers_lock:
+                    _t = self._trackers.get(repo)
+                    if _t is not None:
+                        _t["raw_links"].update(_rl)
+                        _t["repo_links"].update(_rpl)
+                        _t["sub_urls"].update(_sul)
+            # 081XX：记账器文件完成（done==total → 发仓库完成事件 → work
+            # 处理黑名单/统计/删 tmp/递归入队/订阅嗅探）。同步路径（取样）
+            # 的文件没注册过 tracker → no-op。
+            self._tracker_file_done(repo, has_node=has_nodes[0],
+                                    extracted=valid_count, added=new_count)
 
         _ex_t0 = time.time()
         try:
-            if self._extract_pool is not None \
-                    and (content_size_mb > EXTRACT_PROCESS_MIN_MB
-                         or self._pool_small_can_enter()):
-                # 大文件 → 多进程解析池（绕 GIL 用满多核；content pickle
-                # 传递内存×2，由预算封顶；卡住的进程占池子不累积）。
-                # 08111：小文件在池有空位时也进池——纯小文件时段进程池
-                # 空转只用了 1 核；大文件永远优先（无条件进池），小文件
-                # 只占 EXTRACT_PROCESSES - 大文件数的空位，不抢大文件位置。
-                # 08174：排队降级——进程池排队任务 > PROCESS_QUEUE_MAX 时，
-                # 新大文件改线程解析（进程池被大文件占死、小文件进不去时
-                # 让池轮转；08191 实测进程池 2/2 满、排队 305 个 → CPU 51%）。
+            if self._extract_pool is not None:
+                # 081XX：解析全走进程池（大小文件无条件进池）——线程池受
+                # GIL 限制永远 1 核，且 45MB 级大文件 re 匹配在 C 层持有
+                # GIL 会饿死其他解析线程（08241 实测 300s 超时 + 2 核用
+                # 不满的根因）。进程池每个子进程独立 GIL，2 核可打满，
+                # 看门狗计时也准确（注册=真在 CPU 跑，无 GIL 排队误差）。
+                # 排队降级保留（08174 语义）：进程池任务 > 阈值时新大文件
+                # 改线程池兜底（线程池仅兜底角色）——池被占死时让文件
+                # 有地方跑，按进 CPU 的顺序处理。
                 if (content_size_mb > EXTRACT_PROCESS_MIN_MB
                         and (self._pool_big_running + self._pool_small_running
                              >= EXTRACT_PROCESSES + PROCESS_QUEUE_MAX)):
@@ -4346,9 +4785,8 @@ class Collector:
                     future = self._pool_submit(
                         extract, content_size_mb > EXTRACT_PROCESS_MIN_MB)
             elif FILE_PROCESS_TIMEOUT is not None and FILE_PROCESS_TIMEOUT > 0:
-                # 小文件 → 共享解析线程池（08174：原"每文件临时开 1 线程"
-                # 无并发上限——08181 峰值 87 并发是隐患；固定
-                # PARSE_THREAD_POOL_SIZE=32 池，积压排队，杜绝线程爆炸）
+                # 兜底（进程池不可用，如本地 Windows 无 fork）→ 共享
+                # 线程池（08174：固定 PARSE_THREAD_POOL_SIZE=32 池）
                 future = self._parse_pool.submit(extract)
             else:
                 # 无池可用 → 直接执行（同线程）
@@ -4366,9 +4804,12 @@ class Collector:
             except FutureTimeoutError:
                 self._wlog(f"⚠️ 文件处理超时，跳过 {raw_url}")
                 _release_parse_state(_ex_t0)
+                # 081XX：超时跳过也算仓库文件终结（done 计数）
+                self._tracker_file_done(repo, False, 0, 0)
                 return
             except Exception:
                 _release_parse_state(_ex_t0)
+                self._tracker_file_done(repo, False, 0, 0)
                 return
             _postprocess(proxies, _ex_t0)
         else:
@@ -4384,229 +4825,11 @@ class Collector:
             except Exception:
                 _release_parse_state(_ex_t0)
 
-    def _discover_recursive(self, source_url: str, content: str, raw_depth: int,
-                            tag: str = "[种子仓库]"):
-        """从下载文件中发现其他 GitHub 仓库链接和 raw 链接，递归处理。
-
-        两种模式：
-          1. raw 链接：https://raw.githubusercontent.com/user/repo/branch/file
-          2. 仓库链接：https://github.com/user/repo（种子仓库的聚合资源）
-
-        发现的仓库标志位 = [raw{父层数+1}]（README 链接也算 raw）。
-        """
-        # 模式 1：raw 文件链接
-        raw_pattern = re.compile(
-            r'https://raw\.githubusercontent\.com/([^/]+/[^/]+)/([^/]+)/([^\s"\'`#]+)'
-        )
-        # 模式 2：GitHub 仓库链接
-        # 负向前瞻排除 /blob/、/tree/、/raw/ 等文件页路径——那些是文件
-        # 内嵌的代码链接不是仓库页，抓取它们没有递归价值
-        repo_pattern = re.compile(
-            r'https://github\.com/([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)'
-            r'(?!/blob/|/tree/|/raw/|/issues|/pull|/releases|/wiki)'
-        )
-        found = set()
-
-        # ── 处理 raw 链接 ──
-        for match in raw_pattern.finditer(content):
-            full_name = match.group(1)
-            ref = match.group(2)
-            path = match.group(3)
-            ext = os.path.splitext(path)[1].lower()
-
-            if ext not in ALLOWED_EXTENSIONS:
-                continue
-            if not self._check_and_add_seen(full_name) or \
-               self._is_repo_dead(full_name):
-                continue
-            if full_name in found:
-                continue
-
-            found.add(full_name)
-            if self.recursive_count >= MAX_RECURSIVE_REPOS:
-                break
-
-            self._wlog(f"🔗 {tag} 递归发现仓库 {full_name} "
-                  f"(来源 {source_url})")
-            self.recursive_count += 1
-            time.sleep(REPO_SLEEP_SECONDS)
-            # 并发保护：其他线程可能同时在查同一个 404 仓库
-            rl = full_name.lower()
-            if rl in self._repo_checking:
-                time.sleep(0.3)
-                if self._is_repo_dead(full_name):
-                    continue
-            self._repo_checking.add(rl)
-            if self.quota_mgr.exceeded:
-                # 配额耗尽：跳过 repo info（需 API），按未知信息直接入队，
-                # worker 配额恢复后补查（缺信息任务由零 API 循环排队尾）。
-                link_tag_q = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
-                if getattr(self, '_disc_queue', None):
-                    self._disc_put(("GitHub", full_name,
-                                    {"branch": "main", "size": -1,
-                                     "disabled": False, "pushed_at": "",
-                                     "raw_depth": raw_depth + 1,
-                                     "language": "", "tag": link_tag_q}),
-                                   label="链接")
-                self._repo_checking.discard(rl)
-                continue
-            try:
-                repo_info = self.http.get_json(
-                    f"https://api.github.com/repos/{full_name}",
-                    timeout=FILE_DOWNLOAD_TIMEOUT,
-                    operation_name=f"repo info ({full_name})")
-                if not repo_info or repo_info.get('disabled', False):
-                    if not repo_info:
-                        if f"repo info ({full_name})" in self.http.last_404:
-                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）。
-                            # 传父 tag（内部自动 child 一层，防双重 child 绕过层级）
-                            self._mark_repo_not_found(full_name)
-                            if USER_REPOS_ENABLED \
-                                    and self._tag_kind(tag) not in ("user", "404user"):
-                                self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户")
-                                # 404 补偿：同层顶上（depth_offset=0）
-                                self._trace_user_repos(
-                                    full_name, "main", tag, depth_offset=0)
-                    continue
-            finally:
-                self._repo_checking.discard(rl)
-            branch = repo_info.get("default_branch", "main")
-            self._branch_cache[full_name] = branch
-            # raw 链层数封顶：子层 = min(父层+1, MAX_TRACE_DEPTH)。
-            # 防 [raw1]→[raw2]→[raw3]... 无限加深（raw 入队不受 _should_trace
-            # 门控——达上限的 raw 仓库照常入队解析，但不产生更深层）。
-            # 封顶后同层链接被 _check_and_add_seen 去重拦截。
-            raw_tag = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
-            # 入队前追踪判断：已追踪（覆盖且未超期）→ 不入扩展队列；
-            # 仓库更新（pushed_at 不同）→ _is_traced False → 照常入队
-            if self._is_traced(full_name, repo_info.get("pushed_at", ""),
-                               self._tag_depth(raw_tag)):
-                continue
-            # 异步：放入发现队列，不阻塞当前 Worker
-            if getattr(self, '_disc_queue', None):
-                self._disc_put(("GitHub", full_name,
-                                {"branch": branch,
-                                 "size": repo_info.get("size", -1),
-                                 "disabled": False,
-                                 "pushed_at": repo_info.get("pushed_at", ""),
-                                 "raw_depth": raw_depth + 1,
-                                 "language": repo_info.get("language", ""),
-                                 "tag": raw_tag}),
-                               label="raw 递归")
-            else:
-                self.process_repo(full_name, branch=branch,
-                                  size=repo_info.get("size", -1),
-                                  disabled=False,
-                                  pushed_at=repo_info.get("pushed_at", ""),
-                                  raw_depth=raw_depth + 1,
-                                  language=repo_info.get("language", ""),
-                                  tag=raw_tag)
-
-        # ── 处理仓库链接 ──
-        for match in repo_pattern.finditer(content):
-            full_name = match.group(1)
-            if full_name in found or not self._check_and_add_seen(full_name):
-                continue
-            github_url = f"https://github.com/{full_name}"
-            if self._is_repo_dead(full_name):
-                continue
-            found.add(full_name)
-            if self.recursive_count >= MAX_RECURSIVE_REPOS:
-                break
-
-            self._wlog(f"🔗 {tag} 发现仓库链接 {full_name} "
-                  f"(来源 {source_url})")
-            self.recursive_count += 1
-            time.sleep(REPO_SLEEP_SECONDS)
-            # 并发保护：其他线程可能同时在查同一个 404 仓库
-            rl = full_name.lower()
-            if rl in self._repo_checking:
-                time.sleep(0.3)
-                if self._is_repo_dead(full_name):
-                    continue
-            self._repo_checking.add(rl)
-            if self.quota_mgr.exceeded:
-                # 配额耗尽：跳过 repo info（需 API），按未知信息直接入队，
-                # worker 配额恢复后补查（缺信息任务由零 API 循环排队尾）。
-                link_tag_q = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"
-                if getattr(self, '_disc_queue', None):
-                    self._disc_put(("GitHub", full_name,
-                                    {"branch": "main", "size": -1,
-                                     "disabled": False, "pushed_at": "",
-                                     "raw_depth": raw_depth + 1,
-                                     "language": "", "tag": link_tag_q}),
-                                   label="链接")
-                self._repo_checking.discard(rl)
-                continue
-            try:
-                repo_info = self.http.get_json(
-                    f"https://api.github.com/repos/{full_name}",
-                    timeout=FILE_DOWNLOAD_TIMEOUT,
-                    operation_name=f"repo info ({full_name})")
-                if not repo_info or repo_info.get('disabled', False):
-                    if not repo_info:
-                        if f"repo info ({full_name})" in self.http.last_404:
-                            # 404 → 记录跳过（持久化）+ 追踪该用户（补偿损失）。
-                            # 传父 tag（内部自动 child 一层，防双重 child 绕过层级）
-                            self._mark_repo_not_found(full_name)
-                            if USER_REPOS_ENABLED \
-                                    and self._tag_kind(tag) not in ("user", "404user"):
-                                self._wlog(f"🔍 仓库 {full_name} 不存在，追踪用户")
-                                # 404 补偿：同层顶上（depth_offset=0）
-                                self._trace_user_repos(
-                                    full_name, "main", tag, depth_offset=0)
-                    continue
-            finally:
-                self._repo_checking.discard(rl)
-            branch = repo_info.get("default_branch", "main")
-            self._branch_cache[full_name] = branch
-            # README/聚合文件中的来源仓库 → 直接追踪该用户的所有仓库
-            # （来源仓库的 owner 大概率有多个节点仓库，tag=[userN+1]）
-            # 门控：父 tag 层级 < MAX_TRACE_DEPTH 才追踪（源头 0 层允许产生
-            #       [user1]；[raw1]/[fork1] 等已达上限层不再追踪 → 修 [user2] 绕过）
-            #       user 类仓库不追踪 user（防 user→user 无底洞）
-            #       已追踪（覆盖且未超期）→ 跳过，避免重复查用户列表 API
-            if USER_REPOS_ENABLED \
-                    and self._should_trace(tag) \
-                    and self._tag_kind(tag) not in ("user", "404user"):
-                user_tag = self._child_tag(tag, "user")
-                if not self._is_traced(full_name,
-                                       repo_info.get("pushed_at", ""),
-                                       self._tag_depth(user_tag)):
-                    self._wlog(f"👤 来源仓库 {full_name} → 追踪用户 {full_name.split('/')[0]}")
-                    # 传父 tag：内部自动 child 一层生成 [user{父层+1}]。
-                    # 不能传已 child 的 user_tag（内部再 child → 层级 +2 绕过 MAX）
-                    self._trace_user_repos(full_name, branch, tag)
-            link_tag = f"[raw{min(self._tag_depth(tag) + 1, MAX_TRACE_DEPTH)}]"  # README 链接也算 raw（层数封顶）
-            # 入队前追踪判断：已追踪（覆盖且未超期）→ 不入扩展队列
-            if self._is_traced(full_name, repo_info.get("pushed_at", ""),
-                               self._tag_depth(link_tag)):
-                continue
-            # 异步：放入发现队列，不阻塞当前 Worker
-            if getattr(self, '_disc_queue', None):
-                self._disc_put(("GitHub", full_name,
-                                {"branch": branch,
-                                 "size": repo_info.get("size", -1),
-                                 "disabled": False,
-                                 "pushed_at": repo_info.get("pushed_at", ""),
-                                 "raw_depth": raw_depth + 1,
-                                 "language": repo_info.get("language", ""),
-                                 "tag": link_tag}),
-                               label="链接")
-            else:
-                self.process_repo(full_name, branch=branch,
-                                  size=repo_info.get("size", -1),
-                                  disabled=False,
-                                  pushed_at=repo_info.get("pushed_at", ""),
-                                  raw_depth=raw_depth + 1,
-                                  language=repo_info.get("language", ""),
-                                  tag=link_tag)
-
     # ==================== 回退路径：Contents API ====================
 
     def process_file_tree(self, repo: str, path: str, branch: str,
                           has_nodes: List[bool], stats: List[int] = None,
-                          tag: str = "[种子仓库]"):
+                          tag: str = "[种子仓库]", _files_acc: list = None):
         """回退路径：使用 Contents API 逐层遍历目录。
 
         仅在递归树 API 失败时使用。对每个文件/目录单独发请求。
@@ -4616,9 +4839,15 @@ class Collector:
         （默认 False）控制，tree + clone 都失败时直接放弃该仓库，
         不再走到这里（08113 决策，见 docs/DESIGN.md 决策 20）。
 
+        081XX 第 3 批：候选文件统一收集（_files_acc 递归传递），顶层
+        调用（path==""）结束后入待下载队列（异步管道）——不再逐文件
+        同步 _handle_one_file（worker 不阻塞在下载/解析上）。
+
         Args:
             stats: [extracted, added] 本仓库级统计累加。
         """
+        if _files_acc is None:
+            _files_acc = []
         contents_url = (f"https://api.github.com/repos/{repo}/contents/{path}"
                         if path
                         else f"https://api.github.com/repos/{repo}/contents")
@@ -4666,7 +4895,8 @@ class Collector:
                    datetime.now(timezone.utc) - dir_time >= timedelta(hours=24):
                     continue
 
-                self.process_file_tree(repo, item_path, branch, has_nodes)
+                self.process_file_tree(repo, item_path, branch, has_nodes,
+                                       _files_acc=_files_acc)
 
             elif item_type == "file":
                 ext = os.path.splitext(item_path)[1].lower()
@@ -4700,9 +4930,13 @@ class Collector:
                     self.processed_file_shas.add(item_sha)
                     continue
 
-                self._handle_one_file(repo, branch, item_path, item_sha,
-                                      has_nodes, raw_depth=0, stats=stats,
-                                      tag=tag)
+                # 081XX：收集候选（顶层递归结束后统一入队）
+                _files_acc.append((item_path, item_sha, 0))
+
+        # 081XX：顶层调用（path=="" 即根目录）递归结束后统一入队
+        if path == "" and _files_acc:
+            self._enqueue_downloads(repo, branch, _files_acc, has_nodes,
+                                    raw_depth=0, stats=stats, tag=tag)
 
     # ==================== 最终输出 ====================
 
