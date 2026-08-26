@@ -465,6 +465,13 @@ class Collector:
         self._trackers = {}
         self._trackers_lock = threading.Lock()
         self._result_queue = Queue(maxsize=RESULT_QUEUE_SIZE)
+        # 081XX：仓库完成事件分类计数（监控显示）——结果队列事件只有
+        # 两类：取样通过（_sampled_ok=True，有节点）与未取样（候选 ≤
+        # 阈值直接全量处理）。取样失败的仓库在同步路径直接黑名单，
+        # 不进结果队列。
+        self._repo_result_total = 0
+        self._repo_result_sampled = 0
+        self._repo_result_nosample = 0
         self._backpressure_active = False   # 源头背压标志（滞回，见 _backpressure）
 
         # ── 独立组件（每线程一份） ──
@@ -1051,6 +1058,10 @@ class Collector:
                     f"/无节点{self._files_no_nodes_total}"
                     f"/404:{self._files_404_total}"
                     f"/超时{self._files_timeout_total}",
+                    f"   结果队列: 待处理 {self._result_queue.qsize()}"
+                    f" | 累计 {self._repo_result_total} 仓库完成"
+                    f"（取样通过 {self._repo_result_sampled}"
+                    f"/未取样 {self._repo_result_nosample}）",
                     f"   API: 剩余 {self.quota_mgr.remaining()}/{QUOTA_MAX_PER_HOUR} | "
                     f"放行 {self.api_gate.current_rate()}/分钟 | "
                     f"clone 成功{self._clone_repos}/失败{self._clone_fail_count}"
@@ -1086,6 +1097,14 @@ class Collector:
                     f"   {self._qs()}",
                     f"   Worker: {_w}忙/{_i}闲({_r}%) | " + " | ".join(wc),
                 ]
+                # 081XX：运行统计每 30 分钟随监控块显示一次（用户确认
+                # 不做定期落盘，日志显示即可——GA 杀进程/异常结束时
+                # 也能从日志看到接近完整的运行概况）
+                if int(elapsed // 1800) > getattr(self, '_stats_round', -1):
+                    self._stats_round = int(elapsed // 1800)
+                    lines.append(
+                        f"   统计: " + " | ".join(
+                            self._run_stats_lines(elapsed)))
                 _ts = now_str()
                 _block = f"[{_ts}] " + f"\n[{_ts}] ".join(lines)
                 # 08111：高优先级通道——刷屏日志再多监控块也不丢（盲区根因）
@@ -1826,7 +1845,16 @@ class Collector:
         self._wlog(f"⏳ 等待队列清空 ({self._qs()})...")
         while True:
             if wait_full:
-                done = main_queue.qsize() == 0 and disc_queue.qsize() == 0
+                # 081XX：正常完成的完整条件——三渠道（主/发现/下载）队列
+                # + 仓库结果队列全空 + 解析内存/下载在途为 0（下载线程与
+                # 解析池全部消化完）才算任务正常完成。此前只查主/发现
+                # 队列，下载队列 9.5 万积压被忽略（08261 收尾丢弃大量
+                # 已下载未解析的文件）。runtime 检查在下方 break 兜底。
+                done = (main_queue.qsize() == 0 and disc_queue.qsize() == 0
+                        and self._dl_queue.empty()
+                        and self._result_queue.empty()
+                        and self._parsing_bytes <= 0
+                        and self._downloading_active <= 0)
             else:
                 done = (main_queue.qsize() == 0
                         and disc_queue.qsize() < SHARED_POOL_WORKERS)
@@ -2049,9 +2077,13 @@ class Collector:
 
     def _tracker_register(self, repo: str, n_files: int, mode: str = "raw",
                           tmp_dir: str = None, stats: List[int] = None,
-                          tag: str = "", branch: str = ""):
+                          tag: str = "", branch: str = "",
+                          sampled: bool = False):
         """仓库文件入队时登记（total 累加；同 repo 多来源入队合并）。
 
+        sampled（081XX）：True = 取样通过（有节点）；False = 未取样
+        （候选 ≤ 阈值直接全量处理）。随仓库完成事件传出，供监控分类
+        计数（结果队列只有这两类；取样失败的在同步路径直接黑名单）。
         文件列表不驻留：total 是数字，列表在 worker 同步段（取样→入队）
         后释放——目录列表不会在内存堆积（几千仓库 × 几 MB 会 OOM）。
         """
@@ -2063,7 +2095,7 @@ class Collector:
                 t = {"total": 0, "done": 0, "has_node": False,
                      "extracted": 0, "added": 0, "mode": mode,
                      "tmp_dir": tmp_dir, "stats": stats, "tag": tag,
-                     "branch": branch,
+                     "branch": branch, "sampled": sampled,
                      "raw_links": set(), "repo_links": set(),
                      "sub_urls": set()}
                 self._trackers[repo] = t
@@ -2147,7 +2179,14 @@ class Collector:
                     shutil.rmtree(t["tmp_dir"], ignore_errors=True)
                 except Exception:
                     pass
-            # 2. 统计：fclone 有节点仓库数（raw/partial/tree 由 process_repo
+            # 2. 仓库完成事件分类计数（081XX 监控显示）——结果队列事件
+            #    只有两类：取样通过（有节点）与未取样（候选 ≤ 阈值）
+            if t.get("sampled"):
+                self._repo_result_sampled += 1
+            else:
+                self._repo_result_nosample += 1
+            self._repo_result_total += 1
+            # 3. 统计：fclone 有节点仓库数（raw/partial/tree 由 process_repo
             #    的 repo_stats[0]>0 统计——fclone 取样节点不进 repo_stats，
             #    只在此计，两处不重复）
             #    黑名单不在本处做：取样失败的黑名单已在同步路径
@@ -2315,7 +2354,8 @@ class Collector:
     def _enqueue_downloads(self, repo, branch, files_to_check, has_nodes,
                            raw_depth, stats, tag,
                            local_paths: List[str] = None,
-                           mode: str = "raw", tmp_dir: str = None) -> bool:
+                           mode: str = "raw", tmp_dir: str = None,
+                           sampled: bool = False) -> bool:
         """把取样通过后的剩余文件全部入待下载队列（08174）。
 
         local_paths（081XX 第 3 批）：fclone 本地文件路径列表——任务带
@@ -2342,12 +2382,14 @@ class Collector:
                             # 部分入队也算登记（已入队的会走 done 计数）
                             self._tracker_register(
                                 repo, n_ok, mode=mode, tmp_dir=tmp_dir,
-                                stats=stats, tag=tag, branch=branch)
+                                stats=stats, tag=tag, branch=branch,
+                                sampled=sampled)
                             return False
                         time.sleep(0.5)
                 n_ok += 1
         self._tracker_register(repo, n_ok, mode=mode, tmp_dir=tmp_dir,
-                               stats=stats, tag=tag, branch=branch)
+                               stats=stats, tag=tag, branch=branch,
+                               sampled=sampled)
         return True
 
     def _stop_download_workers(self):
@@ -2893,13 +2935,14 @@ class Collector:
         # 081XX：调用已提前到 _dedup_batches_write_no 之后（GA 杀进程时
         # 统计不再丢失），此处保留注释说明位置变更。
 
-    def _write_run_stats(self, elapsed_seconds: float = 0):
-        """08171：运行统计落盘（_finalize 末尾调用，stdout 兜底）。"""
+    def _run_stats_lines(self, elapsed_seconds: float = 0) -> list:
+        """运行统计行（081XX：_write_run_stats 落盘与监控块每 30 分钟
+        显示共用一份——统计内容单点维护，两处展示不漂移）。"""
         sk = self._skip_counts
         _tags = " ".join(f"{k[1:-1]}={v}" for k, v in
                          sorted(self._tag_counts.items(),
                                 key=lambda kv: -kv[1]))
-        _lines = [
+        return [
             f"运行统计 {now_str()}",
             f"总耗时: {elapsed_seconds:.0f}s",
             f"节点: 唯一{self._final_node_count} 提取{self._total_parsed_nodes}"
@@ -2935,6 +2978,10 @@ class Collector:
             f" ({', '.join(self._quota_exhausted_times)}) UTC"
             if self._quota_exhausted_times else "配额耗尽: 0 次",
         ]
+
+    def _write_run_stats(self, elapsed_seconds: float = 0):
+        """08171：运行统计落盘（_finalize 提前调用，stdout 兜底）。"""
+        _lines = self._run_stats_lines(elapsed_seconds)
         try:
             os.makedirs("stats", exist_ok=True)
             with open("stats/run_stats.txt", "w", encoding="utf-8") as f:
@@ -3706,7 +3753,7 @@ class Collector:
         if _sampled_ok:
             has_nodes[0] = True
         self._enqueue_downloads(repo, branch, files_to_check, has_nodes,
-                                raw_depth, stats, tag)
+                                raw_depth, stats, tag, sampled=_sampled_ok)
         return True
 
     def _record_clone(self, repo: str, size_kb: int, time_s: float,
@@ -4004,7 +4051,8 @@ class Collector:
             _dl_total = sum(f[2] for f in _files)
             self._enqueue_downloads(
                 repo, "HEAD", _files, _has, raw_depth=0, stats=[0, 0],
-                tag="[全量]", local_paths=_lps, mode="fclone", tmp_dir=tmp)
+                tag="[全量]", local_paths=_lps, mode="fclone", tmp_dir=tmp,
+                sampled=_sampled_ok)
             _async_kept = True  # tmp 交给仓库完成事件删除
             _now = time.time()
             self._full_clone_60s.append((_now, _size_mb))
@@ -4496,58 +4544,36 @@ class Collector:
             self._tracker_file_done(repo, False, 0, 0)
             return  # 下载失败 → 不标记（下次重试）
 
-        # 读取内容（surrogate 字符兼容）
-        content = None
-        try:
-            content = content_bytes.decode('utf-8', errors='replace')
-        except Exception:
-            try:
-                content = content_bytes.decode('latin-1', errors='replace')
-            except Exception:
-                pass
-
-        if content is None:
-            return  # 解码失败 → 不标记（下次重试）
-
-        # 清洗 surrogate 字符：urllib.parse.quote() 无法处理 \ud800-\udfff
-        # Python 3 正则引擎不匹配 surrogate（非法 Unicode），改用 encode/decode
-        content = content.encode('utf-8', errors='surrogatepass').decode('utf-8', errors='replace')
-
-        content_size_mb = len(content) / 1024 / 1024
-        # 累计解析文件统计（监控显示）
-        self._total_parsed_files += 1
-        self._total_parsed_mb += content_size_mb
-        # 08133：近 60s 解析窗口（监控读取时清理，防旧数据残留）
-        self._parsed_60s.append((time.time(), content_size_mb))
-        if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
-            self._wlog(f"📄 {raw_url} ⚠️ 文件过大 "
-                  f"({content_size_mb:.1f}MB)，跳过")
-            return  # 跳过但可能是间歇性问题 → 不标记
-
-        # 提取节点（使用新的协议解析层）
-        # OOM 诊断：记录正在解析的文件数与最大大小（监控显示，
-        # 08084 内存 100% 时需确认是否解析线程持有大文件）。
-        self._parsing_active += 1
-        with self._state_lock:
-            # 08111：实时集合替代历史峰值——监控"最大"不再误导
-            self._parsing_sizes.add(content_size_mb)
-
-        # 08174：解析 + 后续处理统一走 _submit_parse_task（提交共享解析
-        # 线程池/进程池；wait=True 同步等结果（取样门禁），wait=False
-        # 回调处理不阻塞（下载线程异步管道）。看门狗在提交时开始计时。
+        # 081XX：不再主进程 decode——bytes 直接提交，decode/surrogate
+        # 清洗/链接提取全部在子进程 extract 里做（主进程 GIL 减负；
+        # pickle bytes 比 str 小 3 倍且更快——08261 CPU 50% 的结构性
+        # 瓶颈之一）。解析 + 后续处理统一走 _submit_parse_task（提交
+        # 共享线程池/进程池；wait=True 同步等结果（取样门禁），
+        # wait=False 回调处理不阻塞（下载线程异步管道）。看门狗在提交
+        # 时开始计时。
+        # 统计/计数（_total_parsed_files/_parsed_60s/_parsing_active/
+        # _parsing_sizes）已全部收敛到 _submit_parse_task 单点——此前
+        # _handle_one_file 残留一份旧段造成双重计数 + _parsing_active
+        # 泄漏（08261 监控"解析: 队列 99907"假积压的根因，08174 迁移
+        # 残留，已清理）。
         self._submit_parse_task(
             repo, branch, file_path, sha, has_nodes, raw_depth, stats, tag,
-            content, raw_url, _dl_s, size,
+            content_bytes, raw_url, _dl_s, size,
             content_bytes_preloaded=content_bytes_preloaded,
             wait=not async_mode)
 
         # （解析 + 后续处理已移至 _submit_parse_task，08174）
 
     def _submit_parse_task(self, repo, branch, file_path, sha, has_nodes,
-                           raw_depth, stats, tag, content, raw_url,
+                           raw_depth, stats, tag, content_bytes, raw_url,
                            _dl_s, size, content_bytes_preloaded=None,
                            wait: bool = True):
-        """解析 + 后续处理（过滤/去重/入buffer/递归发现/订阅嗅探）。
+        """解析 + 后续处理（过滤/去重/入buffer/链接提取/记账）。
+
+        content_bytes（081XX）：bytes 直接提交——decode/surrogate 清洗/
+        链接提取全部在子进程 extract 里做（主进程 GIL 减负、pickle bytes
+        比 str 小 3 倍）；extract 返回 (proxies, raw_links, repo_links,
+        sub_urls) 四元组，主进程回调只做轻量过滤/入 buffer/记账。
 
         08174 异步管道改造：
           - 小文件解析提交共享线程池（PARSE_THREAD_POOL_SIZE=32）——
@@ -4560,13 +4586,14 @@ class Collector:
             PARSE_WATCHDOG_SECONDS 未完成 → 监控线程信号转储线程栈
             （只打印不取消——大文件解析几分钟正常）。
         """
-        content_size_mb = len(content) / 1024 / 1024
-        # 累计解析文件统计（监控显示）
+        content_size_mb = len(content_bytes) / 1024 / 1024
+        # 累计解析文件统计（监控显示）——081XX：本函数是唯一统计点
+        # （_handle_one_file 的残留旧段已删，双重计数/泄漏已清理）
         self._total_parsed_files += 1
         self._total_parsed_mb += content_size_mb
         # 08133：近 60s 解析窗口（监控读取时清理，防旧数据残留）
         self._parsed_60s.append((time.time(), content_size_mb))
-        if MAX_FILE_SIZE is not None and len(content) > MAX_FILE_SIZE:
+        if MAX_FILE_SIZE is not None and len(content_bytes) > MAX_FILE_SIZE:
             self._wlog(f"📄 {raw_url} ⚠️ 文件过大 "
                   f"({content_size_mb:.1f}MB)，跳过")
             return  # 跳过但可能是间歇性问题 → 不标记
@@ -4581,8 +4608,9 @@ class Collector:
 
         # 08174：内存预算按字节估算——旧版用 len(str) 字符数当字节（中文
         # 1 字符占 3 字节，预算 2048 实际对应 4-6GB 内存，08191 实测 11GB
-        # 的推手之一）。UTF-8 最坏 3 字节/字符，×3 保守估算（宁多算不少算）。
-        _content_bytes = len(content) * 3
+        # 的推手之一）。081XX：bytes 提交后 len 即真实字节数（不再 ×3
+        # 保守估算——×3 是 str 字符数的兜底，bytes 直接精确）。
+        _content_bytes = len(content_bytes)
 
         # 内存预算控制（08104：64-120 文件并发解析，content 占满 11GB）：
         # 解析前检查"解析中"的 content 总大小，超预算则等待
@@ -4626,7 +4654,25 @@ class Collector:
                     self._pool_wd_queue.put(("start", _wd_key, time.time()))
                 except Exception:
                     pass
-            return extract_all_strategies(content)
+            # 081XX：decode/surrogate 清洗/链接提取全部在子进程做
+            # （bytes 提交，主进程 GIL 减负；原 _handle_one_file 的
+            # decode 段与 _postprocess 的链接提取 regex 一并移入）。
+            # errors='replace' 容错（原 latin-1 兜底由 replace 覆盖）。
+            _text = content_bytes.decode('utf-8', errors='replace')
+            try:
+                _text = _text.encode('utf-8', errors='surrogatepass') \
+                    .decode('utf-8', errors='replace')
+            except Exception:
+                pass
+            _proxies = extract_all_strategies(_text)
+            # 链接提取（regex 也是 CPU 活，移子进程；入队/嗅探仍由
+            # work 在仓库完成事件时执行——解析回调瘦身不变）
+            if ENABLE_RAW_RECURSIVE and self._should_trace(tag) \
+                    and self.recursive_count < MAX_RECURSIVE_REPOS:
+                _rl, _rpl, _sul = self._extract_links(_text)
+            else:
+                _rl, _rpl, _sul = set(), set(), set()
+            return _proxies, _rl, _rpl, _sul
 
         def _release_parse_state(_ex_t0):
             """解析任务收尾：释放计数/预算/看门狗/耗时记录（两种路径共用）。"""
@@ -4649,8 +4695,12 @@ class Collector:
                                      round(content_size_mb, 1)))
             self._file_times_total += 1
 
-        def _postprocess(proxies, _ex_t0):
-            """解析完成后的后续处理（原 _handle_one_file 尾段）。"""
+        def _postprocess(proxies, _rl, _rpl, _sul, _ex_t0):
+            """解析完成后的后续处理（原 _handle_one_file 尾段）。
+
+            081XX：链接（raw/repo/sub）由 extract 在子进程提取后随结果
+            返回（bytes 提交的一部分），本函数只做轻量 set 写入记账器。
+            """
             _release_parse_state(_ex_t0)
 
             # ---- 过滤 + 批次内去重 + 入 buffer（线程安全） ----
@@ -4746,21 +4796,19 @@ class Collector:
                 with self._batch_flush_lock:
                     self._flush_batch()
 
-            # ---- 081XX 第 3 批：递归发现/订阅嗅探改"提取到记账器" ----
-            # 原在此处直接入队递归仓库 + HTTP 拉取订阅（占解析回调资源；
-            # 嗅探 HTTP 8-15s 阻塞解析线程）。现只提取链接（纯 regex，
-            # 毫秒级）到仓库记账器 set，入队/拉取由 work 在仓库完成事件
-            # 时执行（_handle_repo_result）——解析回调瘦身。
-            if ENABLE_RAW_RECURSIVE and self._should_trace(tag) \
-                    and self.recursive_count < MAX_RECURSIVE_REPOS:
-                _rl, _rpl, _sul = self._extract_links(content)
+            # ---- 081XX：链接写入记账器 ----
+            # extract 在子进程已提取链接（decode 随 bytes 提交移入子进程，
+            # regex 提取也是 CPU 活，一并移入），这里只做 set 写入；
+            # 入队/嗅探由 work 在仓库完成事件时执行（_handle_repo_result）
+            # ——解析回调只做轻量操作。
+            if _rl or _rpl or _sul:
                 with self._trackers_lock:
                     _t = self._trackers.get(repo)
                     if _t is not None:
                         _t["raw_links"].update(_rl)
                         _t["repo_links"].update(_rpl)
                         _t["sub_urls"].update(_sul)
-            # 081XX：记账器文件完成（done==total → 发仓库完成事件 → work
+            # 记账器文件完成（done==total → 发仓库完成事件 → work
             # 处理黑名单/统计/删 tmp/递归入队/订阅嗅探）。同步路径（取样）
             # 的文件没注册过 tracker → no-op。
             self._tracker_file_done(repo, has_node=has_nodes[0],
@@ -4790,8 +4838,8 @@ class Collector:
                 future = self._parse_pool.submit(extract)
             else:
                 # 无池可用 → 直接执行（同线程）
-                proxies = extract()
-                _postprocess(proxies, _ex_t0)
+                _res = extract()
+                _postprocess(_res[0], _res[1], _res[2], _res[3], _ex_t0)
                 return
         except Exception:
             _release_parse_state(_ex_t0)
@@ -4800,26 +4848,33 @@ class Collector:
         if wait:
             # 同步路径（取样/全量 clone 门禁）：等待结果再后续处理
             try:
-                proxies = future.result(timeout=FILE_PROCESS_TIMEOUT)
+                _res = future.result(timeout=FILE_PROCESS_TIMEOUT)
             except FutureTimeoutError:
                 self._wlog(f"⚠️ 文件处理超时，跳过 {raw_url}")
                 _release_parse_state(_ex_t0)
-                # 081XX：超时跳过也算仓库文件终结（done 计数）
+                # 081XX：超时 = 未知（非"无节点"）——置 has_nodes[0]=True，
+                # 防取样路径把超时仓库误判"全无节点"而黑名单（08261 的
+                # 245 次取样超时 ≈ 245 个仓库被误杀、任务源枯竭、后期
+                # CPU 空转的根因）。宁可继续处理不可误杀（与 08133
+                # "24h 无新文件 ≠ 无节点"同一安全侧）。
+                has_nodes[0] = True
                 self._tracker_file_done(repo, False, 0, 0)
                 return
             except Exception:
                 _release_parse_state(_ex_t0)
+                # 081XX：解析异常同"未知"，不误判无节点
+                has_nodes[0] = True
                 self._tracker_file_done(repo, False, 0, 0)
                 return
-            _postprocess(proxies, _ex_t0)
+            _postprocess(_res[0], _res[1], _res[2], _res[3], _ex_t0)
         else:
             # 异步路径（下载线程）：回调处理，不阻塞下载线程
             def _done(fut):
                 try:
-                    _proxies = fut.result(timeout=0)
+                    _res = fut.result(timeout=0)
                 except Exception:
-                    _proxies = []
-                _postprocess(_proxies, _ex_t0)
+                    _res = ([], set(), set(), set())
+                _postprocess(_res[0], _res[1], _res[2], _res[3], _ex_t0)
             try:
                 future.add_done_callback(_done)
             except Exception:

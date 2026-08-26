@@ -756,15 +756,20 @@ GATE_STALL_TIMEOUT_SECONDS = 90
 # 收尾时等下载队列清空的超时（秒）：_stop_download_workers 等队列空。
 # 08241 实测：积压 5.5 万文件，join() 无超时 → 收尾卡 ~25 分钟，
 # 拖到 GA 6h 上限被杀，_finalize 的统计/缓存（最后步骤）被截断。
-# 60s 超时后放弃剩余任务：已解析分片已落盘（不丢），未解析文件
-# SHA 未写缓存（下次运行重抓），数据安全。
-DOWNLOAD_DRAIN_TIMEOUT_SECONDS = 60
+# 081XX 修正 60→30s：收尾链路总预算 = SIGTERM 的 120s 兜底
+# （main.py），join worker 20s + drain 30s = 50s，给 _finalize 留
+# ~70s（否则 _finalize 被 os._exit 截断，stats/run_stats.txt 丢失——
+# 08252 实测统计缺失的根因）。超时后放弃剩余任务：已解析分片已
+# 落盘（不丢），未解析文件 SHA 未写缓存（下次运行重抓），数据安全。
+DOWNLOAD_DRAIN_TIMEOUT_SECONDS = 30
 
 # 收尾时 join worker 的超时（秒）：5.5h 自动终止后等 worker 退出。
 # 终止时 worker 可能卡在当前仓库（future.result 300s / clone / 下载），
-# 死等会拖到 GA 上限。60s 超时后直接进 _finalize——worker 是 daemon
-# 线程，main.py 最后 os._exit(0) 兜底强杀残留。
-WORKER_JOIN_TIMEOUT_SECONDS = 60
+# 死等会拖到 GA 上限。081XX 修正 60→20s（与 drain 30s 合计 50s，
+# 给 _finalize 留 ~70s，见 DOWNLOAD_DRAIN_TIMEOUT_SECONDS 注释）。
+# 超时后直接进 _finalize——worker 是 daemon 线程，main.py 最后
+# os._exit(0) 兜底强杀残留。
+WORKER_JOIN_TIMEOUT_SECONDS = 20
 
 # 看门狗/OOM 线程栈转储落盘文件：faulthandler 转储写 stderr 会被 GA
 # 日志管道丢弃（08192 的 44 次看门狗转储全丢失，看不到卡在哪个正则）。
@@ -891,8 +896,11 @@ DOWNLOAD_THROTTLE_SECONDS = 60
 # 解析永远只用 1 核（08104 实测 64 线程并发也仅 50% CPU）。多进程每个
 # 进程独立 GIL，真正用满多核。2 核机器建议 2；content 经 pickle 传递
 # （内存×2，~186MB/93MB 文件），配合 DOWNLOAD_MEMORY_BUDGET_MB 封顶。
+# 081XX：4→6——2 核物理上限下，进程数略多于核数让"等 pickle 传输"
+# 的间隙被利用（子进程管道 I/O 等待时让出 CPU）；大文件占位时冗余
+# 进程并行小文件。内存：6 子进程 × 各自任务副本，仍受 2GB 预算管控。
 # 影响：只影响解析速度与内存峰值，不影响正确性。可随时调整。
-EXTRACT_PROCESSES = 4
+EXTRACT_PROCESSES = 6
 
 # 进程池排队降级阈值（08174）：进程池排队任务数 > 此值 → 新大文件改
 # 线程解析（进程池被大文件占死、小文件进不去时，让池轮转起来）。
