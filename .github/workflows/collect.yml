@@ -1,7 +1,8 @@
 name: 节点搜集
 on:
-  schedule:
-    - cron: '37 14 * * *'   # UTC 14:37 → 北京时间 22:37
+  # 081XX：去掉 cron 定时——每天 6h 的定时任务触发 GA 滥用检测导致账户
+  # 禁用（"GitHub Actions is currently disabled"）。改为纯手动触发：
+  # GitHub 仓库 → Actions → 节点搜集 → Run workflow。
   workflow_dispatch:
 
 jobs:
